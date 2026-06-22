@@ -1,7 +1,6 @@
-import { ConnectSitecoreForm } from "@/components/landing/ConnectSitecoreForm";
 import { Header } from "@/components/landing/Header";
 import { Hero } from "@/components/landing/Hero";
-import { WorkflowPhases } from "@/components/landing/WorkflowPhases";
+import { WorkflowTabs } from "@/components/workflow/WorkflowTabs";
 
 export default function Home() {
   return (
@@ -9,8 +8,7 @@ export default function Home() {
       <Header />
       <main className="mx-auto flex w-full max-w-6xl flex-col gap-12 px-6 py-10 lg:px-8 lg:py-14">
         <Hero />
-        <ConnectSitecoreForm />
-        <WorkflowPhases />
+        <WorkflowTabs />
       </main>
       <footer className="border-t border-zinc-200 bg-white px-6 py-6 text-center text-xs text-zinc-500">
         MigrateX performs read-only Sitecore operations until you explicitly

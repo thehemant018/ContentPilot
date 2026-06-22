@@ -1,17 +1,20 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { SitecoreConnectionResult } from "@/types/sitecore";
 import type { StoredSitecoreSession } from "@/types/sitecore";
 import {
-  clearSession,
   formatExpiry,
   getStoredSession,
   isSessionExpired,
   saveSession,
 } from "@/lib/storage/sitecore-session";
+import { disconnectSitecore } from "@/lib/sitecore/disconnect";
+import { advanceToWorkflowPhase } from "@/lib/workflow/progress";
 
-export function ConnectSitecoreForm() {
+const AUTO_ADVANCE_DELAY_MS = 3000;
+
+export function ConnectSitecoreForm({ embedded = false }: { embedded?: boolean }) {
   const [instanceUrl, setInstanceUrl] = useState("");
   const [clientId, setClientId] = useState("");
   const [clientSecret, setClientSecret] = useState("");
@@ -21,6 +24,7 @@ export function ConnectSitecoreForm() {
     message: string;
   } | null>(null);
   const [session, setSession] = useState<StoredSitecoreSession | null>(null);
+  const advanceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const stored = getStoredSession();
@@ -28,6 +32,12 @@ export function ConnectSitecoreForm() {
       setSession(stored);
       setInstanceUrl(stored.instanceUrl);
     }
+
+    return () => {
+      if (advanceTimeoutRef.current) {
+        clearTimeout(advanceTimeoutRef.current);
+      }
+    };
   }, []);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -62,8 +72,16 @@ export function ConnectSitecoreForm() {
       setClientSecret("");
       setFeedback({
         type: "success",
-        message: result.message,
+        message: `${result.message} Moving to Discovery in 3 seconds…`,
       });
+
+      if (advanceTimeoutRef.current) {
+        clearTimeout(advanceTimeoutRef.current);
+      }
+
+      advanceTimeoutRef.current = setTimeout(() => {
+        advanceToWorkflowPhase("discovery");
+      }, AUTO_ADVANCE_DELAY_MS);
     } catch {
       setFeedback({
         type: "error",
@@ -75,7 +93,12 @@ export function ConnectSitecoreForm() {
   }
 
   function handleDisconnect() {
-    clearSession();
+    if (advanceTimeoutRef.current) {
+      clearTimeout(advanceTimeoutRef.current);
+      advanceTimeoutRef.current = null;
+    }
+
+    disconnectSitecore();
     setSession(null);
     setClientId("");
     setClientSecret("");
@@ -87,10 +110,16 @@ export function ConnectSitecoreForm() {
 
   const hasValidSession = session && !isSessionExpired(session);
 
+  const Wrapper = embedded ? "div" : "section";
+
   return (
-    <section
-      id="connect"
-      className="w-full scroll-mt-24 rounded-2xl border border-violet-200 bg-white p-6 shadow-sm ring-1 ring-violet-100"
+    <Wrapper
+      id={embedded ? undefined : "connect"}
+      className={
+        embedded
+          ? "w-full"
+          : "w-full scroll-mt-24 rounded-2xl border border-violet-200 bg-white p-6 shadow-sm ring-1 ring-violet-100"
+      }
     >
       <div className="flex items-start justify-between gap-4">
         <div>
@@ -224,6 +253,6 @@ export function ConnectSitecoreForm() {
           )}
         </div>
       </form>
-    </section>
+    </Wrapper>
   );
 }
