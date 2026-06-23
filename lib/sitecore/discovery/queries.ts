@@ -28,6 +28,55 @@ export const VALIDATE_PATH_QUERY = `
   }
 `;
 
+export const SEARCH_MEDIA_QUERY = `
+  query MigrateXSearchMedia(
+    $rootItemId: String!
+    $templateName: String!
+    $first: Int!
+    $after: String
+  ) {
+    search(
+      where: {
+        AND: [
+          { name: "_path", operator: CONTAINS, value: $rootItemId }
+          { name: "_templatename", operator: EQ, value: $templateName }
+        ]
+      }
+      first: $first
+      after: $after
+    ) {
+      pageInfo {
+        endCursor
+        hasNext
+      }
+      results {
+        id
+        name
+        path
+      }
+    }
+  }
+`;
+
+export const LIST_MEDIA_CHILDREN_QUERY = `
+  query MigrateXListMediaChildren($path: String!) {
+    item(where: { path: $path }) {
+      children {
+        nodes {
+          itemId
+          name
+          path
+          hasChildren
+          template {
+            name
+            templateId
+          }
+        }
+      }
+    }
+  }
+`;
+
 export const SEARCH_UNDER_PATH_QUERY = `
   query MigrateXSearchUnderPath($path: String!, $pageSize: Int!, $pageIndex: Int!) {
     search(

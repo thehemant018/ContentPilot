@@ -4,6 +4,9 @@ interface DiscoveryResultsProps {
   result: DiscoveryResult;
 }
 
+const SCROLL_PANEL_CLASS =
+  "mt-3 max-h-80 overflow-y-auto overscroll-contain pr-1 [scrollbar-gutter:stable]";
+
 function PathValidationSummary({
   result,
 }: {
@@ -57,8 +60,8 @@ function ItemList({
   emptyMessage: string;
 }) {
   return (
-    <div className="rounded-xl border border-zinc-200 bg-white p-4">
-      <div className="flex items-center justify-between gap-2">
+    <div className="flex max-h-96 flex-col rounded-xl border border-zinc-200 bg-white p-4">
+      <div className="flex shrink-0 items-center justify-between gap-2">
         <h4 className="text-sm font-semibold text-zinc-900">{title}</h4>
         <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-600">
           {items.length}
@@ -68,7 +71,7 @@ function ItemList({
       {items.length === 0 ? (
         <p className="mt-3 text-sm text-zinc-500">{emptyMessage}</p>
       ) : (
-        <ul className="mt-3 max-h-64 space-y-2 overflow-y-auto">
+        <ul className={`${SCROLL_PANEL_CLASS} space-y-2`}>
           {items.map((item) => (
             <li
               key={item.path}
@@ -109,8 +112,8 @@ export function DiscoveryResults({ result }: DiscoveryResultsProps) {
             />
           </div>
 
-          <div className="rounded-xl border border-zinc-200 bg-white p-4">
-            <div className="flex items-center justify-between gap-2">
+          <div className="flex max-h-[32rem] flex-col rounded-xl border border-zinc-200 bg-white p-4">
+            <div className="flex shrink-0 items-center justify-between gap-2">
               <h4 className="text-sm font-semibold text-zinc-900">
                 Templates &amp; field definitions
               </h4>
@@ -124,7 +127,7 @@ export function DiscoveryResults({ result }: DiscoveryResultsProps) {
                 No template definitions found under the provided path.
               </p>
             ) : (
-              <div className="mt-4 space-y-4">
+              <div className="mt-3 min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain pr-1 [scrollbar-gutter:stable]">
                 {result.templates.map((template) => (
                   <article
                     key={template.path}
@@ -140,33 +143,37 @@ export function DiscoveryResults({ result }: DiscoveryResultsProps) {
                         No fields found for this template.
                       </p>
                     ) : (
-                      <table className="mt-3 w-full text-left text-xs">
-                        <thead>
-                          <tr className="border-b border-zinc-200 text-zinc-500">
-                            <th className="py-1 pr-3 font-medium">Section</th>
-                            <th className="py-1 pr-3 font-medium">Field</th>
-                            <th className="py-1 font-medium">Type</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {template.fields.map((field) => (
-                            <tr
-                              key={`${template.path}-${field.section}-${field.name}`}
-                              className="border-b border-zinc-100 last:border-0"
-                            >
-                              <td className="py-1.5 pr-3 text-zinc-600">
-                                {field.section}
-                              </td>
-                              <td className="py-1.5 pr-3 font-medium text-zinc-800">
-                                {field.name}
-                              </td>
-                              <td className="py-1.5 text-zinc-600">
-                                {field.type}
-                              </td>
+                      <div className="mt-3 overflow-x-auto rounded-md border border-zinc-200 bg-white">
+                        <table className="w-full min-w-[28rem] text-left text-xs">
+                          <thead className="bg-zinc-50">
+                            <tr className="border-b border-zinc-200 text-zinc-500">
+                              <th className="py-2 pr-3 pl-3 font-medium">
+                                Section
+                              </th>
+                              <th className="py-2 pr-3 font-medium">Field</th>
+                              <th className="py-2 pr-3 font-medium">Type</th>
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                          </thead>
+                          <tbody>
+                            {template.fields.map((field) => (
+                              <tr
+                                key={`${template.path}-${field.section}-${field.name}`}
+                                className="border-b border-zinc-100 last:border-0"
+                              >
+                                <td className="py-1.5 pr-3 pl-3 text-zinc-600">
+                                  {field.section}
+                                </td>
+                                <td className="py-1.5 pr-3 font-medium text-zinc-800">
+                                  {field.name}
+                                </td>
+                                <td className="py-1.5 pr-3 text-zinc-600">
+                                  {field.type}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
                     )}
                   </article>
                 ))}
