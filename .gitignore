@@ -39,3 +39,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local migration exports (generated from Review phase)
+/data/migrations/
+/data/latest.json
