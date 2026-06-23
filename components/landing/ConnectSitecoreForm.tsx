@@ -27,11 +27,13 @@ export function ConnectSitecoreForm({ embedded = false }: { embedded?: boolean }
   const advanceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    const stored = getStoredSession();
-    if (stored) {
-      setSession(stored);
-      setInstanceUrl(stored.instanceUrl);
-    }
+    queueMicrotask(() => {
+      const stored = getStoredSession();
+      if (stored) {
+        setSession(stored);
+        setInstanceUrl(stored.instanceUrl);
+      }
+    });
 
     return () => {
       if (advanceTimeoutRef.current) {

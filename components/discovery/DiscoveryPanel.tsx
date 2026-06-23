@@ -74,7 +74,9 @@ export function DiscoveryPanel({ embedded = false }: { embedded?: boolean }) {
   }
 
   useEffect(() => {
-    refreshConnectionState();
+    queueMicrotask(() => {
+      refreshConnectionState();
+    });
 
     function handleSessionChange() {
       refreshConnectionState();
@@ -91,7 +93,9 @@ export function DiscoveryPanel({ embedded = false }: { embedded?: boolean }) {
 
   useEffect(() => {
     if (isConnected) {
-      void loadSites();
+      queueMicrotask(() => {
+        void loadSites();
+      });
     }
   }, [isConnected]);
 
