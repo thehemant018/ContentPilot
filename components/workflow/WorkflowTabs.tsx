@@ -51,13 +51,15 @@ export function WorkflowTabs() {
   );
 
   useEffect(() => {
-    setHydrated(true);
-    refreshProgress();
-    const defaultTab = getDefaultPhaseFromHash();
-    setActiveTab(defaultTab);
-    if (window.location.hash.replace("#", "") !== defaultTab) {
-      window.history.replaceState(null, "", `#${defaultTab}`);
-    }
+    queueMicrotask(() => {
+      setHydrated(true);
+      refreshProgress();
+      const defaultTab = getDefaultPhaseFromHash();
+      setActiveTab(defaultTab);
+      if (window.location.hash.replace("#", "") !== defaultTab) {
+        window.history.replaceState(null, "", `#${defaultTab}`);
+      }
+    });
 
     function handleHashChange() {
       const tab = getDefaultPhaseFromHash();
