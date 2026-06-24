@@ -1,3 +1,4 @@
+import { clearContentMigrationData } from "@/lib/storage/workflow-data";
 import { SESSION_CHANGED_EVENT, STORAGE_KEYS } from "@/lib/sitecore/constants";
 import {
   getStoredSession,
@@ -10,6 +11,9 @@ import {
 } from "@/lib/workflow/phases";
 
 export const WORKFLOW_PROGRESS_EVENT = "migratex-workflow-progress-changed";
+export const CONTENT_MIGRATION_RESET_EVENT =
+  "migratex-content-migration-reset";
+export const MIGRATION_EXPORT_EVENT = "migratex-migration-export-updated";
 
 function getPhaseIndex(phaseId: WorkflowPhaseId): number {
   return WORKFLOW_PHASES.findIndex((phase) => phase.id === phaseId);
@@ -127,6 +131,40 @@ export function resetWorkflowProgress(): void {
   window.dispatchEvent(new Event(WORKFLOW_PROGRESS_EVENT));
 }
 
+export function getMigrationCycleId(): number {
+  if (typeof window === "undefined") {
+    return 0;
+  }
+
+  const raw = localStorage.getItem(STORAGE_KEYS.migrationCycleId);
+  const parsed = raw ? Number.parseInt(raw, 10) : 0;
+  return Number.isNaN(parsed) ? 0 : parsed;
+}
+
+/** Reset crawl → migrate phases so the user can migrate another component. */
+export function startNewContentMigration(): void {
+  const crawlIndex = getPhaseIndex("crawl");
+  if (crawlIndex < 0) {
+    return;
+  }
+
+  clearContentMigrationData();
+  clearCrawlPhaseComplete();
+  clearAiMatchPhaseComplete();
+  clearReviewPhaseComplete();
+  clearMigratePhaseComplete();
+
+  localStorage.setItem(STORAGE_KEYS.workflowFurthestPhase, String(crawlIndex));
+  localStorage.setItem(
+    STORAGE_KEYS.migrationCycleId,
+    String(getMigrationCycleId() + 1),
+  );
+
+  window.dispatchEvent(new Event(WORKFLOW_PROGRESS_EVENT));
+  window.dispatchEvent(new Event(CONTENT_MIGRATION_RESET_EVENT));
+  window.location.hash = "crawl";
+}
+
 export function isPhaseComplete(phaseId: WorkflowPhaseId): boolean {
   if (phaseId === "auth") {
     return isAuthPhaseComplete();
@@ -155,6 +193,22 @@ export function getCompletedPhaseIds(): WorkflowPhaseId[] {
   );
 }
 
+export function canReturnToReviewForEditing(): boolean {
+  return isReviewPhaseComplete() && !isMigratePhaseComplete();
+}
+
+export function returnToReviewPhase(): void {
+  if (!canReturnToReviewForEditing()) {
+    return;
+  }
+
+  window.location.hash = "review";
+}
+
+export function notifyMigrationExportUpdated(): void {
+  window.dispatchEvent(new Event(MIGRATION_EXPORT_EVENT));
+}
+
 export function canNavigateToPhase(
   phaseId: WorkflowPhaseId,
   furthestIndex: number,
@@ -167,6 +221,9 @@ export function canNavigateToPhase(
   }
 
   if (index < furthestIndex) {
+    if (phaseId === "review" && canReturnToReviewForEditing()) {
+      return true;
+    }
     return false;
   }
 

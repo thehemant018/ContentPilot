@@ -15,8 +15,11 @@ import {
 } from "@/lib/workflow/phases";
 import {
   canNavigateToPhase,
+  canReturnToReviewForEditing,
+  CONTENT_MIGRATION_RESET_EVENT,
   getDefaultPhaseFromHash,
   getFurthestPhaseIndex,
+  getMigrationCycleId,
   isPhaseComplete,
   setFurthestPhaseIndex,
   subscribeWorkflowProgress,
@@ -30,10 +33,12 @@ export function WorkflowTabs() {
   const [hydrated, setHydrated] = useState(false);
   const [activeTab, setActiveTab] = useState<WorkflowPhaseId>("auth");
   const [furthestIndex, setFurthestIndex] = useState(0);
+  const [migrationCycleId, setMigrationCycleId] = useState(0);
   const [, setProgressVersion] = useState(0);
 
   const refreshProgress = useCallback(() => {
     setFurthestIndex(getFurthestPhaseIndex());
+    setMigrationCycleId(getMigrationCycleId());
     setProgressVersion((value) => value + 1);
   }, []);
 
@@ -77,6 +82,20 @@ export function WorkflowTabs() {
 
   useEffect(() => subscribeWorkflowProgress(refreshProgress), [refreshProgress]);
 
+  useEffect(() => {
+    function handleMigrationReset() {
+      refreshProgress();
+      setActiveTab("crawl");
+    }
+
+    window.addEventListener(CONTENT_MIGRATION_RESET_EVENT, handleMigrationReset);
+    return () =>
+      window.removeEventListener(
+        CONTENT_MIGRATION_RESET_EVENT,
+        handleMigrationReset,
+      );
+  }, [refreshProgress]);
+
   const activePhase = WORKFLOW_PHASES.find((phase) => phase.id === activeTab)!;
 
   return (
@@ -86,8 +105,8 @@ export function WorkflowTabs() {
           Migration workflow
         </h2>
         <p className="mt-1 text-sm text-zinc-600">
-          Complete each phase in order. Finished steps show a checkmark and
-          cannot be reopened.
+          Complete each phase in order. From AI Match onward you can return to
+          Crawl anytime to work on a different page.
         </p>
       </div>
 
@@ -104,7 +123,12 @@ export function WorkflowTabs() {
             const isDisabled = hydrated
               ? !canNavigateToPhase(phase.id, furthestIndex)
               : phase.id !== "auth";
-            const isPreviousStep = hydrated && phaseIndex < furthestIndex;
+            const canEditReview =
+              hydrated &&
+              phase.id === "review" &&
+              canReturnToReviewForEditing();
+            const isPreviousStep =
+              hydrated && phaseIndex < furthestIndex && !canEditReview;
 
             return (
               <button
@@ -117,13 +141,15 @@ export function WorkflowTabs() {
                 aria-disabled={isDisabled}
                 disabled={isDisabled}
                 title={
-                  isPreviousStep
-                    ? "This step is already completed"
-                    : isDisabled && !phase.available
-                      ? "Coming soon"
-                      : isDisabled
-                        ? "Complete the previous phase first"
-                        : undefined
+                  canEditReview
+                    ? "Edit migration queue before pushing"
+                    : isPreviousStep
+                      ? "This step is already completed"
+                      : isDisabled && !phase.available
+                        ? "Coming soon"
+                        : isDisabled
+                          ? "Complete the previous phase first"
+                          : undefined
                 }
                 onClick={() => selectTab(phase.id)}
                 className={`flex shrink-0 items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors ${
@@ -171,10 +197,18 @@ export function WorkflowTabs() {
               >
                 {phase.id === "auth" && <ConnectSitecoreForm embedded />}
                 {phase.id === "discovery" && <DiscoveryPanel embedded />}
-                {phase.id === "crawl" && <CrawlPanel embedded />}
-                {phase.id === "ai-match" && <AiMatchPanel embedded />}
-                {phase.id === "review" && <ReviewPanel embedded />}
-                {phase.id === "migrate" && <MigratePanel embedded />}
+                {phase.id === "crawl" && (
+                  <CrawlPanel key={`crawl-${migrationCycleId}`} embedded />
+                )}
+                {phase.id === "ai-match" && (
+                  <AiMatchPanel key={`ai-match-${migrationCycleId}`} embedded />
+                )}
+                {phase.id === "review" && (
+                  <ReviewPanel key={`review-${migrationCycleId}`} embedded />
+                )}
+                {phase.id === "migrate" && (
+                  <MigratePanel key={`migrate-${migrationCycleId}`} embedded />
+                )}
                 {phase.id !== "auth" &&
                   phase.id !== "discovery" &&
                   phase.id !== "crawl" &&

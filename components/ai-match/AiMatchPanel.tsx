@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { MatchResults } from "@/components/ai-match/MatchResults";
 import { NextPhaseButton } from "@/components/workflow/NextPhaseButton";
+import { ReturnToCrawlBanner } from "@/components/workflow/ReturnToCrawlBanner";
 import { getDefaultModelLabel } from "@/lib/ai-match/default-models";
 import {
   getLlmConfig,
@@ -159,6 +160,8 @@ export function AiMatchPanel({ embedded = false }: { embedded?: boolean }) {
           refine uncertain matches.
         </p>
       </div>
+
+      <ReturnToCrawlBanner />
 
       <form
         onSubmit={handleSaveKeys}

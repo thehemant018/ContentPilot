@@ -88,3 +88,11 @@ export function clearWorkflowData(): void {
   clearMigrationQueue();
   window.dispatchEvent(new Event(WORKFLOW_DATA_CHANGED_EVENT));
 }
+
+/** Clears crawl → migrate data while keeping auth, discovery, and LLM config. */
+export function clearContentMigrationData(): void {
+  localStorage.removeItem(STORAGE_KEYS.crawlResult);
+  localStorage.removeItem(STORAGE_KEYS.aiMatchResult);
+  clearMigrationQueue();
+  window.dispatchEvent(new Event(WORKFLOW_DATA_CHANGED_EVENT));
+}

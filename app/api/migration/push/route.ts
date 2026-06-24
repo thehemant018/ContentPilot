@@ -15,11 +15,15 @@ export async function POST(request: Request) {
   }
 
   try {
-    const body = (await request.json()) as { batchId?: string };
+    const body = (await request.json()) as {
+      batchId?: string;
+      mediaLibraryPath?: string;
+    };
     const result = await pushLatestBatchToSitecore(
       auth.instanceUrl,
       auth.accessToken,
       body.batchId,
+      { mediaLibraryPath: body.mediaLibraryPath },
     );
 
     return NextResponse.json<MigrationPushResult>(result, {
