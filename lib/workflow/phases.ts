@@ -54,7 +54,7 @@ export const WORKFLOW_PHASES: WorkflowPhase[] = [
     activeBorder: "border-blue-600",
     activeBg: "bg-blue-50",
     labelColor: "text-blue-800",
-    available: false,
+    available: true,
   },
   {
     id: "ai-match",
@@ -66,7 +66,7 @@ export const WORKFLOW_PHASES: WorkflowPhase[] = [
     activeBorder: "border-orange-500",
     activeBg: "bg-orange-50",
     labelColor: "text-orange-800",
-    available: false,
+    available: true,
   },
   {
     id: "review",
@@ -78,7 +78,7 @@ export const WORKFLOW_PHASES: WorkflowPhase[] = [
     activeBorder: "border-rose-500",
     activeBg: "bg-rose-50",
     labelColor: "text-rose-800",
-    available: false,
+    available: true,
   },
   {
     id: "migrate",
@@ -90,7 +90,7 @@ export const WORKFLOW_PHASES: WorkflowPhase[] = [
     activeBorder: "border-emerald-600",
     activeBg: "bg-emerald-50",
     labelColor: "text-emerald-800",
-    available: false,
+    available: true,
   },
 ];
 
@@ -104,4 +104,14 @@ export function getPhaseById(id: WorkflowPhaseId): WorkflowPhase {
     throw new Error(`Unknown workflow phase: ${id}`);
   }
   return phase;
+}
+
+export function getNextPhaseId(
+  phaseId: WorkflowPhaseId,
+): WorkflowPhaseId | null {
+  const index = WORKFLOW_PHASES.findIndex((phase) => phase.id === phaseId);
+  if (index < 0 || index >= WORKFLOW_PHASES.length - 1) {
+    return null;
+  }
+  return WORKFLOW_PHASES[index + 1]?.id ?? null;
 }

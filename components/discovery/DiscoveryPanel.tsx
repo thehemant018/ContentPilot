@@ -10,7 +10,9 @@ import {
 import type { DiscoveryResult, SitecoreSite } from "@/types/discovery";
 import { DiscoveryResults } from "@/components/discovery/DiscoveryResults";
 import { SiteSelector } from "@/components/discovery/SiteSelector";
+import { NextPhaseButton } from "@/components/workflow/NextPhaseButton";
 import { markDiscoveryPhaseComplete } from "@/lib/workflow/progress";
+import { saveDiscoveryResult } from "@/lib/storage/workflow-data";
 
 const DEFAULT_RENDERINGS_PATH = "/sitecore/layout/Renderings";
 const DEFAULT_MEDIA_PATH = "/sitecore/media";
@@ -135,6 +137,7 @@ export function DiscoveryPanel({ embedded = false }: { embedded?: boolean }) {
 
       if (payload.success) {
         markDiscoveryPhaseComplete();
+        saveDiscoveryResult(payload);
       }
     } catch (error) {
       setFeedback({
@@ -311,6 +314,18 @@ export function DiscoveryPanel({ embedded = false }: { embedded?: boolean }) {
         </form>
 
         {result && <DiscoveryResults result={result} />}
+
+        {result?.success && (
+          <div className="flex flex-wrap items-center justify-end gap-3 border-t border-zinc-200 pt-6">
+            <p className="text-sm text-zinc-600">
+              Discovery complete. Continue to crawl your source site.
+            </p>
+            <NextPhaseButton
+              currentPhaseId="discovery"
+              className="bg-teal-600 hover:bg-teal-700"
+            />
+          </div>
+        )}
       </div>
     </div>
   );

@@ -3,6 +3,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { ConnectSitecoreForm } from "@/components/landing/ConnectSitecoreForm";
 import { DiscoveryPanel } from "@/components/discovery/DiscoveryPanel";
+import { CrawlPanel } from "@/components/crawl/CrawlPanel";
+import { AiMatchPanel } from "@/components/ai-match/AiMatchPanel";
+import { ReviewPanel } from "@/components/review/ReviewPanel";
+import { MigratePanel } from "@/components/migrate/MigratePanel";
 import { PhasePlaceholder } from "@/components/workflow/PhasePlaceholder";
 import { PhaseTabBadge } from "@/components/workflow/PhaseTabBadge";
 import {
@@ -167,7 +171,16 @@ export function WorkflowTabs() {
               >
                 {phase.id === "auth" && <ConnectSitecoreForm embedded />}
                 {phase.id === "discovery" && <DiscoveryPanel embedded />}
-                {!phase.available && <PhasePlaceholder phase={phase} />}
+                {phase.id === "crawl" && <CrawlPanel embedded />}
+                {phase.id === "ai-match" && <AiMatchPanel embedded />}
+                {phase.id === "review" && <ReviewPanel embedded />}
+                {phase.id === "migrate" && <MigratePanel embedded />}
+                {phase.id !== "auth" &&
+                  phase.id !== "discovery" &&
+                  phase.id !== "crawl" &&
+                  phase.id !== "ai-match" &&
+                  phase.id !== "review" &&
+                  phase.id !== "migrate" && <PhasePlaceholder phase={phase} />}
               </div>
             );
           })}

@@ -49,6 +49,70 @@ export function markDiscoveryPhaseComplete(): void {
   window.dispatchEvent(new Event(WORKFLOW_PROGRESS_EVENT));
 }
 
+export function isCrawlPhaseComplete(): boolean {
+  if (typeof window === "undefined") {
+    return false;
+  }
+  return localStorage.getItem(STORAGE_KEYS.crawlComplete) === "true";
+}
+
+export function markCrawlPhaseComplete(): void {
+  localStorage.setItem(STORAGE_KEYS.crawlComplete, "true");
+  window.dispatchEvent(new Event(WORKFLOW_PROGRESS_EVENT));
+}
+
+export function isAiMatchPhaseComplete(): boolean {
+  if (typeof window === "undefined") {
+    return false;
+  }
+  return localStorage.getItem(STORAGE_KEYS.aiMatchComplete) === "true";
+}
+
+export function markAiMatchPhaseComplete(): void {
+  localStorage.setItem(STORAGE_KEYS.aiMatchComplete, "true");
+  window.dispatchEvent(new Event(WORKFLOW_PROGRESS_EVENT));
+}
+
+export function isReviewPhaseComplete(): boolean {
+  if (typeof window === "undefined") {
+    return false;
+  }
+  return localStorage.getItem(STORAGE_KEYS.reviewComplete) === "true";
+}
+
+export function markReviewPhaseComplete(): void {
+  localStorage.setItem(STORAGE_KEYS.reviewComplete, "true");
+  window.dispatchEvent(new Event(WORKFLOW_PROGRESS_EVENT));
+}
+
+export function clearReviewPhaseComplete(): void {
+  localStorage.removeItem(STORAGE_KEYS.reviewComplete);
+}
+
+export function isMigratePhaseComplete(): boolean {
+  if (typeof window === "undefined") {
+    return false;
+  }
+  return localStorage.getItem(STORAGE_KEYS.migrateComplete) === "true";
+}
+
+export function markMigratePhaseComplete(): void {
+  localStorage.setItem(STORAGE_KEYS.migrateComplete, "true");
+  window.dispatchEvent(new Event(WORKFLOW_PROGRESS_EVENT));
+}
+
+export function clearMigratePhaseComplete(): void {
+  localStorage.removeItem(STORAGE_KEYS.migrateComplete);
+}
+
+export function clearAiMatchPhaseComplete(): void {
+  localStorage.removeItem(STORAGE_KEYS.aiMatchComplete);
+}
+
+export function clearCrawlPhaseComplete(): void {
+  localStorage.removeItem(STORAGE_KEYS.crawlComplete);
+}
+
 export function clearDiscoveryPhaseComplete(): void {
   localStorage.removeItem(STORAGE_KEYS.discoveryComplete);
 }
@@ -56,6 +120,10 @@ export function clearDiscoveryPhaseComplete(): void {
 export function resetWorkflowProgress(): void {
   localStorage.setItem(STORAGE_KEYS.workflowFurthestPhase, "0");
   clearDiscoveryPhaseComplete();
+  clearCrawlPhaseComplete();
+  clearAiMatchPhaseComplete();
+  clearReviewPhaseComplete();
+  clearMigratePhaseComplete();
   window.dispatchEvent(new Event(WORKFLOW_PROGRESS_EVENT));
 }
 
@@ -65,6 +133,18 @@ export function isPhaseComplete(phaseId: WorkflowPhaseId): boolean {
   }
   if (phaseId === "discovery") {
     return isDiscoveryPhaseComplete();
+  }
+  if (phaseId === "crawl") {
+    return isCrawlPhaseComplete();
+  }
+  if (phaseId === "ai-match") {
+    return isAiMatchPhaseComplete();
+  }
+  if (phaseId === "review") {
+    return isReviewPhaseComplete();
+  }
+  if (phaseId === "migrate") {
+    return isMigratePhaseComplete();
   }
   return false;
 }
