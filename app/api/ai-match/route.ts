@@ -11,12 +11,14 @@ export async function POST(request: Request) {
     const body = (await request.json()) as {
       provider?: AiMatchInput["provider"];
       apiKey?: string;
+      useRuleBasedMatching?: boolean;
       discovery?: DiscoveryResult;
       crawl?: CrawlResult;
     };
 
     const provider = body.provider === "claude" ? "claude" : "gemini";
     const apiKey = body.apiKey?.trim() ?? "";
+    const useRuleBasedMatching = body.useRuleBasedMatching === true;
     const discovery = body.discovery;
     const crawl = body.crawl;
 
@@ -35,6 +37,7 @@ export async function POST(request: Request) {
     const result = await runAiMatch({
       provider,
       apiKey,
+      useRuleBasedMatching,
       blocks,
       renderings: discovery.renderings ?? [],
       templates: discovery.templates ?? [],

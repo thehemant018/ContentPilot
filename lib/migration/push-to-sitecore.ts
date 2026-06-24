@@ -142,6 +142,7 @@ export async function pushLatestBatchToSitecore(
   instanceUrl: string,
   accessToken: string,
   batchId?: string,
+  options?: { mediaLibraryPath?: string },
 ): Promise<MigrationPushResult> {
   const latest = await readLatestExportSummary();
   if (!latest) {
@@ -166,9 +167,32 @@ export async function pushLatestBatchToSitecore(
   const results: MigrationPushComponentResult[] = [];
   let pushedCount = 0;
   let failedCount = 0;
-  const mediaLibraryPath = normalizeMediaUploadPath(
-    latest.manifest.mediaLibraryPath ?? "uploads/migratex",
-  );
+
+  const rawMediaPath =
+    options?.mediaLibraryPath?.trim() ||
+    latest.manifest.mediaLibraryPath?.trim();
+
+  if (!rawMediaPath) {
+    return {
+      success: false,
+      message:
+        "Media library path is not set. Configure it in Discovery, then export from Review before pushing.",
+    };
+  }
+
+  let mediaLibraryPath: string;
+  try {
+    mediaLibraryPath = normalizeMediaUploadPath(rawMediaPath);
+  } catch (error) {
+    return {
+      success: false,
+      message:
+        error instanceof Error
+          ? error.message
+          : "Invalid media library path from Discovery.",
+    };
+  }
+
   const uploadCache = new Map<string, UploadMediaResult>();
 
   for (const component of components) {

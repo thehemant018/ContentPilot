@@ -35,10 +35,17 @@ const MIME_BY_EXT: Record<string, string> = {
 
 /** Path relative to the media library root for uploadMedia.itemPath. */
 export function normalizeMediaUploadPath(configuredPath: string): string {
-  let normalized = configuredPath.trim().replace(/^\/+/, "");
-  normalized = normalized.replace(/^sitecore\/media library\/?/i, "");
+  const trimmed = configuredPath.trim();
+  if (!trimmed) {
+    throw new Error(
+      "Media library path is required. Set it in the Discovery phase.",
+    );
+  }
+
+  let normalized = trimmed.replace(/^\/+/, "");
+  normalized = normalized.replace(/^sitecore\/media\s*library\/?/i, "");
   normalized = normalized.replace(/^sitecore\/media\/?/i, "");
-  return normalized.replace(/\/+$/, "") || "uploads/migratex";
+  return normalized.replace(/\/+$/, "");
 }
 
 export function sanitizeMediaFileStem(value: string): string {
@@ -75,8 +82,9 @@ export function buildMediaItemPath(
   }
 
   const itemName = `${stem}-${uniqueSuffix.slice(0, 8)}`;
+  const itemPath = folderPath ? `${folderPath}/${itemName}` : itemName;
   return {
-    itemPath: `${folderPath}/${itemName}`,
+    itemPath,
     fileName: `${itemName}${ext}`,
   };
 }

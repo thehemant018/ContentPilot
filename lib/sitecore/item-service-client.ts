@@ -1,4 +1,10 @@
 import { normalizeInstanceUrl } from "@/lib/sitecore/auth";
+import { executeGraphQL } from "@/lib/sitecore/graphql-client";
+import {
+  CREATE_ITEM_MUTATION,
+  UPDATE_ITEM_MUTATION,
+} from "@/lib/sitecore/item-authoring-queries";
+import { getSitecoreItemByPath } from "@/lib/sitecore/item-lookup";
 
 const ITEM_SERVICE_PATH = "/sitecore/api/ssc/item";
 export const DEFAULT_ITEM_DATABASE = "master";
@@ -44,24 +50,6 @@ function buildItemServiceUrl(
   return query ? `${base}?${query}` : base;
 }
 
-function buildItemServiceIdUrl(
-  instanceUrl: string,
-  itemId: string,
-  options?: ItemServiceOptions,
-): string {
-  const normalizedId = itemId.replace(/[{}]/g, "");
-  const params = new URLSearchParams();
-  params.set("database", options?.database ?? DEFAULT_ITEM_DATABASE);
-  if (options?.language) {
-    params.set("language", options.language);
-  }
-  if (options?.version) {
-    params.set("version", options.version);
-  }
-  const query = params.toString();
-  return `${normalizeInstanceUrl(instanceUrl)}${ITEM_SERVICE_PATH}/${normalizedId}?${query}`;
-}
-
 async function parseItemServiceResponse(
   response: Response,
 ): Promise<ItemServiceItem> {
@@ -83,14 +71,6 @@ async function parseItemServiceResponse(
   }
 }
 
-function extractCreatedItemId(response: Response): string | undefined {
-  const location = response.headers.get("Location") ?? "";
-  const match = location.match(
-    /\/item\/([0-9a-f-]{36})/i,
-  );
-  return match?.[1];
-}
-
 /** Sitecore expects field names at the JSON root, not under a Fields property. */
 export function buildItemServiceFieldPayload(
   fields: Record<string, string>,
@@ -104,6 +84,22 @@ export function buildItemServiceFieldPayload(
     payload[trimmedName] = value;
   }
   return payload;
+}
+
+function toGraphQLFieldInputs(
+  fields: Record<string, string>,
+): Array<{ name: string; value: string; reset: boolean }> {
+  return Object.entries(buildItemServiceFieldPayload(fields)).map(
+    ([name, value]) => ({
+      name,
+      value,
+      reset: false,
+    }),
+  );
+}
+
+function normalizeItemId(itemId: string): string {
+  return itemId.replace(/[{}]/g, "");
 }
 
 export async function getItemByPath(
@@ -144,38 +140,46 @@ export async function createItem(
   fields: Record<string, string>,
   options?: ItemServiceOptions,
 ): Promise<ItemServiceItem> {
-  const url = buildItemServiceUrl(instanceUrl, parentPath, options);
-  const fieldPayload = buildItemServiceFieldPayload(fields);
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
-      Accept: "application/json",
+  const parent = await getSitecoreItemByPath(
+    instanceUrl,
+    accessToken,
+    parentPath,
+  );
+  if (!parent) {
+    throw new Error(`Parent item not found at ${parentPath}.`);
+  }
+
+  const graphqlFields = toGraphQLFieldInputs(fields);
+  const data = await executeGraphQL<{
+    createItem?: {
+      item?: {
+        itemId?: string;
+        name?: string;
+        path?: string;
+      } | null;
+    } | null;
+  }>(instanceUrl, accessToken, CREATE_ITEM_MUTATION, {
+    input: {
+      name: itemName,
+      parent: normalizeItemId(parent.itemId),
+      templateId: normalizeItemId(templateId),
+      language: options?.language ?? "en",
+      fields: graphqlFields,
     },
-    body: JSON.stringify({
-      ItemName: itemName,
-      TemplateID: templateId,
-      ItemLanguage: options?.language ?? "en",
-      ...fieldPayload,
-    }),
-    cache: "no-store",
   });
 
-  if (!response.ok) {
-    const body = await response.text();
+  const created = data.createItem?.item;
+  if (!created?.itemId) {
     throw new Error(
-      `Item Service create failed (${response.status}) under ${parentPath}: ${body.slice(0, 300)}`,
+      `Authoring GraphQL createItem failed under ${parentPath}: no item returned.`,
     );
   }
 
-  const created = await parseItemServiceResponse(response);
-  const createdItemId = created.ItemID ?? extractCreatedItemId(response);
-  if (createdItemId) {
-    created.ItemID = createdItemId;
-  }
-
-  return created;
+  return {
+    ItemID: created.itemId,
+    ItemName: created.name,
+    ItemPath: created.path,
+  };
 }
 
 export async function editItemById(
@@ -185,31 +189,40 @@ export async function editItemById(
   fields: Record<string, string>,
   options?: ItemServiceOptions,
 ): Promise<ItemServiceItem> {
-  const fieldPayload = buildItemServiceFieldPayload(fields);
-  if (Object.keys(fieldPayload).length === 0) {
+  const graphqlFields = toGraphQLFieldInputs(fields);
+  if (graphqlFields.length === 0) {
     return {};
   }
 
-  const url = buildItemServiceIdUrl(instanceUrl, itemId, options);
-  const response = await fetch(url, {
-    method: "PATCH",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
-      Accept: "application/json",
+  const data = await executeGraphQL<{
+    updateItem?: {
+      item?: {
+        itemId?: string;
+        name?: string;
+        path?: string;
+      } | null;
+    } | null;
+  }>(instanceUrl, accessToken, UPDATE_ITEM_MUTATION, {
+    input: {
+      itemId: normalizeItemId(itemId),
+      database: options?.database ?? DEFAULT_ITEM_DATABASE,
+      language: options?.language ?? "en",
+      fields: graphqlFields,
     },
-    body: JSON.stringify(fieldPayload),
-    cache: "no-store",
   });
 
-  if (!response.ok) {
-    const body = await response.text();
+  const updated = data.updateItem?.item;
+  if (!updated?.itemId) {
     throw new Error(
-      `Item Service edit failed (${response.status}) for ${itemId}: ${body.slice(0, 300)}`,
+      `Authoring GraphQL updateItem failed for ${itemId}: no item returned.`,
     );
   }
 
-  return parseItemServiceResponse(response);
+  return {
+    ItemID: updated.itemId,
+    ItemName: updated.name,
+    ItemPath: updated.path,
+  };
 }
 
 export function splitSitecoreItemPath(fullPath: string): {

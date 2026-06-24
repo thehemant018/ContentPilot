@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { QueueItemCard } from "@/components/review/QueueItemCard";
 import { NextPhaseButton } from "@/components/workflow/NextPhaseButton";
+import { ReturnToCrawlBanner } from "@/components/workflow/ReturnToCrawlBanner";
 import {
   getMigrationQueue,
   removeQueueItem,
@@ -17,8 +18,8 @@ import {
 } from "@/lib/storage/workflow-data";
 import {
   isAiMatchPhaseComplete,
-  markMigratePhaseComplete,
   markReviewPhaseComplete,
+  notifyMigrationExportUpdated,
   setFurthestPhaseIndex,
 } from "@/lib/workflow/progress";
 import { WORKFLOW_PHASES } from "@/lib/workflow/phases";
@@ -123,13 +124,13 @@ export function ReviewPanel({ embedded = false }: { embedded?: boolean }) {
       }
 
       setLastExport(payload);
-      markMigratePhaseComplete();
       const migrateIndex = WORKFLOW_PHASES.findIndex(
         (phase) => phase.id === "migrate",
       );
       if (migrateIndex >= 0) {
         setFurthestPhaseIndex(migrateIndex);
       }
+      notifyMigrationExportUpdated();
       setFeedback({
         type: "success",
         message: payload.message,
@@ -193,6 +194,8 @@ export function ReviewPanel({ embedded = false }: { embedded?: boolean }) {
           </p>
         )}
       </div>
+
+      <ReturnToCrawlBanner />
 
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3">
         <p className="text-sm text-zinc-700">

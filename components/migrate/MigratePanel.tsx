@@ -7,7 +7,18 @@ import {
   getStoredSession,
   isSessionExpired,
 } from "@/lib/storage/sitecore-session";
-import { markMigratePhaseComplete } from "@/lib/workflow/progress";
+import {
+  markMigratePhaseComplete,
+  isMigratePhaseComplete,
+  canReturnToReviewForEditing,
+  MIGRATION_EXPORT_EVENT,
+  subscribeWorkflowProgress,
+} from "@/lib/workflow/progress";
+import { ReturnToCrawlBanner } from "@/components/workflow/ReturnToCrawlBanner";
+import { ReturnToCrawlButton } from "@/components/workflow/ReturnToCrawlButton";
+import { ReturnToReviewBanner } from "@/components/workflow/ReturnToReviewBanner";
+import { normalizeMediaUploadPath } from "@/lib/sitecore/media-upload";
+import { getDiscoveryResult } from "@/lib/storage/workflow-data";
 import type { MigrationExportManifest } from "@/types/migration-export";
 import type { MigrationPushResult } from "@/types/migration-export";
 
@@ -31,10 +42,14 @@ export function MigratePanel({ embedded = false }: { embedded?: boolean }) {
   const [pushResult, setPushResult] = useState<MigrationPushResult | null>(
     null,
   );
+  const [migrationComplete, setMigrationComplete] = useState(false);
+  const [canEditReview, setCanEditReview] = useState(false);
   const [feedback, setFeedback] = useState<{
     type: "success" | "error";
     message: string;
   } | null>(null);
+
+  const showMigrateAnother = migrationComplete || feedback?.type === "success";
 
   const refreshConnection = useCallback(() => {
     const session = getStoredSession();
@@ -55,13 +70,31 @@ export function MigratePanel({ embedded = false }: { embedded?: boolean }) {
   useEffect(() => {
     queueMicrotask(() => {
       refreshConnection();
+      setMigrationComplete(isMigratePhaseComplete());
+      setCanEditReview(canReturnToReviewForEditing());
       void loadLatestExport();
     });
 
+    function handleExportUpdated() {
+      void loadLatestExport();
+    }
+
     window.addEventListener(SESSION_CHANGED_EVENT, refreshConnection);
-    return () =>
+    window.addEventListener(MIGRATION_EXPORT_EVENT, handleExportUpdated);
+    return () => {
       window.removeEventListener(SESSION_CHANGED_EVENT, refreshConnection);
+      window.removeEventListener(MIGRATION_EXPORT_EVENT, handleExportUpdated);
+    };
   }, [loadLatestExport, refreshConnection]);
+
+  useEffect(
+    () =>
+      subscribeWorkflowProgress(() => {
+        setMigrationComplete(isMigratePhaseComplete());
+        setCanEditReview(canReturnToReviewForEditing());
+      }),
+    [],
+  );
 
   async function handlePushToSitecore(): Promise<void> {
     if (!latest) {
@@ -88,7 +121,10 @@ export function MigratePanel({ embedded = false }: { embedded?: boolean }) {
       const response = await sitecoreApiFetch("/api/migration/push", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ batchId: latest.batchId }),
+        body: JSON.stringify({
+          batchId: latest.batchId,
+          mediaLibraryPath: discoveryMediaPath || exportMediaPath,
+        }),
       });
 
       const payload = (await response.json()) as MigrationPushResult;
@@ -103,6 +139,8 @@ export function MigratePanel({ embedded = false }: { embedded?: boolean }) {
       }
 
       markMigratePhaseComplete();
+      setMigrationComplete(true);
+      setCanEditReview(false);
       setFeedback({
         type: "success",
         message: payload.message,
@@ -120,6 +158,18 @@ export function MigratePanel({ embedded = false }: { embedded?: boolean }) {
 
   const canPush = Boolean(latest && isConnected && !isPushing);
 
+  const discoveryMediaPath = getDiscoveryResult()?.mediaPath?.trim();
+  const exportMediaPath = latest?.manifest.mediaLibraryPath?.trim();
+  const activeMediaPath = discoveryMediaPath || exportMediaPath || "";
+  let resolvedMediaUploadFolder: string | null = null;
+  if (activeMediaPath) {
+    try {
+      resolvedMediaUploadFolder = normalizeMediaUploadPath(activeMediaPath);
+    } catch {
+      resolvedMediaUploadFolder = null;
+    }
+  }
+
   return (
     <div className={embedded ? "space-y-6" : "mx-auto max-w-4xl space-y-6"}>
       <div>
@@ -132,10 +182,34 @@ export function MigratePanel({ embedded = false }: { embedded?: boolean }) {
         <p className="mt-1 text-sm text-zinc-600">
           Uses the matched Sitecore template and rendering from AI Match (e.g.
           Hero). Creates a content item under the page&apos;s Data item, fills
-          your fields, uploads crawled images to the media library, and assigns
-          the rendering on the target page.
+          your fields, uploads crawled images to the Discovery media library
+          path, and assigns the rendering on the target page.
         </p>
+        {activeMediaPath ? (
+          <p className="mt-2 text-xs text-zinc-500">
+            Image upload folder:{" "}
+            <span className="font-mono">{activeMediaPath}</span>
+            {resolvedMediaUploadFolder !== null && (
+              <>
+                {" "}
+                →{" "}
+                <span className="font-mono">
+                  sitecore/media library/{resolvedMediaUploadFolder || "(root)"}
+                </span>
+              </>
+            )}
+          </p>
+        ) : (
+          <p className="mt-2 text-xs text-amber-700">
+            No media library path from Discovery. Set it in Phase 2 before
+            pushing.
+          </p>
+        )}
       </div>
+
+      {!showMigrateAnother && <ReturnToCrawlBanner />}
+
+      {canEditReview && <ReturnToReviewBanner />}
 
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3">
         <div className="space-y-1 text-sm">
@@ -182,13 +256,30 @@ export function MigratePanel({ embedded = false }: { embedded?: boolean }) {
         </div>
       )}
 
-      {feedback && (
+      {showMigrateAnother && (
+        <div className="rounded-xl border border-emerald-300 bg-emerald-50 p-5">
+          <p className="text-sm font-semibold text-emerald-900">
+            Migration complete
+          </p>
+          {feedback?.type === "success" && (
+            <p className="mt-1 text-sm text-emerald-800">{feedback.message}</p>
+          )}
+          <ReturnToCrawlButton
+            variant="primary"
+            label="Migrate another component"
+            showArrow="right"
+            className="mt-4"
+          />
+          <p className="mt-2 text-xs text-emerald-700">
+            Returns to Crawl so you can parse a new page and run the workflow
+            again. Auth and Discovery stay connected.
+          </p>
+        </div>
+      )}
+
+      {feedback && feedback.type === "error" && (
         <div
-          className={`rounded-xl border px-4 py-3 text-sm ${
-            feedback.type === "success"
-              ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-              : "border-rose-200 bg-rose-50 text-rose-800"
-          }`}
+          className="rounded-xl border px-4 py-3 text-sm border-rose-200 bg-rose-50 text-rose-800"
         >
           {feedback.message}
         </div>

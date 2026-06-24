@@ -16,6 +16,7 @@ export const STORAGE_KEYS = {
   migrationQueue: "migratex_migration_queue",
   reviewComplete: "migratex_review_complete",
   migrateComplete: "migratex_migrate_complete",
+  migrationCycleId: "migratex_migration_cycle_id",
 } as const;
 
 export const SESSION_CHANGED_EVENT = "migratex-session-changed";

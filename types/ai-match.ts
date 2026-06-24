@@ -7,6 +7,8 @@ export interface LlmConfig {
   provider: LlmProvider;
   geminiApiKey?: string;
   claudeApiKey?: string;
+  /** When true, use keyword/name matching only. When false, LLM is required. */
+  useRuleBasedMatching?: boolean;
 }
 
 export interface FlatContentBlock extends ContentBlock {
@@ -23,6 +25,8 @@ export interface FieldMapping {
 }
 
 export type MatchConfidence = "high" | "medium" | "low";
+
+export type MatchStrategy = "llm" | "rule-based";
 
 export interface BlockMatchResult {
   blockId: string;
@@ -43,6 +47,7 @@ export interface BlockMatchResult {
 export interface AiMatchInput {
   provider: LlmProvider;
   apiKey: string;
+  useRuleBasedMatching: boolean;
   blocks: FlatContentBlock[];
   renderings: DiscoveryItem[];
   templates: TemplateDefinition[];
@@ -53,6 +58,7 @@ export interface AiMatchResult {
   message: string;
   provider?: LlmProvider;
   modelId?: string;
+  matchStrategy?: MatchStrategy;
   matches?: BlockMatchResult[];
   lowConfidenceCount?: number;
   reviewedCount?: number;
