@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ConnectSitecoreForm } from "@/components/landing/ConnectSitecoreForm";
 import { DiscoveryPanel } from "@/components/discovery/DiscoveryPanel";
 import { CrawlPanel } from "@/components/crawl/CrawlPanel";
 import { AiMatchPanel } from "@/components/ai-match/AiMatchPanel";
+import { MatchStrategyBadge } from "@/components/ai-match/MatchStrategyBadge";
 import { ReviewPanel } from "@/components/review/ReviewPanel";
 import { MigratePanel } from "@/components/migrate/MigratePanel";
 import { PhasePlaceholder } from "@/components/workflow/PhasePlaceholder";
@@ -24,6 +25,10 @@ import {
   setFurthestPhaseIndex,
   subscribeWorkflowProgress,
 } from "@/lib/workflow/progress";
+import {
+  getAiMatchResult,
+  WORKFLOW_DATA_CHANGED_EVENT,
+} from "@/lib/storage/workflow-data";
 
 function getPhaseIndex(phaseId: WorkflowPhaseId): number {
   return WORKFLOW_PHASES.findIndex((phase) => phase.id === phaseId);
@@ -35,6 +40,7 @@ export function WorkflowTabs() {
   const [furthestIndex, setFurthestIndex] = useState(0);
   const [migrationCycleId, setMigrationCycleId] = useState(0);
   const [, setProgressVersion] = useState(0);
+  const [workflowDataVersion, setWorkflowDataVersion] = useState(0);
 
   const refreshProgress = useCallback(() => {
     setFurthestIndex(getFurthestPhaseIndex());
@@ -83,6 +89,19 @@ export function WorkflowTabs() {
   useEffect(() => subscribeWorkflowProgress(refreshProgress), [refreshProgress]);
 
   useEffect(() => {
+    function handleWorkflowDataChanged() {
+      setWorkflowDataVersion((value) => value + 1);
+    }
+
+    window.addEventListener(WORKFLOW_DATA_CHANGED_EVENT, handleWorkflowDataChanged);
+    return () =>
+      window.removeEventListener(
+        WORKFLOW_DATA_CHANGED_EVENT,
+        handleWorkflowDataChanged,
+      );
+  }, []);
+
+  useEffect(() => {
     function handleMigrationReset() {
       refreshProgress();
       setActiveTab("crawl");
@@ -97,6 +116,10 @@ export function WorkflowTabs() {
   }, [refreshProgress]);
 
   const activePhase = WORKFLOW_PHASES.find((phase) => phase.id === activeTab)!;
+  const aiMatchStrategy = useMemo(
+    () => (hydrated ? getAiMatchResult()?.matchStrategy : undefined),
+    [hydrated, workflowDataVersion],
+  );
 
   return (
     <section id="workflow" className="w-full scroll-mt-24">
@@ -166,6 +189,9 @@ export function WorkflowTabs() {
                   colorClass={phase.color}
                 />
                 <span className="whitespace-nowrap text-inherit">{phase.name}</span>
+                {phase.id === "ai-match" && aiMatchStrategy && (
+                  <MatchStrategyBadge strategy={aiMatchStrategy} compact />
+                )}
                 {!phase.available && (
                   <span
                     className={`rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase ${

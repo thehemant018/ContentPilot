@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { MatchResults } from "@/components/ai-match/MatchResults";
+import { MatchStrategyBadge } from "@/components/ai-match/MatchStrategyBadge";
 import { NextPhaseButton } from "@/components/workflow/NextPhaseButton";
 import { ReturnToCrawlBanner } from "@/components/workflow/ReturnToCrawlBanner";
 import { getDefaultModelLabel } from "@/lib/ai-match/default-models";
@@ -10,7 +11,6 @@ import {
   saveLlmConfig,
 } from "@/lib/storage/llm-config";
 import {
-  getAiMatchResult,
   getCrawlResult,
   getDiscoveryResult,
   saveAiMatchResult,
@@ -27,6 +27,7 @@ export function AiMatchPanel({ embedded = false }: { embedded?: boolean }) {
   const [provider, setProvider] = useState<LlmProvider>("gemini");
   const [geminiApiKey, setGeminiApiKey] = useState("");
   const [claudeApiKey, setClaudeApiKey] = useState("");
+  const [useRuleBasedMatching, setUseRuleBasedMatching] = useState(false);
   const [prerequisitesMet, setPrerequisitesMet] = useState(false);
   const [isMatching, setIsMatching] = useState(false);
   const [feedback, setFeedback] = useState<{
@@ -37,6 +38,13 @@ export function AiMatchPanel({ embedded = false }: { embedded?: boolean }) {
 
   const activeApiKey =
     provider === "claude" ? claudeApiKey.trim() : geminiApiKey.trim();
+  const canRunMatch =
+    useRuleBasedMatching || Boolean(activeApiKey);
+  const matchModeLabel = useRuleBasedMatching
+    ? "Rule-based matching"
+    : activeApiKey
+      ? `LLM · ${getDefaultModelLabel(provider)}`
+      : "Add API key or enable rule-based matching";
 
   useEffect(() => {
     queueMicrotask(() => {
@@ -44,16 +52,13 @@ export function AiMatchPanel({ embedded = false }: { embedded?: boolean }) {
       setProvider(config.provider);
       setGeminiApiKey(config.geminiApiKey ?? "");
       setClaudeApiKey(config.claudeApiKey ?? "");
+      setUseRuleBasedMatching(config.useRuleBasedMatching === true);
       setPrerequisitesMet(
         isDiscoveryPhaseComplete() &&
           isCrawlPhaseComplete() &&
           Boolean(getDiscoveryResult()) &&
           Boolean(getCrawlResult()),
       );
-      const saved = getAiMatchResult();
-      if (saved?.success && saved.matches) {
-        setResult(saved);
-      }
     });
   }, []);
 
@@ -63,6 +68,7 @@ export function AiMatchPanel({ embedded = false }: { embedded?: boolean }) {
       provider,
       geminiApiKey: geminiApiKey.trim() || undefined,
       claudeApiKey: claudeApiKey.trim() || undefined,
+      useRuleBasedMatching,
     });
     setFeedback({
       type: "success",
@@ -83,6 +89,7 @@ export function AiMatchPanel({ embedded = false }: { embedded?: boolean }) {
       provider,
       geminiApiKey: geminiApiKey.trim() || undefined,
       claudeApiKey: claudeApiKey.trim() || undefined,
+      useRuleBasedMatching,
     });
 
     try {
@@ -92,6 +99,7 @@ export function AiMatchPanel({ embedded = false }: { embedded?: boolean }) {
         body: JSON.stringify({
           provider,
           apiKey,
+          useRuleBasedMatching,
           discovery,
           crawl,
         }),
@@ -151,13 +159,17 @@ export function AiMatchPanel({ embedded = false }: { embedded?: boolean }) {
         <p className="text-xs font-semibold uppercase tracking-wider text-orange-600">
           Phase 4 — AI Match
         </p>
-        <h3 className="mt-1 text-lg font-semibold text-zinc-900">
-          AI component matching
-        </h3>
+        <div className="mt-1 flex flex-wrap items-center gap-2">
+          <h3 className="text-lg font-semibold text-zinc-900">
+            AI component matching
+          </h3>
+          {result?.matchStrategy && (
+            <MatchStrategyBadge strategy={result.matchStrategy} />
+          )}
+        </div>
         <p className="mt-1 text-sm text-zinc-600">
-          Crawl block types (hero, rich text, card grid, etc.) are matched to
-          Sitecore renderings and templates by name. An API key is only used to
-          refine uncertain matches.
+          Choose rule-based name matching, or LLM matching with an API key. There
+          is no automatic fallback between the two modes.
         </p>
       </div>
 
@@ -230,10 +242,27 @@ export function AiMatchPanel({ embedded = false }: { embedded?: boolean }) {
         </div>
 
         <p className="text-xs text-zinc-500">
-          Keys stay in your browser only. Matching works without a key when crawl
-          types align with Sitecore component names (e.g. hero → Hero). LLM
-          refines only low-confidence blocks.
+          Keys stay in your browser only. Uncheck rule-based to use the LLM
+          (API key required). Check rule-based to skip the LLM entirely.
         </p>
+
+        <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-zinc-200 bg-white px-4 py-3">
+          <input
+            type="checkbox"
+            checked={useRuleBasedMatching}
+            onChange={(event) => setUseRuleBasedMatching(event.target.checked)}
+            className="mt-0.5 h-4 w-4 rounded border-zinc-300 text-orange-500 focus:ring-orange-500"
+          />
+          <span className="text-sm text-zinc-700">
+            <span className="font-medium text-zinc-900">
+              Use rule-based matching
+            </span>
+            <span className="mt-0.5 block text-xs text-zinc-500">
+              Match crawl block types to Sitecore component names by keywords
+              (e.g. hero → Hero). No API key required.
+            </span>
+          </span>
+        </label>
 
         <button
           type="submit"
@@ -247,15 +276,12 @@ export function AiMatchPanel({ embedded = false }: { embedded?: boolean }) {
         <button
           type="button"
           onClick={() => void handleRunMatch()}
-          disabled={isMatching}
+          disabled={isMatching || !canRunMatch}
           className="inline-flex items-center justify-center rounded-lg bg-orange-500 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {isMatching ? "Matching blocks…" : "Run AI matching"}
+          {isMatching ? "Matching blocks…" : "Run matching"}
         </button>
-        <span className="text-xs text-zinc-500">
-          Type-based matching first
-          {activeApiKey ? ` · ${getDefaultModelLabel(provider)} for uncertain blocks` : " · no API key (rule-based only)"}
-        </span>
+        <span className="text-xs text-zinc-500">{matchModeLabel}</span>
       </div>
 
       {feedback && (

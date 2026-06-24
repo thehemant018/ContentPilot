@@ -4,7 +4,6 @@ import {
   isModelNotFoundError,
 } from "@/lib/ai-match/default-models";
 import {
-  AUTO_MATCH_SCORE_THRESHOLD,
   LOW_CONFIDENCE_SCORE,
   matchBlocksToSitecore,
   summarizeComponentMapping,
@@ -258,35 +257,40 @@ function normalizeLlmMatches(
   });
 }
 
-function mergeMatches(
-  ruleBased: BlockMatchResult[],
-  llmMatches: BlockMatchResult[],
-): BlockMatchResult[] {
-  const llmByBlockId = new Map(
-    llmMatches.map((match) => [match.blockId, match]),
-  );
-
-  return ruleBased.map((existing) => {
-    const llmMatch = llmByBlockId.get(existing.blockId);
-    if (!llmMatch) {
-      return existing;
-    }
-
-    if (llmMatch.matchScore > existing.matchScore) {
-      return llmMatch;
-    }
-
-    return existing;
-  });
+function isResolvableLlmMatch(match: BlockMatchResult | undefined): boolean {
+  return Boolean(match?.renderingPath && match?.templatePath);
 }
 
-function blocksNeedingLlm(matches: BlockMatchResult[]): BlockMatchResult[] {
-  return matches.filter(
-    (match) =>
-      !match.renderingName ||
-      match.matchScore < AUTO_MATCH_SCORE_THRESHOLD ||
-      match.needsReview,
-  );
+function buildLlmOnlyMatches(
+  blocks: FlatContentBlock[],
+  llmMatches: BlockMatchResult[],
+): BlockMatchResult[] {
+  const llmByBlockId = new Map(llmMatches.map((match) => [match.blockId, match]));
+
+  return blocks.map((block) => {
+    const llmMatch = llmByBlockId.get(block.id);
+    if (llmMatch) {
+      return {
+        ...llmMatch,
+        needsReview:
+          llmMatch.needsReview || !isResolvableLlmMatch(llmMatch),
+      };
+    }
+
+    return {
+      blockId: block.id,
+      pageUrl: block.pageUrl,
+      blockType: block.type,
+      blockHeading: block.heading,
+      matchScore: 0,
+      confidence: "low",
+      renderingName: "",
+      templateName: "",
+      reasoning: "LLM did not return a match for this block.",
+      fieldMappings: [],
+      needsReview: true,
+    };
+  });
 }
 
 async function matchBlocksInChunks(
@@ -320,7 +324,14 @@ async function matchBlocksInChunks(
 }
 
 export async function runAiMatch(input: AiMatchInput): Promise<AiMatchResult> {
-  const { provider, apiKey, blocks, renderings, templates } = input;
+  const {
+    provider,
+    apiKey,
+    useRuleBasedMatching,
+    blocks,
+    renderings,
+    templates,
+  } = input;
 
   if (blocks.length === 0) {
     return {
@@ -338,103 +349,84 @@ export async function runAiMatch(input: AiMatchInput): Promise<AiMatchResult> {
 
   const limitedBlocks = blocks.slice(0, MAX_BLOCKS_PER_RUN);
   const skippedCount = blocks.length - limitedBlocks.length;
-
-  const ruleBasedMatches = matchBlocksToSitecore(
-    limitedBlocks,
-    renderings,
-    templates,
-  );
-  const uncertainMatches = blocksNeedingLlm(ruleBasedMatches);
-  const uncertainBlockIds = new Set(uncertainMatches.map((match) => match.blockId));
-  const uncertainBlocks = limitedBlocks.filter((block) =>
-    uncertainBlockIds.has(block.id),
-  );
-
-  let matches = ruleBasedMatches;
-  let modelId: string | undefined;
-  let apiCalls = 0;
-
-  if (uncertainBlocks.length > 0) {
-    if (!apiKey.trim()) {
-      const lowConfidenceCount = matches.filter((match) => match.needsReview).length;
-      const skippedNote =
-        skippedCount > 0
-          ? ` ${skippedCount} block(s) skipped (limit: ${MAX_BLOCKS_PER_RUN} per run).`
-          : "";
-
-      return {
-        success: true,
-        message: `${summarizeComponentMapping(limitedBlocks, renderings, matches)} ${lowConfidenceCount} block(s) need review. Add an API key to refine uncertain matches with LLM.${skippedNote}`,
-        provider,
-        matches,
-        lowConfidenceCount,
-        reviewedCount: matches.length - lowConfidenceCount,
-      };
-    }
-
-    try {
-      const { matches: rawMatches, modelId: usedModel } =
-        await matchBlocksInChunks(
-          provider,
-          apiKey,
-          uncertainBlocks,
-          renderings,
-          templates,
-        );
-      modelId = usedModel;
-      apiCalls = Math.ceil(uncertainBlocks.length / BLOCKS_PER_PASS);
-
-      const llmMatches = normalizeLlmMatches(
-        rawMatches,
-        uncertainBlocks,
-        renderings,
-        templates,
-      );
-      matches = mergeMatches(ruleBasedMatches, llmMatches);
-    } catch (error) {
-      const rawMessage =
-        error instanceof Error ? error.message : "AI matching request failed.";
-      const lowConfidenceCount = ruleBasedMatches.filter(
-        (match) => match.needsReview,
-      ).length;
-
-      if (ruleBasedMatches.some((match) => match.renderingName)) {
-        return {
-          success: true,
-          message: `${summarizeComponentMapping(limitedBlocks, renderings, ruleBasedMatches)} LLM refinement failed (${formatLlmError(rawMessage, provider)}). Rule-based matches kept.`,
-          provider,
-          matches: ruleBasedMatches,
-          lowConfidenceCount,
-          reviewedCount: ruleBasedMatches.length - lowConfidenceCount,
-        };
-      }
-
-      return {
-        success: false,
-        message: formatLlmError(rawMessage, provider),
-      };
-    }
-  }
-
-  const lowConfidenceCount = matches.filter((match) => match.needsReview).length;
   const skippedNote =
     skippedCount > 0
       ? ` ${skippedCount} block(s) skipped (limit: ${MAX_BLOCKS_PER_RUN} per run).`
       : "";
-  const llmNote =
-    apiCalls > 0
-      ? ` LLM refined ${uncertainBlocks.length} uncertain block(s) in ${apiCalls} call(s).`
-      : " All blocks mapped by crawl type → Sitecore component name (no LLM calls).";
 
-  return {
-    success: true,
-    message: `${summarizeComponentMapping(limitedBlocks, renderings, matches)}${llmNote} ${lowConfidenceCount} need manual review.${skippedNote}`,
-    provider,
-    modelId,
-    matches,
-    lowConfidenceCount,
-    reviewedCount: matches.length - lowConfidenceCount,
-  };
+  if (useRuleBasedMatching) {
+    const matches = matchBlocksToSitecore(
+      limitedBlocks,
+      renderings,
+      templates,
+    );
+    const lowConfidenceCount = matches.filter((match) => match.needsReview).length;
+
+    return {
+      success: true,
+      message: `${summarizeComponentMapping(limitedBlocks, renderings, matches)} Rule-based matching. ${lowConfidenceCount} need manual review.${skippedNote}`,
+      provider,
+      matchStrategy: "rule-based",
+      matches,
+      lowConfidenceCount,
+      reviewedCount: matches.length - lowConfidenceCount,
+    };
+  }
+
+  if (!apiKey.trim()) {
+    return {
+      success: false,
+      message:
+        "Add an API key for LLM matching, or enable rule-based matching.",
+    };
+  }
+
+  let modelId: string | undefined;
+  const apiCalls = Math.ceil(limitedBlocks.length / BLOCKS_PER_PASS);
+
+  try {
+    const { matches: rawMatches, modelId: usedModel } =
+      await matchBlocksInChunks(
+        provider,
+        apiKey,
+        limitedBlocks,
+        renderings,
+        templates,
+      );
+    modelId = usedModel;
+
+    const llmMatches = normalizeLlmMatches(
+      rawMatches,
+      limitedBlocks,
+      renderings,
+      templates,
+    );
+    const matches = buildLlmOnlyMatches(limitedBlocks, llmMatches);
+    const lowConfidenceCount = matches.filter((match) => match.needsReview).length;
+    const resolvedCount = matches.filter((match) =>
+      isResolvableLlmMatch(match),
+    ).length;
+
+    return {
+      success: true,
+      message: `${summarizeComponentMapping(limitedBlocks, renderings, matches)} LLM matched ${resolvedCount}/${matches.length} block(s) in ${apiCalls} call(s). ${lowConfidenceCount} need manual review.${skippedNote}`,
+      provider,
+      modelId,
+      matchStrategy: "llm",
+      matches,
+      lowConfidenceCount,
+      reviewedCount: matches.length - lowConfidenceCount,
+    };
+  } catch (error) {
+    const rawMessage =
+      error instanceof Error ? error.message : "AI matching request failed.";
+
+    return {
+      success: false,
+      message: `LLM matching failed: ${formatLlmError(rawMessage, provider)}. Enable rule-based matching to match without an API key.`,
+      provider,
+    };
+  }
 }
 
 export function flattenCrawlBlocks(pages: CrawledPage[]): FlatContentBlock[] {

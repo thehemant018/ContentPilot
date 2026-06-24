@@ -19,6 +19,7 @@ export function getLlmConfig(): LlmConfig {
       provider: parsed.provider === "claude" ? "claude" : "gemini",
       geminiApiKey: parsed.geminiApiKey?.trim() || undefined,
       claudeApiKey: parsed.claudeApiKey?.trim() || undefined,
+      useRuleBasedMatching: parsed.useRuleBasedMatching === true,
     };
   } catch {
     return { provider: "gemini" };

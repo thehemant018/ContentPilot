@@ -40,6 +40,23 @@ function scoreTemplateRelevance(
   return score;
 }
 
+export function pickTemplatesForLlmPrompt(
+  templates: TemplateDefinition[],
+): TemplateDefinition[] {
+  const datasourceTemplates = templates.filter(
+    (template) =>
+      template.fields.length > 0 && !/\bparameters?\b/i.test(template.name),
+  );
+
+  if (datasourceTemplates.length > 0) {
+    return datasourceTemplates.slice(0, MAX_TEMPLATES_IN_PROMPT);
+  }
+
+  return templates
+    .filter((template) => template.fields.length > 0)
+    .slice(0, MAX_TEMPLATES_IN_PROMPT);
+}
+
 export function pickRelevantTemplates(
   blocks: FlatContentBlock[],
   templates: TemplateDefinition[],
@@ -113,16 +130,18 @@ export function buildCombinedMatchPrompt(
   renderings: DiscoveryItem[],
   templates: TemplateDefinition[],
 ): string {
-  const relevantTemplates = pickRelevantTemplates(blocks, templates);
+  const datasourceTemplates = pickTemplatesForLlmPrompt(templates);
 
-  return `Sitecore migration: match each HTML block to a rendering + template.
-Prefer name alignment with crawl block type (hero→Hero, rich-text→Rich Text, card-grid→Card/Grid, media→Image/Media, cta→CTA).
+  return `Sitecore migration: match each crawled HTML block to a rendering + datasource template.
+Use only names from the lists below. Pick datasource templates (with fields), never *Parameters* templates.
+Match by heading, body text, and structure — not only crawl block type.
+Semantic hints: hero/banner/jumbotron→Hero; blockquote/featured quote/testimonial/pull quote→Quote; video/youtube/embed→Video; image-only→media component if listed; rich text/article→text component; card grid/features/testimonials→grid/card component if listed.
 Return JSON only: {"matches":[{"blockId":"","matchScore":0-100,"confidence":"high|medium|low","renderingName":"","templateName":"","reason":""}]}
 Rules: one match per block; use only listed names; reason max 8 words; no field mappings.
 
 RENDERINGS: ${compactRenderings(renderings)}
 TEMPLATES:
-${compactTemplateCatalog(relevantTemplates)}
+${compactTemplateCatalog(datasourceTemplates)}
 BLOCKS:
 ${compactBlocksForMatchPass(blocks)}`;
 }
