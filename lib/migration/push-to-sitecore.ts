@@ -1,5 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { resolveMediaFieldsForComponent } from "@/lib/migration/resolve-media-fields";
 import {
   ensureSitecoreItemExists,
   getSitecoreItemByPath,
@@ -9,6 +10,10 @@ import {
   editItemById,
   splitSitecoreItemPath,
 } from "@/lib/sitecore/item-service-client";
+import {
+  normalizeMediaUploadPath,
+  type UploadMediaResult,
+} from "@/lib/sitecore/media-upload";
 import { addRenderingToPage } from "@/lib/sitecore/presentation-client";
 import {
   getMigrationDataRoot,
@@ -73,6 +78,7 @@ async function upsertDatasource(
   instanceUrl: string,
   accessToken: string,
   component: MigrationComponentExport,
+  fields: Record<string, string>,
 ): Promise<{ created: boolean; updated: boolean; path: string }> {
   const language = component.presentation.language || "en";
   const datasourcePath = component.datasource.path;
@@ -96,7 +102,7 @@ async function upsertDatasource(
       instanceUrl,
       accessToken,
       existing.itemId,
-      component.datasource.fields,
+      fields,
       { language, database: "master" },
     );
     return { created: false, updated: true, path: datasourcePath };
@@ -109,23 +115,22 @@ async function upsertDatasource(
     component.datasource.templateName,
   );
 
-  const fieldPayload = component.datasource.fields;
   const created = await createItem(
     instanceUrl,
     accessToken,
     parentPath,
     itemName,
     templateId,
-    fieldPayload,
+    fields,
     { language, database: "master" },
   );
 
-  if (created.ItemID && Object.keys(fieldPayload).length > 0) {
+  if (created.ItemID && Object.keys(fields).length > 0) {
     await editItemById(
       instanceUrl,
       accessToken,
       created.ItemID,
-      fieldPayload,
+      fields,
       { language, database: "master" },
     );
   }
@@ -161,6 +166,10 @@ export async function pushLatestBatchToSitecore(
   const results: MigrationPushComponentResult[] = [];
   let pushedCount = 0;
   let failedCount = 0;
+  const mediaLibraryPath = normalizeMediaUploadPath(
+    latest.manifest.mediaLibraryPath ?? "uploads/migratex",
+  );
+  const uploadCache = new Map<string, UploadMediaResult>();
 
   for (const component of components) {
     const result: MigrationPushComponentResult = {
@@ -170,14 +179,26 @@ export async function pushLatestBatchToSitecore(
       datasourceCreated: false,
       datasourceUpdated: false,
       presentationAssigned: false,
+      mediaUploaded: 0,
       warnings: [],
     };
 
     try {
+      const resolvedFields = await resolveMediaFieldsForComponent(
+        instanceUrl,
+        accessToken,
+        component,
+        mediaLibraryPath,
+        uploadCache,
+      );
+      result.mediaUploaded = resolvedFields.uploadedCount;
+      result.warnings.push(...resolvedFields.warnings);
+
       const datasource = await upsertDatasource(
         instanceUrl,
         accessToken,
         component,
+        resolvedFields.fields,
       );
       result.datasourceCreated = datasource.created;
       result.datasourceUpdated = datasource.updated;

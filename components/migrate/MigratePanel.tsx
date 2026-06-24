@@ -132,7 +132,8 @@ export function MigratePanel({ embedded = false }: { embedded?: boolean }) {
         <p className="mt-1 text-sm text-zinc-600">
           Uses the matched Sitecore template and rendering from AI Match (e.g.
           Hero). Creates a content item under the page&apos;s Data item, fills
-          your fields, and assigns the rendering on the target page.
+          your fields, uploads crawled images to the media library, and assigns
+          the rendering on the target page.
         </p>
       </div>
 
@@ -248,6 +249,12 @@ export function MigratePanel({ embedded = false }: { embedded?: boolean }) {
                       {" · "}
                       Presentation:{" "}
                       {entry.presentationAssigned ? "assigned" : "not assigned"}
+                      {(entry.mediaUploaded ?? 0) > 0 && (
+                        <>
+                          {" · "}
+                          Media: {entry.mediaUploaded} uploaded
+                        </>
+                      )}
                     </p>
                     {entry.error && (
                       <p className="mt-1 text-xs text-rose-700">{entry.error}</p>

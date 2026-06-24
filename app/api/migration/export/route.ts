@@ -21,10 +21,13 @@ export async function POST(request: Request) {
   try {
     const body = (await request.json()) as {
       queue?: MigrationQueueItem[];
+      mediaLibraryPath?: string;
     };
 
     const queue = body.queue ?? [];
-    const result = await exportQueueToLocalData(queue);
+    const result = await exportQueueToLocalData(queue, {
+      mediaLibraryPath: body.mediaLibraryPath,
+    });
 
     return NextResponse.json<MigrationExportResult>(result, {
       status: result.success ? 200 : 400,

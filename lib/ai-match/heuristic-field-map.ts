@@ -83,7 +83,8 @@ export function buildHeuristicFieldMappings(
     used.add(field.name);
     mappings.push({
       sourceRegion: REGION_LABELS[region],
-      sourcePreview: trimmed.slice(0, 80),
+      sourcePreview:
+        region === "image" ? trimmed : trimmed.slice(0, 80),
       sitecoreField: field.name,
       fieldType: field.type,
       section: field.section,
@@ -102,8 +103,8 @@ export function buildHeuristicFieldMappings(
   }
 
   const image = block.images[0];
-  if (image) {
-    addMapping("image", image.alt || image.src);
+  if (image?.src) {
+    addMapping("image", image.src);
   }
 
   const link = block.links[0];

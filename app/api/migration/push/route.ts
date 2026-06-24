@@ -6,7 +6,7 @@ import {
 } from "@/lib/sitecore/request-auth";
 import type { MigrationPushResult } from "@/types/migration-export";
 
-export const maxDuration = 120;
+export const maxDuration = 300;
 
 export async function POST(request: Request) {
   const auth = getAuthFromRequest(request);

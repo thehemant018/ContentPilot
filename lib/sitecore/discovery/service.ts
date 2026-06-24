@@ -477,6 +477,7 @@ export async function runDiscovery(
   return {
     success: true,
     message: `Discovery complete for site "${input.siteName}". All paths verified (read-only).`,
+    mediaPath,
     pathValidation,
     allPathsValid: true,
     renderings,

@@ -29,6 +29,7 @@ export function getMigrationDataRoot(): string {
 
 export async function exportQueueToLocalData(
   queue: MigrationQueueItem[],
+  options?: { mediaLibraryPath?: string },
 ): Promise<MigrationExportResult> {
   if (queue.length === 0) {
     return {
@@ -101,6 +102,7 @@ export async function exportQueueToLocalData(
     pageCount: pageExports.length,
     components: componentFiles,
     pages: pageFiles,
+    mediaLibraryPath: options?.mediaLibraryPath?.trim() || undefined,
   };
 
   await writeJson(path.join(batchDir, "manifest.json"), manifest);

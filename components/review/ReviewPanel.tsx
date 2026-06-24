@@ -13,6 +13,7 @@ import {
 import {
   getAiMatchResult,
   getCrawlResult,
+  getDiscoveryResult,
 } from "@/lib/storage/workflow-data";
 import {
   isAiMatchPhaseComplete,
@@ -101,10 +102,14 @@ export function ReviewPanel({ embedded = false }: { embedded?: boolean }) {
     }
 
     try {
+      const discovery = getDiscoveryResult();
       const response = await fetch("/api/migration/export", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ queue: currentQueue }),
+        body: JSON.stringify({
+          queue: currentQueue,
+          mediaLibraryPath: discovery?.mediaPath,
+        }),
       });
 
       const payload = (await response.json()) as MigrationExportResult;
@@ -178,9 +183,15 @@ export function ReviewPanel({ embedded = false }: { embedded?: boolean }) {
         <p className="mt-1 text-sm text-zinc-600">
           Set target page paths, datasource paths, and presentation placeholders.
           Export writes component JSON to the local{" "}
-          <span className="font-mono">data/migrations</span> folder with
-          datasource field values and presentation details.
+          <span className="font-mono">data/migrations</span> folder. On push,
+          crawled image URLs are uploaded to the Discovery media library path.
         </p>
+        {getDiscoveryResult()?.mediaPath && (
+          <p className="mt-2 text-xs text-zinc-500">
+            Media upload folder:{" "}
+            <span className="font-mono">{getDiscoveryResult()?.mediaPath}</span>
+          </p>
+        )}
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3">

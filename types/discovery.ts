@@ -46,6 +46,8 @@ export interface DiscoveryPathsInput {
 export interface DiscoveryResult {
   success: boolean;
   message: string;
+  /** Media library folder path from Discovery (used when uploading crawled images). */
+  mediaPath?: string;
   pathValidation?: PathValidationResult[];
   allPathsValid?: boolean;
   renderings?: DiscoveryItem[];

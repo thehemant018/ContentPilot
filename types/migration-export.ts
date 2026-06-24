@@ -51,6 +51,8 @@ export interface MigrationExportManifest {
   pageCount: number;
   components: string[];
   pages: string[];
+  /** Sitecore media library folder for crawled image uploads during push. */
+  mediaLibraryPath?: string;
 }
 
 export interface MigrationExportResult {
@@ -69,6 +71,7 @@ export interface MigrationPushComponentResult {
   datasourceCreated: boolean;
   datasourceUpdated: boolean;
   presentationAssigned: boolean;
+  mediaUploaded?: number;
   warnings: string[];
   error?: string;
 }
