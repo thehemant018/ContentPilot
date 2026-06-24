@@ -1,6 +1,7 @@
 import { Header } from "@/components/landing/Header";
 import { Hero } from "@/components/landing/Hero";
 import { WorkflowTabs } from "@/components/workflow/WorkflowTabs";
+import { Analytics } from "@vercel/analytics/next"
 
 export default function Home() {
   return (
@@ -14,6 +15,7 @@ export default function Home() {
         MigrateX performs read-only Sitecore operations until you explicitly
         approve migration changes.
       </footer>
+      <Analytics />
     </div>
   );
 }
