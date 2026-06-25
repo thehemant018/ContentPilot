@@ -1,3 +1,7 @@
+import {
+  DEFAULT_MIGRATION_LANGUAGE,
+  DEFAULT_PRESENTATION_PLACEHOLDER,
+} from "@/lib/migration/constants";
 import { buildSxaDatasourceParentPath } from "@/lib/sitecore/item-lookup";
 import type {
   MigrationComponentExport,
@@ -5,8 +9,8 @@ import type {
 } from "@/types/migration-export";
 import type { MigrationQueueItem } from "@/types/migration-queue";
 
-const DEFAULT_PLACEHOLDER = "main";
-const DEFAULT_LANGUAGE = "en";
+const DEFAULT_PLACEHOLDER = DEFAULT_PRESENTATION_PLACEHOLDER;
+const DEFAULT_LANGUAGE = DEFAULT_MIGRATION_LANGUAGE;
 
 export function sanitizePathSegment(value: string): string {
   return value

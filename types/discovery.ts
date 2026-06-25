@@ -19,7 +19,8 @@ export interface DiscoveryItem {
   itemId: string;
   name: string;
   path: string;
-  templateName: string;
+  /** Present during discovery fetch; stripped from persisted payload. */
+  templateName?: string;
   templateId?: string;
 }
 
@@ -46,11 +47,10 @@ export interface DiscoveryPathsInput {
 export interface DiscoveryResult {
   success: boolean;
   message: string;
-  /** Media library folder path from Discovery (used when uploading crawled images). */
+  /** Media library folder for crawled image uploads during migrate push. */
   mediaPath?: string;
+  /** Included only on failed discovery (paths not found). */
   pathValidation?: PathValidationResult[];
-  allPathsValid?: boolean;
   renderings?: DiscoveryItem[];
-  media?: DiscoveryItem[];
   templates?: TemplateDefinition[];
 }

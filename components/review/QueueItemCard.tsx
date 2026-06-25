@@ -4,6 +4,13 @@ import {
   buildComponentExport,
   buildDatasourcePath,
 } from "@/lib/migration/build-export";
+import {
+  reviewFieldInputClass,
+  reviewFieldLabelClass,
+  reviewInputMonoClass,
+  reviewLabelClass,
+  reviewTextareaClass,
+} from "@/components/review/form-styles";
 import type { EditableFieldValue, MigrationQueueItem } from "@/types/migration-queue";
 
 function ConfidenceBadge({
@@ -32,16 +39,7 @@ interface QueueItemCardProps {
   item: MigrationQueueItem;
   onUpdate: (
     id: string,
-    updates: Partial<
-      Pick<
-        MigrationQueueItem,
-        | "targetPagePath"
-        | "fields"
-        | "placeholder"
-        | "datasourcePath"
-        | "language"
-      >
-    >,
+    updates: Partial<Pick<MigrationQueueItem, "fields" | "datasourcePath">>,
   ) => void;
   onRemove: (id: string) => void;
 }
@@ -148,90 +146,32 @@ export function QueueItemCard({ item, onUpdate, onRemove }: QueueItemCardProps) 
         </div>
       </div>
 
-      <div className="mt-4 grid gap-4 md:grid-cols-2">
-        <div>
-          <label
-            htmlFor={`target-${item.id}`}
-            className="block text-xs font-semibold uppercase tracking-wide text-zinc-500"
-          >
-            Target Sitecore page path
-          </label>
-          <input
-            id={`target-${item.id}`}
-            type="text"
-            value={item.targetPagePath}
-            onChange={(event) =>
-              onUpdate(item.id, { targetPagePath: event.target.value })
-            }
-            placeholder="/sitecore/content/YourSite/Home"
-            className="mt-1.5 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm outline-none ring-rose-500 focus:border-rose-500 focus:ring-2"
-          />
-        </div>
-        <div>
-          <label
-            htmlFor={`placeholder-${item.id}`}
-            className="block text-xs font-semibold uppercase tracking-wide text-zinc-500"
-          >
-            Presentation placeholder
-          </label>
-          <input
-            id={`placeholder-${item.id}`}
-            type="text"
-            value={item.placeholder ?? "main"}
-            onChange={(event) =>
-              onUpdate(item.id, { placeholder: event.target.value })
-            }
-            placeholder="main"
-            className="mt-1.5 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm outline-none ring-rose-500 focus:border-rose-500 focus:ring-2"
-          />
-        </div>
-      </div>
-
-      <div className="mt-4 grid gap-4 md:grid-cols-2">
-        <div>
-          <label
-            htmlFor={`datasource-${item.id}`}
-            className="block text-xs font-semibold uppercase tracking-wide text-zinc-500"
-          >
-            Datasource item path
-          </label>
-          <input
-            id={`datasource-${item.id}`}
-            type="text"
-            value={item.datasourcePath ?? ""}
-            onChange={(event) =>
-              onUpdate(item.id, { datasourcePath: event.target.value })
-            }
-            placeholder={suggestedDatasource || "/sitecore/content/.../Data/..."}
-            className="mt-1.5 w-full rounded-lg border border-zinc-300 px-3 py-2 font-mono text-xs outline-none ring-rose-500 focus:border-rose-500 focus:ring-2"
-          />
-          <p className="mt-1 text-xs text-zinc-500">
-            Created under the page&apos;s SXA <span className="font-mono">Data</span>{" "}
-            item (local datasources), not a folder.
+      <div className="mt-4 rounded-xl border-2 border-zinc-200 bg-zinc-50/80 p-4">
+        <label
+          htmlFor={`datasource-${item.id}`}
+          className={reviewLabelClass}
+        >
+          Datasource item path
+        </label>
+        <input
+          id={`datasource-${item.id}`}
+          type="text"
+          value={item.datasourcePath ?? ""}
+          onChange={(event) =>
+            onUpdate(item.id, { datasourcePath: event.target.value })
+          }
+          placeholder={suggestedDatasource || "/sitecore/content/.../Data/..."}
+          className={reviewInputMonoClass}
+        />
+        <p className="mt-1.5 text-xs text-zinc-600">
+          Created under the page&apos;s SXA <span className="font-mono font-medium text-zinc-800">Data</span>{" "}
+          item (local datasources), not a folder.
+        </p>
+        {suggestedDatasource && !item.datasourcePath?.trim() && (
+          <p className="mt-1 text-xs text-zinc-600">
+            Auto: <span className="font-mono font-medium text-zinc-800">{suggestedDatasource}</span>
           </p>
-          {suggestedDatasource && !item.datasourcePath?.trim() && (
-            <p className="mt-1 text-xs text-zinc-500">
-              Auto: <span className="font-mono">{suggestedDatasource}</span>
-            </p>
-          )}
-        </div>
-        <div>
-          <label
-            htmlFor={`language-${item.id}`}
-            className="block text-xs font-semibold uppercase tracking-wide text-zinc-500"
-          >
-            Language
-          </label>
-          <input
-            id={`language-${item.id}`}
-            type="text"
-            value={item.language ?? "en"}
-            onChange={(event) =>
-              onUpdate(item.id, { language: event.target.value })
-            }
-            className="mt-1.5 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm outline-none ring-rose-500 focus:border-rose-500 focus:ring-2"
-          />
-        </div>
+        )}
       </div>
 
       {previewExport && (
@@ -280,7 +220,7 @@ export function QueueItemCard({ item, onUpdate, onRemove }: QueueItemCardProps) 
 
       <div className="mt-5">
         <div className="flex items-center justify-between gap-2">
-          <h5 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+          <h5 className="text-xs font-semibold uppercase tracking-wide text-zinc-700">
             Datasource field content
           </h5>
           <button
@@ -301,11 +241,11 @@ export function QueueItemCard({ item, onUpdate, onRemove }: QueueItemCardProps) 
             {item.fields.map((field) => (
               <div
                 key={field.id}
-                className="rounded-lg border border-zinc-200 bg-zinc-50 p-3"
+                className="rounded-lg border-2 border-zinc-200 bg-white p-3 shadow-sm"
               >
                 <div className="grid gap-3 md:grid-cols-2">
                   <div>
-                    <label className="block text-xs font-medium text-zinc-600">
+                    <label className={reviewFieldLabelClass}>
                       Sitecore field
                     </label>
                     <input
@@ -317,11 +257,11 @@ export function QueueItemCard({ item, onUpdate, onRemove }: QueueItemCardProps) 
                         })
                       }
                       placeholder="Title"
-                      className="mt-1 w-full rounded-md border border-zinc-300 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-rose-500 focus:ring-1 focus:ring-rose-500"
+                      className={reviewFieldInputClass}
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-zinc-600">
+                    <label className={reviewFieldLabelClass}>
                       Source region
                     </label>
                     <input
@@ -332,19 +272,19 @@ export function QueueItemCard({ item, onUpdate, onRemove }: QueueItemCardProps) 
                           sourceRegion: event.target.value,
                         })
                       }
-                      className="mt-1 w-full rounded-md border border-zinc-300 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-rose-500 focus:ring-1 focus:ring-rose-500"
+                      className={reviewFieldInputClass}
                     />
                   </div>
                 </div>
                 <div className="mt-3">
-                  <label className="block text-xs font-medium text-zinc-600">
+                  <label className={reviewFieldLabelClass}>
                     Content value
                   </label>
                   <textarea
                     value={field.value}
                     onChange={(event) => updateField(field.id, event.target.value)}
                     rows={3}
-                    className="mt-1 w-full rounded-md border border-zinc-300 bg-white px-2.5 py-2 text-sm outline-none focus:border-rose-500 focus:ring-1 focus:ring-rose-500"
+                    className={reviewTextareaClass}
                   />
                 </div>
                 {(field.fieldType || field.section) && (

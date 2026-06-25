@@ -27,6 +27,7 @@ export function AiMatchPanel({ embedded = false }: { embedded?: boolean }) {
   const [provider, setProvider] = useState<LlmProvider>("gemini");
   const [geminiApiKey, setGeminiApiKey] = useState("");
   const [claudeApiKey, setClaudeApiKey] = useState("");
+  const [groqApiKey, setGroqApiKey] = useState("");
   const [useRuleBasedMatching, setUseRuleBasedMatching] = useState(false);
   const [prerequisitesMet, setPrerequisitesMet] = useState(false);
   const [isMatching, setIsMatching] = useState(false);
@@ -37,14 +38,18 @@ export function AiMatchPanel({ embedded = false }: { embedded?: boolean }) {
   const [result, setResult] = useState<AiMatchResult | null>(null);
 
   const activeApiKey =
-    provider === "claude" ? claudeApiKey.trim() : geminiApiKey.trim();
+    provider === "claude"
+      ? claudeApiKey.trim()
+      : provider === "groq"
+        ? groqApiKey.trim()
+        : geminiApiKey.trim();
   const canRunMatch =
     useRuleBasedMatching || Boolean(activeApiKey);
   const matchModeLabel = useRuleBasedMatching
     ? "Rule-based matching"
     : activeApiKey
       ? `LLM · ${getDefaultModelLabel(provider)}`
-      : "Add API key or enable rule-based matching";
+      : `Add a ${provider === "groq" ? "Groq" : provider === "claude" ? "Claude" : "Gemini"} API key or enable rule-based matching`;
 
   useEffect(() => {
     queueMicrotask(() => {
@@ -52,6 +57,7 @@ export function AiMatchPanel({ embedded = false }: { embedded?: boolean }) {
       setProvider(config.provider);
       setGeminiApiKey(config.geminiApiKey ?? "");
       setClaudeApiKey(config.claudeApiKey ?? "");
+      setGroqApiKey(config.groqApiKey ?? "");
       setUseRuleBasedMatching(config.useRuleBasedMatching === true);
       setPrerequisitesMet(
         isDiscoveryPhaseComplete() &&
@@ -62,14 +68,24 @@ export function AiMatchPanel({ embedded = false }: { embedded?: boolean }) {
     });
   }, []);
 
-  function handleSaveKeys(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  function persistLlmConfig(nextProvider: LlmProvider = provider) {
     saveLlmConfig({
-      provider,
+      provider: nextProvider,
       geminiApiKey: geminiApiKey.trim() || undefined,
       claudeApiKey: claudeApiKey.trim() || undefined,
+      groqApiKey: groqApiKey.trim() || undefined,
       useRuleBasedMatching,
     });
+  }
+
+  function handleProviderChange(nextProvider: LlmProvider) {
+    setProvider(nextProvider);
+    persistLlmConfig(nextProvider);
+  }
+
+  function handleSaveKeys(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    persistLlmConfig();
     setFeedback({
       type: "success",
       message: "API keys saved in this browser (localStorage).",
@@ -85,12 +101,7 @@ export function AiMatchPanel({ embedded = false }: { embedded?: boolean }) {
     const crawl = getCrawlResult();
     const apiKey = activeApiKey;
 
-    saveLlmConfig({
-      provider,
-      geminiApiKey: geminiApiKey.trim() || undefined,
-      claudeApiKey: claudeApiKey.trim() || undefined,
-      useRuleBasedMatching,
-    });
+    persistLlmConfig();
 
     try {
       const response = await fetch("/api/ai-match", {
@@ -100,7 +111,13 @@ export function AiMatchPanel({ embedded = false }: { embedded?: boolean }) {
           provider,
           apiKey,
           useRuleBasedMatching,
-          discovery,
+          discovery: discovery
+            ? {
+                success: true,
+                renderings: discovery.renderings,
+                templates: discovery.templates,
+              }
+            : undefined,
           crawl,
         }),
       });
@@ -188,7 +205,7 @@ export function AiMatchPanel({ embedded = false }: { embedded?: boolean }) {
               name="llm-provider"
               value="gemini"
               checked={provider === "gemini"}
-              onChange={() => setProvider("gemini")}
+              onChange={() => handleProviderChange("gemini")}
             />
             Google Gemini ({getDefaultModelLabel("gemini")})
           </label>
@@ -198,13 +215,28 @@ export function AiMatchPanel({ embedded = false }: { embedded?: boolean }) {
               name="llm-provider"
               value="claude"
               checked={provider === "claude"}
-              onChange={() => setProvider("claude")}
+              onChange={() => handleProviderChange("claude")}
             />
             Anthropic Claude ({getDefaultModelLabel("claude")})
           </label>
+          <label className="flex items-center gap-2 text-sm text-zinc-700">
+            <input
+              type="radio"
+              name="llm-provider"
+              value="groq"
+              checked={provider === "groq"}
+              onChange={() => handleProviderChange("groq")}
+            />
+            Groq ({getDefaultModelLabel("groq")})
+          </label>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2">
+        <p className="text-xs text-zinc-500">
+          Run matching uses the <span className="font-medium">selected</span>{" "}
+          provider only. Select a provider above, then enter its API key below.
+        </p>
+
+        {provider === "gemini" && (
           <div>
             <label
               htmlFor="gemini-api-key"
@@ -222,6 +254,9 @@ export function AiMatchPanel({ embedded = false }: { embedded?: boolean }) {
               className="mt-1.5 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm outline-none ring-orange-500 focus:border-orange-500 focus:ring-2"
             />
           </div>
+        )}
+
+        {provider === "claude" && (
           <div>
             <label
               htmlFor="claude-api-key"
@@ -239,7 +274,27 @@ export function AiMatchPanel({ embedded = false }: { embedded?: boolean }) {
               className="mt-1.5 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm outline-none ring-orange-500 focus:border-orange-500 focus:ring-2"
             />
           </div>
-        </div>
+        )}
+
+        {provider === "groq" && (
+          <div>
+            <label
+              htmlFor="groq-api-key"
+              className="block text-sm font-medium text-zinc-700"
+            >
+              Groq API key
+            </label>
+            <input
+              id="groq-api-key"
+              type="password"
+              value={groqApiKey}
+              onChange={(event) => setGroqApiKey(event.target.value)}
+              placeholder="gsk_..."
+              autoComplete="off"
+              className="mt-1.5 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm outline-none ring-orange-500 focus:border-orange-500 focus:ring-2"
+            />
+          </div>
+        )}
 
         <p className="text-xs text-zinc-500">
           Keys stay in your browser only. Uncheck rule-based to use the LLM

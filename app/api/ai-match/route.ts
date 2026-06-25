@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { flattenCrawlBlocks, runAiMatch } from "@/lib/ai-match/service";
+import { slimDiscoveryResult } from "@/lib/sitecore/discovery/slim-result";
 import type { AiMatchInput, AiMatchResult } from "@/types/ai-match";
 import type { CrawlResult } from "@/types/crawl";
 import type { DiscoveryResult } from "@/types/discovery";
@@ -16,10 +17,17 @@ export async function POST(request: Request) {
       crawl?: CrawlResult;
     };
 
-    const provider = body.provider === "claude" ? "claude" : "gemini";
+    const provider =
+      body.provider === "claude"
+        ? "claude"
+        : body.provider === "groq"
+          ? "groq"
+          : "gemini";
     const apiKey = body.apiKey?.trim() ?? "";
     const useRuleBasedMatching = body.useRuleBasedMatching === true;
-    const discovery = body.discovery;
+    const discovery = body.discovery
+      ? slimDiscoveryResult(body.discovery)
+      : undefined;
     const crawl = body.crawl;
 
     if (!discovery?.success || !crawl?.success) {

@@ -1,5 +1,7 @@
 import { randomUUID } from "node:crypto";
 
+import { DEFAULT_PRESENTATION_PLACEHOLDER } from "@/lib/migration/constants";
+
 /** Default layout device used by most Sitecore / SXA pages. */
 export const DEFAULT_LAYOUT_DEVICE_ID = "FE5D7FDF-89C0-4D99-9AA3-B5FBD009C9F3";
 
@@ -26,7 +28,8 @@ export function buildRenderingElement(input: {
   const uid = formatSitecoreGuid(input.uid ?? randomUUID());
   const renderingId = formatSitecoreGuid(input.renderingId);
   const datasourceId = formatSitecoreGuid(input.datasourceId);
-  const placeholder = input.placeholder.trim() || "main";
+  const placeholder =
+    input.placeholder.trim() || DEFAULT_PRESENTATION_PLACEHOLDER;
 
   return `<r uid="${uid}" s:id="${renderingId}" s:ph="${placeholder}" s:ds="${datasourceId}" s:par="" s:ccb="Clear on publish" />`;
 }
