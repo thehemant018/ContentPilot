@@ -62,6 +62,7 @@ export function buildMediaItemPath(
   mediaFolderPath: string,
   sourceUrl: string,
   uniqueSuffix: string,
+  displayName?: string,
 ): { itemPath: string; fileName: string } {
   const folderPath = normalizeMediaUploadPath(mediaFolderPath);
 
@@ -74,11 +75,15 @@ export function buildMediaItemPath(
     if (parsed.ext) {
       ext = parsed.ext.toLowerCase();
     }
-    if (parsed.name) {
+    if (displayName?.trim()) {
+      stem = sanitizeMediaFileStem(displayName);
+    } else if (parsed.name) {
       stem = sanitizeMediaFileStem(parsed.name);
     }
   } catch {
-    // Keep defaults for invalid URLs.
+    if (displayName?.trim()) {
+      stem = sanitizeMediaFileStem(displayName);
+    }
   }
 
   const itemName = `${stem}-${uniqueSuffix.slice(0, 8)}`;
@@ -232,6 +237,7 @@ export async function uploadImageFromUrl(
     uniqueSuffix: string;
     language?: string;
     alt?: string;
+    displayName?: string;
   },
 ): Promise<UploadMediaResult> {
   const absoluteUrl = resolveAbsoluteImageUrl(sourceUrl);
@@ -239,6 +245,7 @@ export async function uploadImageFromUrl(
     options.mediaFolderPath,
     absoluteUrl,
     options.uniqueSuffix,
+    options.displayName ?? options.alt,
   );
 
   const { buffer, fileName: downloadedName, mimeType } =

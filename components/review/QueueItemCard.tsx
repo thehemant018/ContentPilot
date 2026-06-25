@@ -4,6 +4,8 @@ import {
   buildComponentExport,
   buildDatasourcePath,
 } from "@/lib/migration/build-export";
+import { isHttpImageFieldValue } from "@/lib/sitecore/media-upload";
+import { isSitecoreMediaPathValue } from "@/lib/sitecore/media-lookup";
 import {
   reviewFieldInputClass,
   reviewFieldLabelClass,
@@ -62,7 +64,9 @@ export function QueueItemCard({ item, onUpdate, onRemove }: QueueItemCardProps) 
 
   function updateFieldMeta(
     fieldId: string,
-    updates: Partial<Pick<EditableFieldValue, "sitecoreField" | "sourceRegion">>,
+    updates: Partial<
+      Pick<EditableFieldValue, "sitecoreField" | "sourceRegion" | "imageAlt">
+    >,
   ): void {
     onUpdate(item.id, {
       fields: item.fields.map((field) =>
@@ -285,8 +289,40 @@ export function QueueItemCard({ item, onUpdate, onRemove }: QueueItemCardProps) 
                     onChange={(event) => updateField(field.id, event.target.value)}
                     rows={3}
                     className={reviewTextareaClass}
+                    placeholder={
+                      field.fieldType?.toLowerCase().includes("image") ||
+                      /\b(image|photo|media)\b/i.test(field.sitecoreField)
+                        ? "https://... or /sitecore/media/Project/YourFolder/image-name"
+                        : undefined
+                    }
                   />
+                  {(field.fieldType?.toLowerCase().includes("image") ||
+                    /\b(image|photo|media)\b/i.test(field.sitecoreField)) && (
+                    <p className="mt-1.5 text-xs text-zinc-600">
+                      Paste a crawled image URL to upload, or an existing Sitecore
+                      media item path to reuse without uploading.
+                    </p>
+                  )}
                 </div>
+                {isHttpImageFieldValue(field.value) &&
+                  !isSitecoreMediaPathValue(field.value) && (
+                  <div className="mt-3">
+                    <label className={reviewFieldLabelClass}>
+                      Image alt text (used on media upload)
+                    </label>
+                    <input
+                      type="text"
+                      value={field.imageAlt ?? ""}
+                      onChange={(event) =>
+                        updateFieldMeta(field.id, {
+                          imageAlt: event.target.value,
+                        })
+                      }
+                      placeholder="From crawled img alt or file name"
+                      className={reviewFieldInputClass}
+                    />
+                  </div>
+                )}
                 {(field.fieldType || field.section) && (
                   <p className="mt-2 text-xs text-zinc-500">
                     {field.fieldType && `Type: ${field.fieldType}`}

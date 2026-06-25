@@ -1,4 +1,5 @@
 import { VALIDATE_PATH_QUERY } from "@/lib/sitecore/discovery/queries";
+import { normalizeSitecoreItemPath } from "@/lib/migration/sitecore-path";
 import { executeGraphQL } from "@/lib/sitecore/graphql-client";
 
 interface ValidatePathGraphResult {
@@ -24,7 +25,7 @@ export async function getSitecoreItemByPath(
     instanceUrl,
     accessToken,
     VALIDATE_PATH_QUERY,
-    { path: itemPath.trim() },
+    { path: normalizeSitecoreItemPath(itemPath) },
   );
 
   if (!data.item?.itemId || !data.item.path) {

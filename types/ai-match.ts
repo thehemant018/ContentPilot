@@ -5,9 +5,6 @@ export type LlmProvider = "gemini" | "claude" | "groq";
 
 export interface LlmConfig {
   provider: LlmProvider;
-  geminiApiKey?: string;
-  claudeApiKey?: string;
-  groqApiKey?: string;
   /** When true, use keyword/name matching only. When false, LLM is required. */
   useRuleBasedMatching?: boolean;
 }
@@ -23,6 +20,8 @@ export interface FieldMapping {
   sitecoreField: string;
   fieldType?: string;
   section?: string;
+  /** Crawled img alt text when the mapped value is an image URL. */
+  imageAlt?: string;
 }
 
 export type MatchConfidence = "high" | "medium" | "low";
@@ -34,6 +33,7 @@ export interface BlockMatchResult {
   pageUrl: string;
   blockType: string;
   blockHeading?: string;
+  parentBlockId?: string;
   matchScore: number;
   confidence: MatchConfidence;
   renderingName: string;
@@ -43,6 +43,8 @@ export interface BlockMatchResult {
   reasoning: string;
   fieldMappings: FieldMapping[];
   needsReview: boolean;
+  /** True when no Sitecore component in discovery fits this block. */
+  unmatched?: boolean;
 }
 
 export interface AiMatchInput {

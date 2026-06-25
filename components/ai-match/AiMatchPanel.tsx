@@ -23,12 +23,22 @@ import {
 } from "@/lib/workflow/progress";
 import type { AiMatchResult, LlmProvider } from "@/types/ai-match";
 
+const PROVIDER_LABELS: Record<LlmProvider, string> = {
+  gemini: "Google Gemini",
+  claude: "Anthropic Claude",
+  groq: "Groq",
+};
+
 export function AiMatchPanel({ embedded = false }: { embedded?: boolean }) {
   const [provider, setProvider] = useState<LlmProvider>("gemini");
-  const [geminiApiKey, setGeminiApiKey] = useState("");
-  const [claudeApiKey, setClaudeApiKey] = useState("");
-  const [groqApiKey, setGroqApiKey] = useState("");
   const [useRuleBasedMatching, setUseRuleBasedMatching] = useState(false);
+  const [providerConfigured, setProviderConfigured] = useState<
+    Record<LlmProvider, boolean>
+  >({
+    gemini: false,
+    claude: false,
+    groq: false,
+  });
   const [prerequisitesMet, setPrerequisitesMet] = useState(false);
   const [isMatching, setIsMatching] = useState(false);
   const [feedback, setFeedback] = useState<{
@@ -37,27 +47,18 @@ export function AiMatchPanel({ embedded = false }: { embedded?: boolean }) {
   } | null>(null);
   const [result, setResult] = useState<AiMatchResult | null>(null);
 
-  const activeApiKey =
-    provider === "claude"
-      ? claudeApiKey.trim()
-      : provider === "groq"
-        ? groqApiKey.trim()
-        : geminiApiKey.trim();
-  const canRunMatch =
-    useRuleBasedMatching || Boolean(activeApiKey);
+  const llmReady = providerConfigured[provider];
+  const canRunMatch = useRuleBasedMatching || llmReady;
   const matchModeLabel = useRuleBasedMatching
     ? "Rule-based matching"
-    : activeApiKey
+    : llmReady
       ? `LLM · ${getDefaultModelLabel(provider)}`
-      : `Add a ${provider === "groq" ? "Groq" : provider === "claude" ? "Claude" : "Gemini"} API key or enable rule-based matching`;
+      : `Set ${provider === "claude" ? "ANTHROPIC_API_KEY" : provider === "groq" ? "GROQ_API_KEY" : "GEMINI_API_KEY"} in .env.local`;
 
   useEffect(() => {
     queueMicrotask(() => {
       const config = getLlmConfig();
       setProvider(config.provider);
-      setGeminiApiKey(config.geminiApiKey ?? "");
-      setClaudeApiKey(config.claudeApiKey ?? "");
-      setGroqApiKey(config.groqApiKey ?? "");
       setUseRuleBasedMatching(config.useRuleBasedMatching === true);
       setPrerequisitesMet(
         isDiscoveryPhaseComplete() &&
@@ -66,15 +67,26 @@ export function AiMatchPanel({ embedded = false }: { embedded?: boolean }) {
           Boolean(getCrawlResult()),
       );
     });
+
+    void fetch("/api/ai-match")
+      .then((response) => response.json())
+      .then((payload: { configured?: Record<LlmProvider, boolean> }) => {
+        if (payload.configured) {
+          setProviderConfigured(payload.configured);
+        }
+      })
+      .catch(() => {
+        /* env status is optional for UI hints */
+      });
   }, []);
 
-  function persistLlmConfig(nextProvider: LlmProvider = provider) {
+  function persistLlmConfig(
+    nextProvider: LlmProvider = provider,
+    nextRuleBased: boolean = useRuleBasedMatching,
+  ) {
     saveLlmConfig({
       provider: nextProvider,
-      geminiApiKey: geminiApiKey.trim() || undefined,
-      claudeApiKey: claudeApiKey.trim() || undefined,
-      groqApiKey: groqApiKey.trim() || undefined,
-      useRuleBasedMatching,
+      useRuleBasedMatching: nextRuleBased,
     });
   }
 
@@ -83,13 +95,9 @@ export function AiMatchPanel({ embedded = false }: { embedded?: boolean }) {
     persistLlmConfig(nextProvider);
   }
 
-  function handleSaveKeys(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    persistLlmConfig();
-    setFeedback({
-      type: "success",
-      message: "API keys saved in this browser (localStorage).",
-    });
+  function handleRuleBasedChange(checked: boolean) {
+    setUseRuleBasedMatching(checked);
+    persistLlmConfig(provider, checked);
   }
 
   async function handleRunMatch() {
@@ -99,7 +107,6 @@ export function AiMatchPanel({ embedded = false }: { embedded?: boolean }) {
 
     const discovery = getDiscoveryResult();
     const crawl = getCrawlResult();
-    const apiKey = activeApiKey;
 
     persistLlmConfig();
 
@@ -109,7 +116,6 @@ export function AiMatchPanel({ embedded = false }: { embedded?: boolean }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           provider,
-          apiKey,
           useRuleBasedMatching,
           discovery: discovery
             ? {
@@ -185,127 +191,51 @@ export function AiMatchPanel({ embedded = false }: { embedded?: boolean }) {
           )}
         </div>
         <p className="mt-1 text-sm text-zinc-600">
-          Choose rule-based name matching, or LLM matching with an API key. There
-          is no automatic fallback between the two modes.
+          API keys are read from your server environment (.env.local). Choose a
+          provider and run matching, or use rule-based matching without an LLM.
         </p>
       </div>
 
       <ReturnToCrawlBanner />
 
-      <form
-        onSubmit={handleSaveKeys}
-        className="space-y-4 rounded-xl border border-zinc-200 bg-zinc-50 p-5"
-      >
-        <h4 className="text-sm font-semibold text-zinc-900">LLM provider</h4>
-
-        <div className="flex flex-wrap gap-4">
-          <label className="flex items-center gap-2 text-sm text-zinc-700">
-            <input
-              type="radio"
-              name="llm-provider"
-              value="gemini"
-              checked={provider === "gemini"}
-              onChange={() => handleProviderChange("gemini")}
-            />
-            Google Gemini ({getDefaultModelLabel("gemini")})
+      <div className="space-y-4 rounded-xl border border-zinc-200 bg-zinc-50 p-5">
+        <div>
+          <label
+            htmlFor="llm-provider"
+            className="block text-sm font-semibold text-zinc-900"
+          >
+            LLM provider
           </label>
-          <label className="flex items-center gap-2 text-sm text-zinc-700">
-            <input
-              type="radio"
-              name="llm-provider"
-              value="claude"
-              checked={provider === "claude"}
-              onChange={() => handleProviderChange("claude")}
-            />
-            Anthropic Claude ({getDefaultModelLabel("claude")})
-          </label>
-          <label className="flex items-center gap-2 text-sm text-zinc-700">
-            <input
-              type="radio"
-              name="llm-provider"
-              value="groq"
-              checked={provider === "groq"}
-              onChange={() => handleProviderChange("groq")}
-            />
-            Groq ({getDefaultModelLabel("groq")})
-          </label>
+          <select
+            id="llm-provider"
+            value={provider}
+            onChange={(event) =>
+              handleProviderChange(event.target.value as LlmProvider)
+            }
+            disabled={useRuleBasedMatching}
+            className="mt-1.5 w-full max-w-sm rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm outline-none ring-orange-500 focus:border-orange-500 focus:ring-2 disabled:cursor-not-allowed disabled:bg-zinc-100 disabled:text-zinc-500"
+          >
+            {(Object.keys(PROVIDER_LABELS) as LlmProvider[]).map((key) => (
+              <option key={key} value={key}>
+                {PROVIDER_LABELS[key]} ({getDefaultModelLabel(key)})
+                {providerConfigured[key] ? "" : " — key not set"}
+              </option>
+            ))}
+          </select>
+          {!useRuleBasedMatching && (
+            <p className="mt-1.5 text-xs text-zinc-500">
+              {llmReady
+                ? `${PROVIDER_LABELS[provider]} API key found in environment.`
+                : `No API key in environment for ${PROVIDER_LABELS[provider]}. Add the key to .env.local and restart the dev server.`}
+            </p>
+          )}
         </div>
-
-        <p className="text-xs text-zinc-500">
-          Run matching uses the <span className="font-medium">selected</span>{" "}
-          provider only. Select a provider above, then enter its API key below.
-        </p>
-
-        {provider === "gemini" && (
-          <div>
-            <label
-              htmlFor="gemini-api-key"
-              className="block text-sm font-medium text-zinc-700"
-            >
-              Gemini API key
-            </label>
-            <input
-              id="gemini-api-key"
-              type="password"
-              value={geminiApiKey}
-              onChange={(event) => setGeminiApiKey(event.target.value)}
-              placeholder="AIza..."
-              autoComplete="off"
-              className="mt-1.5 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm outline-none ring-orange-500 focus:border-orange-500 focus:ring-2"
-            />
-          </div>
-        )}
-
-        {provider === "claude" && (
-          <div>
-            <label
-              htmlFor="claude-api-key"
-              className="block text-sm font-medium text-zinc-700"
-            >
-              Claude API key
-            </label>
-            <input
-              id="claude-api-key"
-              type="password"
-              value={claudeApiKey}
-              onChange={(event) => setClaudeApiKey(event.target.value)}
-              placeholder="sk-ant-..."
-              autoComplete="off"
-              className="mt-1.5 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm outline-none ring-orange-500 focus:border-orange-500 focus:ring-2"
-            />
-          </div>
-        )}
-
-        {provider === "groq" && (
-          <div>
-            <label
-              htmlFor="groq-api-key"
-              className="block text-sm font-medium text-zinc-700"
-            >
-              Groq API key
-            </label>
-            <input
-              id="groq-api-key"
-              type="password"
-              value={groqApiKey}
-              onChange={(event) => setGroqApiKey(event.target.value)}
-              placeholder="gsk_..."
-              autoComplete="off"
-              className="mt-1.5 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm outline-none ring-orange-500 focus:border-orange-500 focus:ring-2"
-            />
-          </div>
-        )}
-
-        <p className="text-xs text-zinc-500">
-          Keys stay in your browser only. Uncheck rule-based to use the LLM
-          (API key required). Check rule-based to skip the LLM entirely.
-        </p>
 
         <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-zinc-200 bg-white px-4 py-3">
           <input
             type="checkbox"
             checked={useRuleBasedMatching}
-            onChange={(event) => setUseRuleBasedMatching(event.target.checked)}
+            onChange={(event) => handleRuleBasedChange(event.target.checked)}
             className="mt-0.5 h-4 w-4 rounded border-zinc-300 text-orange-500 focus:ring-orange-500"
           />
           <span className="text-sm text-zinc-700">
@@ -319,24 +249,17 @@ export function AiMatchPanel({ embedded = false }: { embedded?: boolean }) {
           </span>
         </label>
 
-        <button
-          type="submit"
-          className="inline-flex items-center justify-center rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm font-semibold text-zinc-800 transition-colors hover:bg-zinc-100"
-        >
-          Save API keys
-        </button>
-      </form>
-
-      <div className="flex flex-wrap items-center gap-3">
-        <button
-          type="button"
-          onClick={() => void handleRunMatch()}
-          disabled={isMatching || !canRunMatch}
-          className="inline-flex items-center justify-center rounded-lg bg-orange-500 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {isMatching ? "Matching blocks…" : "Run matching"}
-        </button>
-        <span className="text-xs text-zinc-500">{matchModeLabel}</span>
+        <div className="flex flex-wrap items-center gap-3 pt-1">
+          <button
+            type="button"
+            onClick={() => void handleRunMatch()}
+            disabled={isMatching || !canRunMatch}
+            className="inline-flex items-center justify-center rounded-lg bg-orange-500 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {isMatching ? "Matching blocks…" : "Run matching"}
+          </button>
+          <span className="text-xs text-zinc-500">{matchModeLabel}</span>
+        </div>
       </div>
 
       {feedback && (

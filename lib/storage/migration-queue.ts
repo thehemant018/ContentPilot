@@ -3,8 +3,15 @@ import {
   queueItemKey,
 } from "@/lib/migration-queue/from-match";
 import { DEFAULT_PRESENTATION_PLACEHOLDER } from "@/lib/migration/constants";
+import {
+  applyTargetPageChangeToQueueItem,
+  normalizeQueueItemPaths,
+} from "@/lib/migration/queue-sync";
+import { normalizeSourcePageUrl } from "@/lib/migration/sitecore-path";
 import { STORAGE_KEYS } from "@/lib/sitecore/constants";
+import { getCrawlResult } from "@/lib/storage/workflow-data";
 import type { BlockMatchResult } from "@/types/ai-match";
+import type { CrawlImage } from "@/types/crawl";
 import type { MigrationQueueItem } from "@/types/migration-queue";
 
 export const MIGRATION_QUEUE_CHANGED_EVENT = "migratex-migration-queue-changed";
@@ -52,9 +59,36 @@ export function isMatchInQueue(match: BlockMatchResult): boolean {
   );
 }
 
+function findBlockImages(match: BlockMatchResult): CrawlImage[] {
+  const crawl = getCrawlResult();
+  const page = crawl?.pages?.find((entry) => entry.url === match.pageUrl);
+  const parentBlock = match.parentBlockId
+    ? page?.blocks.find((entry) => entry.id === match.parentBlockId)
+    : undefined;
+  const block =
+    page?.blocks.find((entry) => entry.id === match.blockId) ??
+    parentBlock?.subBlocks?.find((entry) => entry.id === match.blockId);
+  return block?.images ?? [];
+}
+
 export function addMatchToQueue(
   match: BlockMatchResult,
 ): { success: boolean; message: string } {
+  if (match.unmatched) {
+    return {
+      success: false,
+      message:
+        "This block has no Sitecore component match and cannot be added to the queue.",
+    };
+  }
+
+  if (!match.renderingPath || !match.templatePath) {
+    return {
+      success: false,
+      message: "Resolve a rendering and template before adding to the queue.",
+    };
+  }
+
   if (isMatchInQueue(match)) {
     return {
       success: false,
@@ -63,9 +97,14 @@ export function addMatchToQueue(
   }
 
   const items = getMigrationQueue();
-  const newItem = queueItemFromMatch(match);
+  const newItem = normalizeQueueItemPaths(
+    queueItemFromMatch(match, findBlockImages(match)),
+  );
+  const normalizedPageUrl = normalizeSourcePageUrl(match.pageUrl);
+  newItem.sourcePageUrl = normalizedPageUrl;
   const existingOnPage = items.find(
-    (item) => item.sourcePageUrl === match.pageUrl,
+    (item) =>
+      normalizeSourcePageUrl(item.sourcePageUrl) === normalizedPageUrl,
   );
   if (existingOnPage) {
     newItem.targetPagePath = existingOnPage.targetPagePath;
@@ -87,9 +126,26 @@ export function updateQueueItemsForSourcePage(
     Pick<MigrationQueueItem, "targetPagePath" | "placeholder" | "language">
   >,
 ): void {
-  const items = getMigrationQueue().map((item) =>
-    item.sourcePageUrl === sourcePageUrl ? { ...item, ...updates } : item,
-  );
+  const normalizedSource = normalizeSourcePageUrl(sourcePageUrl);
+  const items = getMigrationQueue().map((item) => {
+    if (normalizeSourcePageUrl(item.sourcePageUrl) !== normalizedSource) {
+      return item;
+    }
+
+    if (updates.targetPagePath !== undefined) {
+      const withTarget = applyTargetPageChangeToQueueItem(
+        item,
+        updates.targetPagePath,
+      );
+      return {
+        ...withTarget,
+        placeholder: updates.placeholder ?? withTarget.placeholder,
+        language: updates.language ?? withTarget.language,
+      };
+    }
+
+    return { ...item, ...updates };
+  });
   saveMigrationQueue(items);
 }
 

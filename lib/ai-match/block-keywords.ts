@@ -6,6 +6,8 @@ export const BLOCK_TYPE_COMPONENT_KEYWORDS: Record<
   readonly string[]
 > = {
   hero: ["hero", "banner", "jumbotron", "masthead", "promo"],
+  quote: ["quote", "testimonial", "pull quote", "blockquote", "featured quote"],
+  video: ["video", "youtube", "vimeo", "embed", "media player"],
   "rich-text": [
     "rich text",
     "richtext",

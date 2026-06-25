@@ -11,6 +11,7 @@ export interface MigrationDatasourceExport {
     type?: string;
     section?: string;
     sourceRegion: string;
+    imageAlt?: string;
   }>;
 }
 
@@ -27,6 +28,7 @@ export interface MigrationPresentationExport {
 
 export interface MigrationComponentExport {
   queueItemId: string;
+  blockId?: string;
   exportedAt: string;
   blockType: string;
   blockHeading?: string;
@@ -38,40 +40,16 @@ export interface MigrationComponentExport {
   presentation: MigrationPresentationExport;
 }
 
-export interface MigrationPagePresentationExport {
-  targetPagePath: string;
-  language: string;
-  renderings: MigrationPresentationExport[];
-}
-
-export interface MigrationExportManifest {
-  batchId: string;
-  exportedAt: string;
-  componentCount: number;
-  pageCount: number;
-  components: string[];
-  pages: string[];
-  /** Sitecore media library folder for crawled image uploads during push. */
-  mediaLibraryPath?: string;
-}
-
-export interface MigrationExportResult {
-  success: boolean;
-  message: string;
-  batchId?: string;
-  outputDir?: string;
-  manifest?: MigrationExportManifest;
-  skipped?: Array<{ queueItemId: string; reason: string }>;
-}
-
 export interface MigrationPushComponentResult {
   queueItemId: string;
+  sourcePageUrl?: string;
   datasourcePath: string;
   targetPagePath: string;
   datasourceCreated: boolean;
   datasourceUpdated: boolean;
   presentationAssigned: boolean;
   mediaUploaded?: number;
+  mediaReused?: number;
   warnings: string[];
   error?: string;
 }
@@ -79,7 +57,6 @@ export interface MigrationPushComponentResult {
 export interface MigrationPushResult {
   success: boolean;
   message: string;
-  batchId?: string;
   results?: MigrationPushComponentResult[];
   pushedCount?: number;
   failedCount?: number;

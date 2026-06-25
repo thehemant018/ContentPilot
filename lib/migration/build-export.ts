@@ -2,10 +2,10 @@ import {
   DEFAULT_MIGRATION_LANGUAGE,
   DEFAULT_PRESENTATION_PLACEHOLDER,
 } from "@/lib/migration/constants";
+import { normalizeSitecoreItemPath } from "@/lib/migration/sitecore-path";
 import { buildSxaDatasourceParentPath } from "@/lib/sitecore/item-lookup";
 import type {
   MigrationComponentExport,
-  MigrationPagePresentationExport,
 } from "@/types/migration-export";
 import type { MigrationQueueItem } from "@/types/migration-queue";
 
@@ -51,7 +51,7 @@ export function buildComponentExport(
   index: number,
   exportedAt: string,
 ): MigrationComponentExport | null {
-  const targetPagePath = item.targetPagePath.trim();
+  const targetPagePath = normalizeSitecoreItemPath(item.targetPagePath);
   if (!targetPagePath) {
     return null;
   }
@@ -71,11 +71,13 @@ export function buildComponentExport(
       type: field.fieldType,
       section: field.section,
       sourceRegion: field.sourceRegion,
+      imageAlt: field.imageAlt?.trim() || undefined,
     });
   }
 
   return {
     queueItemId: item.id,
+    blockId: item.blockId,
     exportedAt,
     blockType: item.blockType,
     blockHeading: item.blockHeading,
@@ -102,33 +104,4 @@ export function buildComponentExport(
       index,
     },
   };
-}
-
-export function groupPresentationByPage(
-  components: MigrationComponentExport[],
-): MigrationPagePresentationExport[] {
-  const byPage = new Map<string, MigrationPagePresentationExport>();
-
-  for (const component of components) {
-    const key = component.targetPagePath;
-    const existing = byPage.get(key);
-    if (existing) {
-      existing.renderings.push(component.presentation);
-      continue;
-    }
-
-    byPage.set(key, {
-      targetPagePath: key,
-      language: component.presentation.language,
-      renderings: [component.presentation],
-    });
-  }
-
-  return Array.from(byPage.values()).sort((a, b) =>
-    a.targetPagePath.localeCompare(b.targetPagePath),
-  );
-}
-
-export function pageFileKey(targetPagePath: string): string {
-  return sanitizePathSegment(targetPagePath.replace(/\//g, "-")) || "page";
 }

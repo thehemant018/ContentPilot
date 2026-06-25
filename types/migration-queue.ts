@@ -7,6 +7,8 @@ export interface EditableFieldValue {
   fieldType?: string;
   section?: string;
   value: string;
+  /** Alt text for image URL values, used during media upload. */
+  imageAlt?: string;
 }
 
 export interface MigrationQueueItem {

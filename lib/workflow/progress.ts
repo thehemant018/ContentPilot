@@ -13,7 +13,6 @@ import {
 export const WORKFLOW_PROGRESS_EVENT = "migratex-workflow-progress-changed";
 export const CONTENT_MIGRATION_RESET_EVENT =
   "migratex-content-migration-reset";
-export const MIGRATION_EXPORT_EVENT = "migratex-migration-export-updated";
 
 function getPhaseIndex(phaseId: WorkflowPhaseId): number {
   return WORKFLOW_PHASES.findIndex((phase) => phase.id === phaseId);
@@ -203,10 +202,6 @@ export function returnToReviewPhase(): void {
   }
 
   window.location.hash = "review";
-}
-
-export function notifyMigrationExportUpdated(): void {
-  window.dispatchEvent(new Event(MIGRATION_EXPORT_EVENT));
 }
 
 export function canNavigateToPhase(
