@@ -98,9 +98,9 @@ export function CrawlPanel({ embedded = false }: { embedded?: boolean }) {
         </h3>
         <p className="mt-1 text-sm text-zinc-600">
           Paste a page URL or domain root. We fetch the HTML and detect semantic
-          blocks such as heroes, navigation, card grids, media, CTAs, and
-          footers. JavaScript-rendered pages may need a browser-based crawler
-          later.
+          content blocks such as heroes, card grids, media, CTAs, and rich text.
+          Headers, footers, navigation, and ads are excluded from the crawl JSON.
+          JavaScript-rendered pages may need a browser-based crawler later.
         </p>
       </div>
 

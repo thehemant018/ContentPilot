@@ -1,3 +1,7 @@
+import {
+  DEFAULT_MIGRATION_LANGUAGE,
+  DEFAULT_PRESENTATION_PLACEHOLDER,
+} from "@/lib/migration/constants";
 import type { BlockMatchResult } from "@/types/ai-match";
 import type {
   EditableFieldValue,
@@ -31,8 +35,8 @@ export function queueItemFromMatch(match: BlockMatchResult): MigrationQueueItem 
     confidence: match.confidence,
     reasoning: match.reasoning,
     targetPagePath: "",
-    placeholder: "main",
-    language: "en",
+    placeholder: DEFAULT_PRESENTATION_PLACEHOLDER,
+    language: DEFAULT_MIGRATION_LANGUAGE,
     fields,
   };
 }

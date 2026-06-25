@@ -12,7 +12,7 @@ function PathValidationSummary({
 }: {
   result: DiscoveryResult;
 }) {
-  if (!result.pathValidation?.length) {
+  if (result.success || !result.pathValidation?.length) {
     return null;
   }
 
@@ -36,9 +36,6 @@ function PathValidationSummary({
             </span>
             <span className="font-medium text-zinc-700">{item.label}:</span>
             <span className="font-mono text-xs text-zinc-600">{item.path}</span>
-            {item.name && (
-              <span className="text-xs text-zinc-500">({item.name})</span>
-            )}
           </li>
         ))}
       </ul>
@@ -55,7 +52,6 @@ function ItemList({
   items: Array<{
     name: string;
     path: string;
-    templateName: string;
   }>;
   emptyMessage: string;
 }) {
@@ -81,9 +77,6 @@ function ItemList({
               <p className="mt-0.5 font-mono text-xs text-zinc-500">
                 {item.path}
               </p>
-              <p className="mt-1 text-xs text-zinc-500">
-                Template: {item.templateName}
-              </p>
             </li>
           ))}
         </ul>
@@ -97,20 +90,20 @@ export function DiscoveryResults({ result }: DiscoveryResultsProps) {
     <div className="space-y-6 border-t border-zinc-200 pt-6">
       <PathValidationSummary result={result} />
 
-      {result.allPathsValid && (
+      {result.success && (
         <>
-          <div className="grid gap-4 lg:grid-cols-2">
-            <ItemList
-              title="Renderings"
-              items={result.renderings ?? []}
-              emptyMessage="No rendering items found under the provided path."
-            />
-            <ItemList
-              title="Media items"
-              items={result.media ?? []}
-              emptyMessage="No media items found under the provided path."
-            />
-          </div>
+          {result.mediaPath && (
+            <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-700">
+              <span className="font-medium text-zinc-900">Media upload folder:</span>{" "}
+              <span className="font-mono text-xs">{result.mediaPath}</span>
+            </div>
+          )}
+
+          <ItemList
+            title="Renderings"
+            items={result.renderings ?? []}
+            emptyMessage="No rendering items found under the provided path."
+          />
 
           <div className="flex max-h-[32rem] flex-col rounded-xl border border-zinc-200 bg-white p-4">
             <div className="flex shrink-0 items-center justify-between gap-2">
@@ -124,7 +117,7 @@ export function DiscoveryResults({ result }: DiscoveryResultsProps) {
 
             {!result.templates?.length ? (
               <p className="mt-3 text-sm text-zinc-500">
-                No template definitions found under the provided path.
+                No datasource templates found under the provided path.
               </p>
             ) : (
               <div className="mt-3 min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain pr-1 [scrollbar-gutter:stable]">
@@ -138,43 +131,37 @@ export function DiscoveryResults({ result }: DiscoveryResultsProps) {
                       {template.path}
                     </p>
 
-                    {template.fields.length === 0 ? (
-                      <p className="mt-2 text-xs text-zinc-500">
-                        No fields found for this template.
-                      </p>
-                    ) : (
-                      <div className="mt-3 overflow-x-auto rounded-md border border-zinc-200 bg-white">
-                        <table className="w-full min-w-[28rem] text-left text-xs">
-                          <thead className="bg-zinc-50">
-                            <tr className="border-b border-zinc-200 text-zinc-500">
-                              <th className="py-2 pr-3 pl-3 font-medium">
-                                Section
-                              </th>
-                              <th className="py-2 pr-3 font-medium">Field</th>
-                              <th className="py-2 pr-3 font-medium">Type</th>
+                    <div className="mt-3 overflow-x-auto rounded-md border border-zinc-200 bg-white">
+                      <table className="w-full min-w-[28rem] text-left text-xs">
+                        <thead className="bg-zinc-50">
+                          <tr className="border-b border-zinc-200 text-zinc-500">
+                            <th className="py-2 pr-3 pl-3 font-medium">
+                              Section
+                            </th>
+                            <th className="py-2 pr-3 font-medium">Field</th>
+                            <th className="py-2 pr-3 font-medium">Type</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {template.fields.map((field) => (
+                            <tr
+                              key={`${template.path}-${field.section}-${field.name}`}
+                              className="border-b border-zinc-100 last:border-0"
+                            >
+                              <td className="py-1.5 pr-3 pl-3 text-zinc-600">
+                                {field.section}
+                              </td>
+                              <td className="py-1.5 pr-3 font-medium text-zinc-800">
+                                {field.name}
+                              </td>
+                              <td className="py-1.5 pr-3 text-zinc-600">
+                                {field.type}
+                              </td>
                             </tr>
-                          </thead>
-                          <tbody>
-                            {template.fields.map((field) => (
-                              <tr
-                                key={`${template.path}-${field.section}-${field.name}`}
-                                className="border-b border-zinc-100 last:border-0"
-                              >
-                                <td className="py-1.5 pr-3 pl-3 text-zinc-600">
-                                  {field.section}
-                                </td>
-                                <td className="py-1.5 pr-3 font-medium text-zinc-800">
-                                  {field.name}
-                                </td>
-                                <td className="py-1.5 pr-3 text-zinc-600">
-                                  {field.type}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    )}
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   </article>
                 ))}
               </div>

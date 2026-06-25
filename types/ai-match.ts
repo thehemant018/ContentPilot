@@ -1,12 +1,13 @@
 import type { ContentBlock } from "@/types/crawl";
 import type { DiscoveryItem, TemplateDefinition } from "@/types/discovery";
 
-export type LlmProvider = "gemini" | "claude";
+export type LlmProvider = "gemini" | "claude" | "groq";
 
 export interface LlmConfig {
   provider: LlmProvider;
   geminiApiKey?: string;
   claudeApiKey?: string;
+  groqApiKey?: string;
   /** When true, use keyword/name matching only. When false, LLM is required. */
   useRuleBasedMatching?: boolean;
 }

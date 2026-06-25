@@ -13,8 +13,19 @@ export const CLAUDE_MODELS = [
   "claude-sonnet-4-20250514",
 ] as const;
 
+export const GROQ_MODELS = [
+  "llama-3.1-8b-instant",
+  "llama-3.3-70b-versatile",
+] as const;
+
 export function getDefaultModels(provider: LlmProvider): readonly string[] {
-  return provider === "claude" ? CLAUDE_MODELS : GEMINI_MODELS;
+  if (provider === "claude") {
+    return CLAUDE_MODELS;
+  }
+  if (provider === "groq") {
+    return GROQ_MODELS;
+  }
+  return GEMINI_MODELS;
 }
 
 export function getDefaultModelId(provider: LlmProvider): string {
@@ -22,7 +33,13 @@ export function getDefaultModelId(provider: LlmProvider): string {
 }
 
 export function getDefaultModelLabel(provider: LlmProvider): string {
-  return provider === "claude" ? "Claude Haiku" : "Gemini 2.0 Flash Lite";
+  if (provider === "claude") {
+    return "Claude Haiku";
+  }
+  if (provider === "groq") {
+    return "Llama 3.1 8B";
+  }
+  return "Gemini 2.0 Flash Lite";
 }
 
 export function isModelNotFoundError(message: string): boolean {

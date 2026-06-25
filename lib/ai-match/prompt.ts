@@ -1,4 +1,5 @@
 import { blockTypeKeywords } from "@/lib/ai-match/block-keywords";
+import { isDatasourceTemplate } from "@/lib/sitecore/discovery/slim-result";
 import type { FlatContentBlock } from "@/types/ai-match";
 import type { DiscoveryItem, TemplateDefinition } from "@/types/discovery";
 
@@ -43,10 +44,7 @@ function scoreTemplateRelevance(
 export function pickTemplatesForLlmPrompt(
   templates: TemplateDefinition[],
 ): TemplateDefinition[] {
-  const datasourceTemplates = templates.filter(
-    (template) =>
-      template.fields.length > 0 && !/\bparameters?\b/i.test(template.name),
-  );
+  const datasourceTemplates = templates.filter(isDatasourceTemplate);
 
   if (datasourceTemplates.length > 0) {
     return datasourceTemplates.slice(0, MAX_TEMPLATES_IN_PROMPT);

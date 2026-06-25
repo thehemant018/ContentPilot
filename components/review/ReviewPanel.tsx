@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { QueueItemCard } from "@/components/review/QueueItemCard";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { PageMigrationGroup } from "@/components/review/PageMigrationGroup";
 import { NextPhaseButton } from "@/components/workflow/NextPhaseButton";
 import { ReturnToCrawlBanner } from "@/components/workflow/ReturnToCrawlBanner";
 import {
@@ -10,6 +10,7 @@ import {
   saveMigrationQueue,
   subscribeMigrationQueue,
   updateQueueItem,
+  updateQueueItemsForSourcePage,
 } from "@/lib/storage/migration-queue";
 import {
   getAiMatchResult,
@@ -52,17 +53,23 @@ export function ReviewPanel({ embedded = false }: { embedded?: boolean }) {
     return subscribeMigrationQueue(refreshQueue);
   }, [refreshQueue]);
 
-  function handleUpdate(
+  function handleUpdatePageSettings(
+    sourcePageUrl: string,
+    updates: Partial<
+      Pick<MigrationQueueItem, "targetPagePath" | "placeholder" | "language">
+    >,
+  ): void {
+    updateQueueItemsForSourcePage(sourcePageUrl, updates);
+    refreshQueue();
+    if (getMigrationQueue().length > 0) {
+      markReviewPhaseComplete();
+    }
+  }
+
+  function handleUpdateItem(
     id: string,
     updates: Partial<
-      Pick<
-        MigrationQueueItem,
-        | "targetPagePath"
-        | "fields"
-        | "placeholder"
-        | "datasourcePath"
-        | "language"
-      >
+      Pick<MigrationQueueItem, "fields" | "datasourcePath">
     >,
   ): void {
     updateQueueItem(id, updates);
@@ -151,6 +158,15 @@ export function ReviewPanel({ embedded = false }: { embedded?: boolean }) {
     ...new Set(crawlPages.map((page) => page.url).filter(Boolean)),
   ];
   const readyCount = queue.filter((item) => item.targetPagePath.trim()).length;
+  const queueBySourcePage = useMemo(() => {
+    const groups = new Map<string, MigrationQueueItem[]>();
+    for (const item of queue) {
+      const existing = groups.get(item.sourcePageUrl) ?? [];
+      existing.push(item);
+      groups.set(item.sourcePageUrl, existing);
+    }
+    return Array.from(groups.entries()).sort(([a], [b]) => a.localeCompare(b));
+  }, [queue]);
 
   if (!prerequisitesMet && queue.length === 0) {
     return (
@@ -182,7 +198,8 @@ export function ReviewPanel({ embedded = false }: { embedded?: boolean }) {
           Migration queue
         </h3>
         <p className="mt-1 text-sm text-zinc-600">
-          Set target page paths, datasource paths, and presentation placeholders.
+          Set target page paths and SXA placeholders once per source page.
+          Each component keeps its own datasource path and field content.
           Export writes component JSON to the local{" "}
           <span className="font-mono">data/migrations</span> folder. On push,
           crawled image URLs are uploaded to the Discovery media library path.
@@ -264,13 +281,15 @@ export function ReviewPanel({ embedded = false }: { embedded?: boolean }) {
           </p>
         </div>
       ) : (
-        <div className="space-y-4">
-          {queue.map((item) => (
-            <QueueItemCard
-              key={item.id}
-              item={item}
-              onUpdate={handleUpdate}
-              onRemove={handleRemove}
+        <div className="space-y-6">
+          {queueBySourcePage.map(([sourcePageUrl, items]) => (
+            <PageMigrationGroup
+              key={sourcePageUrl}
+              sourcePageUrl={sourcePageUrl}
+              items={items}
+              onUpdatePageSettings={handleUpdatePageSettings}
+              onUpdateItem={handleUpdateItem}
+              onRemoveItem={handleRemove}
             />
           ))}
         </div>

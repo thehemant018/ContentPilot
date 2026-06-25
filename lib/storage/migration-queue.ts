@@ -2,6 +2,7 @@ import {
   queueItemFromMatch,
   queueItemKey,
 } from "@/lib/migration-queue/from-match";
+import { DEFAULT_PRESENTATION_PLACEHOLDER } from "@/lib/migration/constants";
 import { STORAGE_KEYS } from "@/lib/sitecore/constants";
 import type { BlockMatchResult } from "@/types/ai-match";
 import type { MigrationQueueItem } from "@/types/migration-queue";
@@ -10,6 +11,15 @@ export const MIGRATION_QUEUE_CHANGED_EVENT = "migratex-migration-queue-changed";
 
 function dispatchQueueChanged(): void {
   window.dispatchEvent(new Event(MIGRATION_QUEUE_CHANGED_EVENT));
+}
+
+function normalizeQueueItem(item: MigrationQueueItem): MigrationQueueItem {
+  const placeholder =
+    item.placeholder?.trim() === "main"
+      ? DEFAULT_PRESENTATION_PLACEHOLDER
+      : item.placeholder;
+
+  return placeholder === item.placeholder ? item : { ...item, placeholder };
 }
 
 export function getMigrationQueue(): MigrationQueueItem[] {
@@ -24,7 +34,7 @@ export function getMigrationQueue(): MigrationQueueItem[] {
 
   try {
     const parsed = JSON.parse(raw) as MigrationQueueItem[];
-    return Array.isArray(parsed) ? parsed : [];
+    return Array.isArray(parsed) ? parsed.map(normalizeQueueItem) : [];
   } catch {
     return [];
   }
@@ -53,13 +63,34 @@ export function addMatchToQueue(
   }
 
   const items = getMigrationQueue();
-  items.push(queueItemFromMatch(match));
+  const newItem = queueItemFromMatch(match);
+  const existingOnPage = items.find(
+    (item) => item.sourcePageUrl === match.pageUrl,
+  );
+  if (existingOnPage) {
+    newItem.targetPagePath = existingOnPage.targetPagePath;
+    newItem.placeholder = existingOnPage.placeholder;
+    newItem.language = existingOnPage.language;
+  }
+  items.push(newItem);
   saveMigrationQueue(items);
 
   return {
     success: true,
     message: "Added to review queue.",
   };
+}
+
+export function updateQueueItemsForSourcePage(
+  sourcePageUrl: string,
+  updates: Partial<
+    Pick<MigrationQueueItem, "targetPagePath" | "placeholder" | "language">
+  >,
+): void {
+  const items = getMigrationQueue().map((item) =>
+    item.sourcePageUrl === sourcePageUrl ? { ...item, ...updates } : item,
+  );
+  saveMigrationQueue(items);
 }
 
 export function updateQueueItem(

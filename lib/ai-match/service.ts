@@ -95,6 +95,50 @@ async function callGemini(
   return text;
 }
 
+async function callGroq(
+  apiKey: string,
+  modelId: string,
+  prompt: string,
+): Promise<string> {
+  const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: modelId,
+      max_tokens: 1024,
+      temperature: 0.2,
+      response_format: { type: "json_object" },
+      messages: [
+        {
+          role: "user",
+          content: `${prompt}\n\nRespond with JSON only.`,
+        },
+      ],
+    }),
+  });
+
+  const payload = (await response.json()) as {
+    error?: { message?: string };
+    choices?: Array<{ message?: { content?: string } }>;
+  };
+
+  if (!response.ok) {
+    const message =
+      payload.error?.message ?? `Groq request failed (${response.status}).`;
+    throw new LlmRequestError(message, response.status);
+  }
+
+  const text = payload.choices?.[0]?.message?.content;
+  if (!text) {
+    throw new Error("Groq returned an empty response.");
+  }
+
+  return text;
+}
+
 async function callClaude(
   apiKey: string,
   modelId: string,
@@ -172,10 +216,15 @@ async function callLlm(
   modelId: string,
   prompt: string,
 ): Promise<string> {
-  const invoke = () =>
-    provider === "claude"
-      ? callClaude(apiKey, modelId, prompt)
-      : callGemini(apiKey, modelId, prompt);
+  const invoke = () => {
+    if (provider === "claude") {
+      return callClaude(apiKey, modelId, prompt);
+    }
+    if (provider === "groq") {
+      return callGroq(apiKey, modelId, prompt);
+    }
+    return callGemini(apiKey, modelId, prompt);
+  };
 
   return withLlmRetry(invoke, {
     isRetryable: (error) => {

@@ -1,5 +1,9 @@
 import { clearMigrationQueue } from "@/lib/storage/migration-queue";
 import { STORAGE_KEYS } from "@/lib/sitecore/constants";
+import {
+  slimDiscoveryResult,
+  type LegacyDiscoveryResult,
+} from "@/lib/sitecore/discovery/slim-result";
 import type { CrawlResult } from "@/types/crawl";
 import type { DiscoveryResult } from "@/types/discovery";
 import type { AiMatchResult } from "@/types/ai-match";
@@ -10,7 +14,10 @@ export function saveDiscoveryResult(result: DiscoveryResult): void {
   if (!result.success) {
     return;
   }
-  localStorage.setItem(STORAGE_KEYS.discoveryResult, JSON.stringify(result));
+  localStorage.setItem(
+    STORAGE_KEYS.discoveryResult,
+    JSON.stringify(slimDiscoveryResult(result)),
+  );
   window.dispatchEvent(new Event(WORKFLOW_DATA_CHANGED_EVENT));
 }
 
@@ -25,7 +32,15 @@ export function getDiscoveryResult(): DiscoveryResult | null {
   }
 
   try {
-    return JSON.parse(raw) as DiscoveryResult;
+    const parsed = JSON.parse(raw) as LegacyDiscoveryResult;
+    const slimmed = slimDiscoveryResult(parsed);
+    if (parsed.media !== undefined) {
+      localStorage.setItem(
+        STORAGE_KEYS.discoveryResult,
+        JSON.stringify(slimmed),
+      );
+    }
+    return slimmed;
   } catch {
     return null;
   }

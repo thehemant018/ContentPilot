@@ -180,28 +180,90 @@ function getHeading($: CheerioAPI, element: Element): string | undefined {
   return text || undefined;
 }
 
-function isHeaderOrFooterElement($: CheerioAPI, element: Element): boolean {
+const SEMANTIC_CHROME_SELECTOR =
+  "header, footer, nav, [role='banner'], [role='contentinfo'], [role='navigation']";
+
+const AD_SELECTOR =
+  "[class*='ad-'], [class*='ads-'], [id*='ad-'], [id*='ads-'], [data-ad], [data-ad-slot], .adsbygoogle";
+
+function isSemanticChromeTag(tag: string): boolean {
+  return tag === "header" || tag === "footer" || tag === "nav";
+}
+
+function stripChromeFromDom($: CheerioAPI): void {
+  $(SEMANTIC_CHROME_SELECTOR).remove();
+  $(AD_SELECTOR).remove();
+}
+
+function isExcludedChromeElement($: CheerioAPI, element: Element): boolean {
   const $element = $(element);
   const tag = element.tagName.toLowerCase();
 
-  if (tag === "header" || tag === "footer") {
+  if (isSemanticChromeTag(tag)) {
     return true;
   }
 
   const role = $element.attr("role")?.toLowerCase() ?? "";
-  if (role === "banner" || role === "contentinfo") {
+  if (role === "banner" || role === "contentinfo" || role === "navigation") {
     return true;
   }
 
   const classAndId =
     `${$element.attr("id") ?? ""} ${$element.attr("class") ?? ""}`.toLowerCase();
-  if (/\b(header|footer|site-header|site-footer|page-header|page-footer)\b/.test(classAndId)) {
+  if (
+    /\b(header|footer|site-header|site-footer|page-header|page-footer|navbar|nav-bar|site-nav|main-nav|top-nav|bottom-nav|breadcrumb|breadcrumbs|global-nav|utility-nav)\b/.test(
+      classAndId,
+    ) ||
+    /\b(navbar|nav-menu|main-menu|site-menu|top-menu)\b/.test(classAndId)
+  ) {
+    return true;
+  }
+
+  if (isAdElement($, element)) {
     return true;
   }
 
   if (
-    $element.closest("header, footer, [role='banner'], [role='contentinfo']").length >
-    0
+    $element.closest(SEMANTIC_CHROME_SELECTOR).length > 0
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+function isAdElement($: CheerioAPI, element: Element): boolean {
+  const $element = $(element);
+  const tag = element.tagName.toLowerCase();
+  const classAndId =
+    `${$element.attr("id") ?? ""} ${$element.attr("class") ?? ""}`.toLowerCase();
+  const attrs = [
+    $element.attr("data-ad"),
+    $element.attr("data-ad-slot"),
+    $element.attr("data-ad-unit"),
+    $element.attr("data-ad-client"),
+    $element.attr("data-google-query-id"),
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  if (
+    /\b(ad|ads|advert|advertisement|advertising|sponsored|adsbygoogle|ad-slot|ad-container|ad-wrapper|dfp-ad|google-ad|outbrain|taboola|ad-banner|ad-unit|adblock|ad-block)\b/.test(
+      `${classAndId} ${attrs}`,
+    ) ||
+    /\bad[-_]/.test(classAndId) ||
+    /[-_]ad\b/.test(classAndId)
+  ) {
+    return true;
+  }
+
+  if (tag === "aside" && /\b(ad|ads|sponsor|promo)\b/.test(classAndId)) {
+    return true;
+  }
+
+  if (
+    $element.closest(AD_SELECTOR).length > 0
   ) {
     return true;
   }
@@ -266,10 +328,15 @@ function pickCandidateRoots($: CheerioAPI): Element[] {
 
   const roots = $(selectors)
     .toArray()
-    .filter(isElement);
+    .filter(isElement)
+    .filter((element) => !isExcludedChromeElement($, element));
 
   if (roots.length === 0) {
-    return $("body").children().toArray().filter(isElement);
+    return $("body")
+      .children()
+      .toArray()
+      .filter(isElement)
+      .filter((element) => !isExcludedChromeElement($, element));
   }
 
   return roots;
@@ -277,6 +344,7 @@ function pickCandidateRoots($: CheerioAPI): Element[] {
 
 export function extractBlocksFromHtml(html: string): ContentBlock[] {
   const $ = cheerio.load(html);
+  stripChromeFromDom($);
   const seen = new Set<Element>();
   const blocks: ContentBlock[] = [];
 
@@ -289,7 +357,7 @@ export function extractBlocksFromHtml(html: string): ContentBlock[] {
       return;
     }
 
-    if (isHeaderOrFooterElement($, element)) {
+    if (isExcludedChromeElement($, element)) {
       return;
     }
 
@@ -316,10 +384,16 @@ export function extractBlocksFromHtml(html: string): ContentBlock[] {
     $("body > div, body > section, body > article")
       .toArray()
       .filter(isElement)
+      .filter((element) => !isExcludedChromeElement($, element))
       .forEach((element) => addElement(element));
   }
 
-  return blocks;
+  return blocks.filter(
+    (block) =>
+      block.type !== "navigation" &&
+      block.type !== "footer" &&
+      !isSemanticChromeTag(block.tagName),
+  );
 }
 
 export function extractPageTitle(html: string): string {
