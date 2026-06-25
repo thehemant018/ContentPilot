@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
-import { pushLatestBatchToSitecore } from "@/lib/migration/push-to-sitecore";
+import { pushQueueToSitecore } from "@/lib/migration/push-to-sitecore";
 import {
   getAuthFromRequest,
   unauthorizedResponse,
 } from "@/lib/sitecore/request-auth";
 import type { MigrationPushResult } from "@/types/migration-export";
+import type { MigrationQueueItem } from "@/types/migration-queue";
 
 export const maxDuration = 300;
 
@@ -16,14 +17,27 @@ export async function POST(request: Request) {
 
   try {
     const body = (await request.json()) as {
-      batchId?: string;
       mediaLibraryPath?: string;
+      queue?: MigrationQueueItem[];
     };
-    const result = await pushLatestBatchToSitecore(
+
+    if (!body.queue?.length) {
+      return NextResponse.json<MigrationPushResult>(
+        {
+          success: false,
+          message: "Review queue is required. Add components in AI Match first.",
+        },
+        { status: 400 },
+      );
+    }
+
+    const result = await pushQueueToSitecore(
       auth.instanceUrl,
       auth.accessToken,
-      body.batchId,
-      { mediaLibraryPath: body.mediaLibraryPath },
+      {
+        mediaLibraryPath: body.mediaLibraryPath ?? "",
+        queue: body.queue,
+      },
     );
 
     return NextResponse.json<MigrationPushResult>(result, {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { SESSION_CHANGED_EVENT } from "@/lib/sitecore/constants";
 import { sitecoreApiFetch } from "@/lib/sitecore/api-client";
 import {
@@ -11,7 +11,6 @@ import {
   markMigratePhaseComplete,
   isMigratePhaseComplete,
   canReturnToReviewForEditing,
-  MIGRATION_EXPORT_EVENT,
   subscribeWorkflowProgress,
 } from "@/lib/workflow/progress";
 import { ReturnToCrawlBanner } from "@/components/workflow/ReturnToCrawlBanner";
@@ -19,35 +18,26 @@ import { ReturnToCrawlButton } from "@/components/workflow/ReturnToCrawlButton";
 import { ReturnToReviewBanner } from "@/components/workflow/ReturnToReviewBanner";
 import { normalizeMediaUploadPath } from "@/lib/sitecore/media-upload";
 import { getDiscoveryResult } from "@/lib/storage/workflow-data";
-import type { MigrationExportManifest } from "@/types/migration-export";
+import { getMigrationQueue } from "@/lib/storage/migration-queue";
+import { prepareQueueForMigration } from "@/lib/migration/queue-sync";
 import type { MigrationPushResult } from "@/types/migration-export";
-
-interface LatestExportResponse {
-  success: boolean;
-  latest?: {
-    batchId: string;
-    exportedAt: string;
-    batchDir: string;
-    manifest: MigrationExportManifest;
-  };
-}
+import type { MigrationQueueItem } from "@/types/migration-queue";
 
 export function MigratePanel({ embedded = false }: { embedded?: boolean }) {
-  const [latest, setLatest] = useState<LatestExportResponse["latest"] | null>(
-    null,
-  );
-  const [loading, setLoading] = useState(true);
   const [isConnected, setIsConnected] = useState(false);
   const [isPushing, setIsPushing] = useState(false);
-  const [pushResult, setPushResult] = useState<MigrationPushResult | null>(
-    null,
-  );
+  const [pushResult, setPushResult] = useState<MigrationPushResult | null>(null);
   const [migrationComplete, setMigrationComplete] = useState(false);
   const [canEditReview, setCanEditReview] = useState(false);
+  const [queue, setQueue] = useState<MigrationQueueItem[]>([]);
   const [feedback, setFeedback] = useState<{
     type: "success" | "error";
     message: string;
   } | null>(null);
+
+  const refreshQueue = useCallback(() => {
+    setQueue(prepareQueueForMigration(getMigrationQueue()));
+  }, []);
 
   const showMigrateAnother = migrationComplete || feedback?.type === "success";
 
@@ -56,36 +46,28 @@ export function MigratePanel({ embedded = false }: { embedded?: boolean }) {
     setIsConnected(Boolean(session && !isSessionExpired(session)));
   }, []);
 
-  const loadLatestExport = useCallback(async () => {
-    setLoading(true);
-    try {
-      const response = await fetch("/api/migration/export");
-      const payload = (await response.json()) as LatestExportResponse;
-      setLatest(payload.latest ?? null);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
   useEffect(() => {
     queueMicrotask(() => {
       refreshConnection();
+      refreshQueue();
       setMigrationComplete(isMigratePhaseComplete());
       setCanEditReview(canReturnToReviewForEditing());
-      void loadLatestExport();
     });
 
-    function handleExportUpdated() {
-      void loadLatestExport();
+    function handleQueueUpdated() {
+      refreshQueue();
     }
 
     window.addEventListener(SESSION_CHANGED_EVENT, refreshConnection);
-    window.addEventListener(MIGRATION_EXPORT_EVENT, handleExportUpdated);
+    window.addEventListener("migratex-migration-queue-changed", handleQueueUpdated);
     return () => {
       window.removeEventListener(SESSION_CHANGED_EVENT, refreshConnection);
-      window.removeEventListener(MIGRATION_EXPORT_EVENT, handleExportUpdated);
+      window.removeEventListener(
+        "migratex-migration-queue-changed",
+        handleQueueUpdated,
+      );
     };
-  }, [loadLatestExport, refreshConnection]);
+  }, [refreshConnection, refreshQueue]);
 
   useEffect(
     () =>
@@ -97,10 +79,25 @@ export function MigratePanel({ embedded = false }: { embedded?: boolean }) {
   );
 
   async function handlePushToSitecore(): Promise<void> {
-    if (!latest) {
+    const currentQueue = prepareQueueForMigration(getMigrationQueue());
+    refreshQueue();
+
+    if (currentQueue.length === 0) {
       setFeedback({
         type: "error",
-        message: "Export a batch from Review before pushing to Sitecore.",
+        message:
+          "Review queue is empty. Add components in AI Match and set target page paths in Review.",
+      });
+      return;
+    }
+
+    const missingTarget = currentQueue.filter(
+      (item) => !item.targetPagePath.trim(),
+    );
+    if (missingTarget.length > 0) {
+      setFeedback({
+        type: "error",
+        message: `${missingTarget.length} queued component(s) are missing a target Sitecore page path. Set them in Review (Phase 5).`,
       });
       return;
     }
@@ -109,6 +106,15 @@ export function MigratePanel({ embedded = false }: { embedded?: boolean }) {
       setFeedback({
         type: "error",
         message: "Connect to Sitecore in Phase 1 before pushing.",
+      });
+      return;
+    }
+
+    const mediaLibraryPath = getDiscoveryResult()?.mediaPath?.trim();
+    if (!mediaLibraryPath) {
+      setFeedback({
+        type: "error",
+        message: "Set the media library path in Discovery (Phase 2) before pushing.",
       });
       return;
     }
@@ -122,8 +128,8 @@ export function MigratePanel({ embedded = false }: { embedded?: boolean }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          batchId: latest.batchId,
-          mediaLibraryPath: discoveryMediaPath || exportMediaPath,
+          mediaLibraryPath,
+          queue: currentQueue,
         }),
       });
 
@@ -156,15 +162,25 @@ export function MigratePanel({ embedded = false }: { embedded?: boolean }) {
     }
   }
 
-  const canPush = Boolean(latest && isConnected && !isPushing);
+  const canPush = Boolean(isConnected && !isPushing && queue.length > 0);
 
-  const discoveryMediaPath = getDiscoveryResult()?.mediaPath?.trim();
-  const exportMediaPath = latest?.manifest.mediaLibraryPath?.trim();
-  const activeMediaPath = discoveryMediaPath || exportMediaPath || "";
+  const pushPreview = useMemo(
+    () =>
+      queue.map((item) => ({
+        id: item.id,
+        label: item.blockHeading || item.blockType,
+        sourcePageUrl: item.sourcePageUrl,
+        targetPagePath: item.targetPagePath,
+        renderingName: item.renderingName,
+      })),
+    [queue],
+  );
+
+  const discoveryMediaPath = getDiscoveryResult()?.mediaPath?.trim() ?? "";
   let resolvedMediaUploadFolder: string | null = null;
-  if (activeMediaPath) {
+  if (discoveryMediaPath) {
     try {
-      resolvedMediaUploadFolder = normalizeMediaUploadPath(activeMediaPath);
+      resolvedMediaUploadFolder = normalizeMediaUploadPath(discoveryMediaPath);
     } catch {
       resolvedMediaUploadFolder = null;
     }
@@ -180,15 +196,14 @@ export function MigratePanel({ embedded = false }: { embedded?: boolean }) {
           Push to Sitecore
         </h3>
         <p className="mt-1 text-sm text-zinc-600">
-          Uses the matched Sitecore template and rendering from AI Match (e.g.
-          Hero). Creates a content item under the page&apos;s Data item, fills
-          your fields, uploads crawled images to the Discovery media library
-          path, and assigns the rendering on the target page.
+          Sends your Review queue directly to Sitecore — creates datasource items
+          under each target page&apos;s Data folder, fills field values, uploads
+          crawled images, and assigns renderings. No local files are stored.
         </p>
-        {activeMediaPath ? (
+        {discoveryMediaPath ? (
           <p className="mt-2 text-xs text-zinc-500">
             Image upload folder:{" "}
-            <span className="font-mono">{activeMediaPath}</span>
+            <span className="font-mono">{discoveryMediaPath}</span>
             {resolvedMediaUploadFolder !== null && (
               <>
                 {" "}
@@ -224,9 +239,9 @@ export function MigratePanel({ embedded = false }: { embedded?: boolean }) {
             </span>
           </p>
           <p className="text-zinc-700">
-            Local export:{" "}
+            Queue:{" "}
             <span className="font-semibold text-zinc-900">
-              {latest ? latest.batchId : "None"}
+              {queue.length} component{queue.length === 1 ? "" : "s"}
             </span>
           </p>
         </div>
@@ -246,13 +261,40 @@ export function MigratePanel({ embedded = false }: { embedded?: boolean }) {
         </div>
       )}
 
-      {!loading && !latest && (
+      {queue.length === 0 && (
         <div className="rounded-xl border border-dashed border-zinc-300 bg-zinc-50 p-8 text-center">
-          <p className="text-sm font-medium text-zinc-800">No export yet</p>
+          <p className="text-sm font-medium text-zinc-800">Queue is empty</p>
           <p className="mt-2 text-sm text-zinc-600">
-            In Review, set target paths and click{" "}
-            <strong>Export to local data</strong>, then return here to push.
+            In Review, add components and set target paths, then return here to
+            push.
           </p>
+        </div>
+      )}
+
+      {queue.length > 0 && (
+        <div className="rounded-xl border border-blue-200 bg-blue-50 p-5">
+          <p className="text-sm font-semibold text-blue-950">Push preview</p>
+          <p className="mt-1 text-xs text-blue-900">
+            These settings from your Review queue will be sent to Sitecore.
+          </p>
+          <ul className="mt-3 space-y-2 text-sm">
+            {pushPreview.map((entry) => (
+              <li
+                key={entry.id}
+                className="rounded-lg border border-blue-100 bg-white px-3 py-2"
+              >
+                <p className="font-medium text-zinc-900">
+                  {entry.label}{" "}
+                  <span className="text-xs font-normal text-zinc-500">
+                    ({entry.renderingName})
+                  </span>
+                </p>
+                <p className="mt-1 font-mono text-xs text-zinc-700">
+                  → {entry.targetPagePath}
+                </p>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
 
@@ -278,90 +320,71 @@ export function MigratePanel({ embedded = false }: { embedded?: boolean }) {
       )}
 
       {feedback && feedback.type === "error" && (
-        <div
-          className="rounded-xl border px-4 py-3 text-sm border-rose-200 bg-rose-50 text-rose-800"
-        >
+        <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
           {feedback.message}
         </div>
       )}
 
-      {loading ? (
-        <p className="text-sm text-zinc-500">Loading export summary…</p>
-      ) : latest ? (
-        <div className="space-y-4">
-          <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-5">
-            <p className="text-sm font-semibold text-emerald-900">
-              Latest export batch
-            </p>
-            <dl className="mt-3 space-y-2 text-sm text-emerald-950">
-              <div className="flex flex-wrap gap-2">
-                <dt className="font-medium">Batch ID:</dt>
-                <dd className="font-mono">{latest.batchId}</dd>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <dt className="font-medium">Exported:</dt>
-                <dd>{new Date(latest.exportedAt).toLocaleString()}</dd>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <dt className="font-medium">Folder:</dt>
-                <dd className="font-mono">migratex/{latest.batchDir}</dd>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <dt className="font-medium">Components:</dt>
-                <dd>{latest.manifest.componentCount}</dd>
-              </div>
-            </dl>
-          </div>
-
-          {pushResult?.results && pushResult.results.length > 0 && (
-            <div className="rounded-xl border border-zinc-200 bg-white p-5">
-              <h4 className="text-sm font-semibold text-zinc-900">
-                Push details
-              </h4>
-              <ul className="mt-3 space-y-3 text-sm">
-                {pushResult.results.map((entry) => (
-                  <li
-                    key={entry.queueItemId}
-                    className="rounded-lg border border-zinc-100 bg-zinc-50 p-3"
-                  >
-                    <p className="font-mono text-xs text-zinc-600">
-                      {entry.datasourcePath}
-                    </p>
-                    <p className="mt-1 text-zinc-800">
-                      Page: {entry.targetPagePath}
-                    </p>
-                    <p className="mt-1 text-xs text-zinc-600">
-                      Datasource:{" "}
-                      {entry.datasourceCreated
-                        ? "created"
-                        : entry.datasourceUpdated
-                          ? "updated"
-                          : "—"}
+      {pushResult?.results && pushResult.results.length > 0 && (
+        <div className="rounded-xl border border-zinc-200 bg-white p-5">
+          <h4 className="text-sm font-semibold text-zinc-900">Push details</h4>
+          <ul className="mt-3 space-y-3 text-sm">
+            {pushResult.results.map((entry) => (
+              <li
+                key={entry.queueItemId}
+                className="rounded-lg border border-zinc-100 bg-zinc-50 p-3"
+              >
+                <p className="font-mono text-xs text-zinc-600">
+                  {entry.datasourcePath}
+                </p>
+                {entry.sourcePageUrl && (
+                  <p className="mt-1 text-xs text-zinc-500">
+                    Source:{" "}
+                    <span className="break-all font-mono">
+                      {entry.sourcePageUrl}
+                    </span>
+                  </p>
+                )}
+                <p className="mt-1 text-zinc-800">
+                  Target page:{" "}
+                  <span className="font-mono">{entry.targetPagePath}</span>
+                </p>
+                <p className="mt-1 text-xs text-zinc-600">
+                  Datasource:{" "}
+                  {entry.datasourceCreated
+                    ? "created"
+                    : entry.datasourceUpdated
+                      ? "updated"
+                      : "—"}
+                  {" · "}
+                  Presentation:{" "}
+                  {entry.presentationAssigned ? "assigned" : "not assigned"}
+                  {(entry.mediaUploaded ?? 0) > 0 && (
+                    <>
                       {" · "}
-                      Presentation:{" "}
-                      {entry.presentationAssigned ? "assigned" : "not assigned"}
-                      {(entry.mediaUploaded ?? 0) > 0 && (
-                        <>
-                          {" · "}
-                          Media: {entry.mediaUploaded} uploaded
-                        </>
-                      )}
-                    </p>
-                    {entry.error && (
-                      <p className="mt-1 text-xs text-rose-700">{entry.error}</p>
-                    )}
-                    {entry.warnings.map((warning) => (
-                      <p key={warning} className="mt-1 text-xs text-amber-800">
-                        {warning}
-                      </p>
-                    ))}
-                  </li>
+                      Media: {entry.mediaUploaded} uploaded
+                    </>
+                  )}
+                  {(entry.mediaReused ?? 0) > 0 && (
+                    <>
+                      {" · "}
+                      Media: {entry.mediaReused} reused
+                    </>
+                  )}
+                </p>
+                {entry.error && (
+                  <p className="mt-1 text-xs text-rose-700">{entry.error}</p>
+                )}
+                {entry.warnings.map((warning) => (
+                  <p key={warning} className="mt-1 text-xs text-amber-800">
+                    {warning}
+                  </p>
                 ))}
-              </ul>
-            </div>
-          )}
+              </li>
+            ))}
+          </ul>
         </div>
-      ) : null}
+      )}
     </div>
   );
 }

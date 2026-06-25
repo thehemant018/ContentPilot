@@ -1,13 +1,22 @@
+import { refineBlockForMatching } from "@/lib/ai-match/block-intent";
 import {
   getDefaultModelId,
   getDefaultModels,
   isModelNotFoundError,
 } from "@/lib/ai-match/default-models";
 import {
+  buildNoMatchResult,
   LOW_CONFIDENCE_SCORE,
+  matchBlockToSitecore,
   matchBlocksToSitecore,
   summarizeComponentMapping,
 } from "@/lib/ai-match/component-mapper";
+import {
+  FIELD_MAPPING_RESPONSE_SCHEMA,
+  mergeFieldMappingResults,
+  parseLlmFieldMappingsForBlock,
+  type RawLlmFieldMappingResponse,
+} from "@/lib/ai-match/field-map-llm";
 import { buildHeuristicFieldMappings } from "@/lib/ai-match/heuristic-field-map";
 import {
   formatLlmError,
@@ -20,11 +29,13 @@ import {
 import { extractJsonFromText } from "@/lib/ai-match/parse-response";
 import {
   BLOCKS_PER_PASS,
+  buildBatchFieldMappingPrompt,
   buildCombinedMatchPrompt,
   chunkBlocks,
+  FIELDS_PER_PASS,
   MAX_BLOCKS_PER_RUN,
+  type FieldMappingPromptItem,
 } from "@/lib/ai-match/prompt";
-import type { CrawledPage } from "@/types/crawl";
 import type {
   AiMatchInput,
   AiMatchResult,
@@ -44,6 +55,11 @@ interface RawCombinedMatch {
   fieldMappings?: BlockMatchResult["fieldMappings"];
 }
 
+interface LlmCallOptions {
+  maxOutputTokens?: number;
+  jsonSchema?: Record<string, unknown>;
+}
+
 class LlmRequestError extends Error {
   status: number;
 
@@ -57,7 +73,18 @@ async function callGemini(
   apiKey: string,
   modelId: string,
   prompt: string,
+  options?: LlmCallOptions,
 ): Promise<string> {
+  const generationConfig: Record<string, unknown> = {
+    temperature: 0.2,
+    maxOutputTokens: options?.maxOutputTokens ?? 1024,
+    responseMimeType: "application/json",
+  };
+
+  if (options?.jsonSchema) {
+    generationConfig.responseSchema = options.jsonSchema;
+  }
+
   const response = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(modelId)}:generateContent?key=${encodeURIComponent(apiKey)}`,
     {
@@ -65,11 +92,7 @@ async function callGemini(
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: {
-          temperature: 0.2,
-          maxOutputTokens: 1024,
-          responseMimeType: "application/json",
-        },
+        generationConfig,
       }),
     },
   );
@@ -99,6 +122,7 @@ async function callGroq(
   apiKey: string,
   modelId: string,
   prompt: string,
+  options?: LlmCallOptions,
 ): Promise<string> {
   const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
@@ -108,7 +132,7 @@ async function callGroq(
     },
     body: JSON.stringify({
       model: modelId,
-      max_tokens: 1024,
+      max_tokens: options?.maxOutputTokens ?? 1024,
       temperature: 0.2,
       response_format: { type: "json_object" },
       messages: [
@@ -143,6 +167,7 @@ async function callClaude(
   apiKey: string,
   modelId: string,
   prompt: string,
+  options?: LlmCallOptions,
 ): Promise<string> {
   const response = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
@@ -153,7 +178,7 @@ async function callClaude(
     },
     body: JSON.stringify({
       model: modelId,
-      max_tokens: 1024,
+      max_tokens: options?.maxOutputTokens ?? 1024,
       temperature: 0.2,
       messages: [
         {
@@ -187,13 +212,14 @@ async function callLlmWithFallback(
   provider: AiMatchInput["provider"],
   apiKey: string,
   prompt: string,
+  options?: LlmCallOptions,
 ): Promise<{ text: string; modelId: string }> {
   const models = getDefaultModels(provider);
   let lastError: unknown;
 
   for (const modelId of models) {
     try {
-      const text = await callLlm(provider, apiKey, modelId, prompt);
+      const text = await callLlm(provider, apiKey, modelId, prompt, options);
       return { text, modelId };
     } catch (error) {
       lastError = error;
@@ -215,15 +241,16 @@ async function callLlm(
   apiKey: string,
   modelId: string,
   prompt: string,
+  options?: LlmCallOptions,
 ): Promise<string> {
   const invoke = () => {
     if (provider === "claude") {
-      return callClaude(apiKey, modelId, prompt);
+      return callClaude(apiKey, modelId, prompt, options);
     }
     if (provider === "groq") {
-      return callGroq(apiKey, modelId, prompt);
+      return callGroq(apiKey, modelId, prompt, options);
     }
-    return callGemini(apiKey, modelId, prompt);
+    return callGemini(apiKey, modelId, prompt, options);
   };
 
   return withLlmRetry(invoke, {
@@ -267,78 +294,151 @@ function findTemplate(
   );
 }
 
+function isSkipMatchName(name: string): boolean {
+  const normalized = name.trim().toLowerCase();
+  return (
+    !normalized ||
+    normalized === "none" ||
+    normalized === "n/a" ||
+    normalized === "skip" ||
+    normalized === "unmatched"
+  );
+}
+
 function normalizeLlmMatches(
   rawMatches: RawCombinedMatch[],
   blocks: FlatContentBlock[],
   renderings: DiscoveryItem[],
   templates: TemplateDefinition[],
+  useHeuristicFields: boolean,
 ): BlockMatchResult[] {
   const blockMap = new Map(blocks.map((block) => [block.id, block]));
 
   return rawMatches.map((raw) => {
     const block = blockMap.get(raw.blockId);
+    if (!block) {
+      return buildNoMatchResult(
+        {
+          id: raw.blockId,
+          type: "unknown",
+          tagName: "div",
+          selector: "",
+          text: "",
+          htmlSnippet: "",
+          links: [],
+          images: [],
+          order: 0,
+          pageUrl: "",
+          pageTitle: "",
+        },
+        renderings,
+        "Block not found in crawl data.",
+      );
+    }
+
+    const refinedBlock = refineBlockForMatching(block);
+
+    if (
+      isSkipMatchName(raw.renderingName) ||
+      isSkipMatchName(raw.templateName)
+    ) {
+      return buildNoMatchResult(
+        refinedBlock,
+        renderings,
+        raw.reason ?? "LLM found no suitable Sitecore component.",
+      );
+    }
+
     const score = Math.min(100, Math.max(0, Number(raw.matchScore) || 0));
     const confidence = raw.confidence ?? scoreToConfidence(score);
     const rendering = findRendering(renderings, raw.renderingName);
     const template = findTemplate(templates, raw.templateName);
+
+    if (!rendering || !template || score < LOW_CONFIDENCE_SCORE) {
+      return buildNoMatchResult(
+        refinedBlock,
+        renderings,
+        raw.reason ??
+          "LLM match could not be resolved to a discovery rendering/template.",
+      );
+    }
+
     const fieldMappings =
       raw.fieldMappings && raw.fieldMappings.length > 0
         ? raw.fieldMappings
-        : block
+        : useHeuristicFields
           ? buildHeuristicFieldMappings(block, template)
           : [];
 
     return {
       blockId: raw.blockId,
-      pageUrl: block?.pageUrl ?? "",
-      blockType: block?.type ?? "unknown",
-      blockHeading: block?.heading,
+      pageUrl: block.pageUrl,
+      blockType: refinedBlock.type,
+      blockHeading: block.heading,
+      parentBlockId: block.parentBlockId,
       matchScore: score,
       confidence,
-      renderingName: rendering?.name ?? raw.renderingName,
-      renderingPath: rendering?.path,
-      templateName: template?.name ?? raw.templateName,
-      templatePath: template?.path,
+      renderingName: rendering.name,
+      renderingPath: rendering.path,
+      templateName: template.name,
+      templatePath: template.path,
       reasoning: raw.reason ?? "LLM suggested this rendering/template pair.",
       fieldMappings,
       needsReview: score < LOW_CONFIDENCE_SCORE || confidence === "low",
+      unmatched: false,
     };
   });
 }
 
 function isResolvableLlmMatch(match: BlockMatchResult | undefined): boolean {
-  return Boolean(match?.renderingPath && match?.templatePath);
+  return Boolean(
+    match &&
+      !match.unmatched &&
+      match.renderingPath &&
+      match.templatePath,
+  );
 }
 
 function buildLlmOnlyMatches(
   blocks: FlatContentBlock[],
   llmMatches: BlockMatchResult[],
+  renderings: DiscoveryItem[],
+  templates: TemplateDefinition[],
 ): BlockMatchResult[] {
   const llmByBlockId = new Map(llmMatches.map((match) => [match.blockId, match]));
 
   return blocks.map((block) => {
+    const refinedBlock = refineBlockForMatching(block);
     const llmMatch = llmByBlockId.get(block.id);
-    if (llmMatch) {
-      return {
-        ...llmMatch,
-        needsReview:
-          llmMatch.needsReview || !isResolvableLlmMatch(llmMatch),
-      };
+
+    const withContext = (match: BlockMatchResult): BlockMatchResult => ({
+      ...match,
+      blockType: refinedBlock.type,
+      parentBlockId: block.parentBlockId,
+    });
+
+    if (
+      llmMatch &&
+      !llmMatch.unmatched &&
+      isResolvableLlmMatch(llmMatch) &&
+      llmMatch.matchScore >= LOW_CONFIDENCE_SCORE
+    ) {
+      return withContext(llmMatch);
     }
 
-    return {
-      blockId: block.id,
-      pageUrl: block.pageUrl,
-      blockType: block.type,
-      blockHeading: block.heading,
-      matchScore: 0,
-      confidence: "low",
-      renderingName: "",
-      templateName: "",
-      reasoning: "LLM did not return a match for this block.",
-      fieldMappings: [],
-      needsReview: true,
-    };
+    if (llmMatch?.unmatched) {
+      return withContext(llmMatch);
+    }
+
+    const fallback = matchBlockToSitecore(refinedBlock, renderings, templates);
+    if (llmMatch && !llmMatch.unmatched) {
+      return withContext({
+        ...fallback,
+        reasoning: `No confident LLM match; ${fallback.reasoning}`,
+      });
+    }
+
+    return withContext(fallback);
   });
 }
 
@@ -372,6 +472,112 @@ async function matchBlocksInChunks(
   return { matches: allMatches, modelId };
 }
 
+function buildFieldMappingItems(
+  matches: BlockMatchResult[],
+  blocks: FlatContentBlock[],
+  templates: TemplateDefinition[],
+): FieldMappingPromptItem[] {
+  const blockMap = new Map(blocks.map((block) => [block.id, block]));
+  const items: FieldMappingPromptItem[] = [];
+
+  for (const match of matches) {
+    if (match.unmatched || !isResolvableLlmMatch(match)) {
+      continue;
+    }
+
+    const block = blockMap.get(match.blockId);
+    const template = findTemplate(templates, match.templateName);
+    if (!block || !template || template.fields.length === 0) {
+      continue;
+    }
+
+    items.push({ block, template });
+  }
+
+  return items;
+}
+
+async function matchFieldsInChunks(
+  provider: AiMatchInput["provider"],
+  apiKey: string,
+  matches: BlockMatchResult[],
+  blocks: FlatContentBlock[],
+  templates: TemplateDefinition[],
+): Promise<{ matches: BlockMatchResult[]; modelId: string; apiCalls: number }> {
+  const items = buildFieldMappingItems(matches, blocks, templates);
+  if (items.length === 0) {
+    return { matches, modelId: getDefaultModelId(provider), apiCalls: 0 };
+  }
+
+  const blockMap = new Map(blocks.map((block) => [block.id, block]));
+  const templateByBlockId = new Map(
+    items.map((item) => [item.block.id, item.template]),
+  );
+  const llmByBlockId = new Map<string, BlockMatchResult["fieldMappings"]>();
+  const chunks = chunkBlocks(items, FIELDS_PER_PASS);
+  const delayMs = requestDelayMs(provider);
+  let modelId = getDefaultModelId(provider);
+
+  for (let index = 0; index < chunks.length; index += 1) {
+    if (index > 0) {
+      await sleep(delayMs);
+    }
+
+    const chunk = chunks[index]!;
+    const prompt = buildBatchFieldMappingPrompt(chunk);
+    const geminiSchema =
+      provider === "gemini"
+        ? { jsonSchema: FIELD_MAPPING_RESPONSE_SCHEMA as Record<string, unknown> }
+        : undefined;
+
+    try {
+      const response = await callLlmWithFallback(provider, apiKey, prompt, {
+        maxOutputTokens: 2048,
+        ...geminiSchema,
+      });
+      modelId = response.modelId;
+
+      const parsed = JSON.parse(
+        extractJsonFromText(response.text),
+      ) as RawLlmFieldMappingResponse;
+
+      for (const blockResult of parsed.blocks ?? []) {
+        const block = blockMap.get(blockResult.blockId);
+        const template = templateByBlockId.get(blockResult.blockId);
+        if (!block || !template) {
+          continue;
+        }
+
+        const mappings = parseLlmFieldMappingsForBlock(
+          block,
+          template,
+          blockResult.mappings,
+        );
+        if (mappings.length > 0) {
+          llmByBlockId.set(blockResult.blockId, mappings);
+        }
+      }
+    } catch (error) {
+      console.warn(
+        "LLM field mapping pass failed for chunk; using heuristic fallback.",
+        error instanceof Error ? error.message : error,
+      );
+    }
+  }
+
+  const updatedMatches = matches.map((match) => ({ ...match }));
+  const blockIdsToUpdate = new Set(items.map((item) => item.block.id));
+  mergeFieldMappingResults(
+    updatedMatches,
+    blockMap,
+    templateByBlockId,
+    llmByBlockId,
+    blockIdsToUpdate,
+  );
+
+  return { matches: updatedMatches, modelId, apiCalls: chunks.length };
+}
+
 export async function runAiMatch(input: AiMatchInput): Promise<AiMatchResult> {
   const {
     provider,
@@ -396,7 +602,9 @@ export async function runAiMatch(input: AiMatchInput): Promise<AiMatchResult> {
     };
   }
 
-  const limitedBlocks = blocks.slice(0, MAX_BLOCKS_PER_RUN);
+  const limitedBlocks = blocks
+    .slice(0, MAX_BLOCKS_PER_RUN)
+    .map(refineBlockForMatching);
   const skippedCount = blocks.length - limitedBlocks.length;
   const skippedNote =
     skippedCount > 0
@@ -409,7 +617,9 @@ export async function runAiMatch(input: AiMatchInput): Promise<AiMatchResult> {
       renderings,
       templates,
     );
-    const lowConfidenceCount = matches.filter((match) => match.needsReview).length;
+    const lowConfidenceCount = matches.filter(
+      (match) => !match.unmatched && match.needsReview,
+    ).length;
 
     return {
       success: true,
@@ -426,12 +636,12 @@ export async function runAiMatch(input: AiMatchInput): Promise<AiMatchResult> {
     return {
       success: false,
       message:
-        "Add an API key for LLM matching, or enable rule-based matching.",
+        "No LLM API key configured on the server. Set the provider key in .env.local or enable rule-based matching.",
     };
   }
 
   let modelId: string | undefined;
-  const apiCalls = Math.ceil(limitedBlocks.length / BLOCKS_PER_PASS);
+  const matchApiCalls = Math.ceil(limitedBlocks.length / BLOCKS_PER_PASS);
 
   try {
     const { matches: rawMatches, modelId: usedModel } =
@@ -449,16 +659,39 @@ export async function runAiMatch(input: AiMatchInput): Promise<AiMatchResult> {
       limitedBlocks,
       renderings,
       templates,
+      false,
     );
-    const matches = buildLlmOnlyMatches(limitedBlocks, llmMatches);
-    const lowConfidenceCount = matches.filter((match) => match.needsReview).length;
-    const resolvedCount = matches.filter((match) =>
-      isResolvableLlmMatch(match),
+
+    const {
+      matches: matchesWithFields,
+      modelId: fieldModelId,
+      apiCalls: fieldApiCalls,
+    } = await matchFieldsInChunks(
+      provider,
+      apiKey,
+      llmMatches,
+      limitedBlocks,
+      templates,
+    );
+    modelId = fieldModelId;
+
+    const matches = buildLlmOnlyMatches(
+      limitedBlocks,
+      matchesWithFields,
+      renderings,
+      templates,
+    );
+    const lowConfidenceCount = matches.filter(
+      (match) => !match.unmatched && match.needsReview,
     ).length;
+    const resolvedCount = matches.filter(
+      (match) => !match.unmatched && isResolvableLlmMatch(match),
+    ).length;
+    const totalApiCalls = matchApiCalls + fieldApiCalls;
 
     return {
       success: true,
-      message: `${summarizeComponentMapping(limitedBlocks, renderings, matches)} LLM matched ${resolvedCount}/${matches.length} block(s) in ${apiCalls} call(s). ${lowConfidenceCount} need manual review.${skippedNote}`,
+      message: `${summarizeComponentMapping(limitedBlocks, renderings, matches)} LLM matched ${resolvedCount}/${matches.length} block(s) in ${totalApiCalls} call(s) (${matchApiCalls} component + ${fieldApiCalls} field). ${lowConfidenceCount} need manual review.${skippedNote}`,
       provider,
       modelId,
       matchStrategy: "llm",
@@ -476,20 +709,4 @@ export async function runAiMatch(input: AiMatchInput): Promise<AiMatchResult> {
       provider,
     };
   }
-}
-
-export function flattenCrawlBlocks(pages: CrawledPage[]): FlatContentBlock[] {
-  const flat: FlatContentBlock[] = [];
-
-  for (const page of pages) {
-    for (const block of page.blocks) {
-      flat.push({
-        ...block,
-        pageUrl: page.url,
-        pageTitle: page.title,
-      });
-    }
-  }
-
-  return flat;
 }

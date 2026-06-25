@@ -24,9 +24,6 @@ export function getLlmConfig(): LlmConfig {
     const parsed = JSON.parse(raw) as LlmConfig;
     return {
       provider: normalizeProvider(parsed.provider),
-      geminiApiKey: parsed.geminiApiKey?.trim() || undefined,
-      claudeApiKey: parsed.claudeApiKey?.trim() || undefined,
-      groqApiKey: parsed.groqApiKey?.trim() || undefined,
       useRuleBasedMatching: parsed.useRuleBasedMatching === true,
     };
   } catch {
@@ -37,17 +34,6 @@ export function getLlmConfig(): LlmConfig {
 export function saveLlmConfig(config: LlmConfig): void {
   localStorage.setItem(STORAGE_KEYS.llmConfig, JSON.stringify(config));
   window.dispatchEvent(new Event(LLM_CONFIG_CHANGED_EVENT));
-}
-
-export function getActiveApiKey(provider: LlmProvider): string | undefined {
-  const config = getLlmConfig();
-  if (provider === "claude") {
-    return config.claudeApiKey;
-  }
-  if (provider === "groq") {
-    return config.groqApiKey;
-  }
-  return config.geminiApiKey;
 }
 
 export function clearLlmConfig(): void {

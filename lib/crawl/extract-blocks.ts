@@ -1,3 +1,4 @@
+import { extractSubBlocks } from "@/lib/crawl/extract-sub-blocks";
 import * as cheerio from "cheerio";
 import type { CheerioAPI } from "cheerio";
 import type { AnyNode, Element } from "domhandler";
@@ -132,8 +133,45 @@ function inferBlockType($: CheerioAPI, element: Element): SemanticBlockType {
     return "hero";
   }
 
+  if (
+    $element.find(
+      'iframe[src*="youtube"], iframe[src*="youtu.be"], iframe[src*="vimeo"], video[src]',
+    ).length > 0 ||
+    /video|youtube|embed|media-player/.test(classAndId)
+  ) {
+    return "video";
+  }
+
+  if (
+    $element.find("blockquote").length > 0 ||
+    /quote|testimonial|pull-quote|featured-quote|blockquote/.test(classAndId) ||
+    /featured quote|pull quote/i.test(getHeading($, element) ?? "")
+  ) {
+    const figures = $element.find("figure").length;
+    const articles = $element.find("article").length;
+    if (
+      figures <= 1 &&
+      articles === 0 &&
+      !/stories|testimonials|cards|grid|services|features/.test(classAndId)
+    ) {
+      return "quote";
+    }
+    if (
+      /featured.?quote|pull.?quote|quote-heading/.test(classAndId) ||
+      /featured quote/i.test(getHeading($, element) ?? "")
+    ) {
+      return "quote";
+    }
+  }
+
   const cards = $element.find("article, .card, [class*='card'], li > a");
-  if (cards.length >= 3 && /grid|cards|listing|features/.test(classAndId)) {
+  if (
+    cards.length >= 3 ||
+    (cards.length >= 2 &&
+      /grid|cards|listing|features|services|stories|testimonials/.test(
+        classAndId,
+      ))
+  ) {
     return "card-grid";
   }
 
@@ -368,14 +406,13 @@ export function extractBlocksFromHtml(html: string): ContentBlock[] {
     }
 
     seen.add(element);
-    blocks.push(
-      createBlock(
-        $,
-        element,
-        forcedType ?? inferBlockType($, element),
-        blocks.length + 1,
-      ),
-    );
+    const blockType = forcedType ?? inferBlockType($, element);
+    const block = createBlock($, element, blockType, blocks.length + 1);
+    const subBlocks = extractSubBlocks($, block, element);
+    if (subBlocks.length >= 2) {
+      block.subBlocks = subBlocks;
+    }
+    blocks.push(block);
   }
 
   pickCandidateRoots($).forEach((element) => addElement(element));

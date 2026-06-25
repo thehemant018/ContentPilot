@@ -3,6 +3,8 @@ export type CrawlMode = "single" | "site";
 export type SemanticBlockType =
   | "navigation"
   | "hero"
+  | "quote"
+  | "video"
   | "rich-text"
   | "card-grid"
   | "media"
@@ -33,6 +35,10 @@ export interface ContentBlock {
   links: CrawlLink[];
   images: CrawlImage[];
   order: number;
+  /** Parent block id when this block was extracted from a compound section. */
+  parentBlockId?: string;
+  /** Child items extracted from card grids, testimonial lists, etc. */
+  subBlocks?: ContentBlock[];
 }
 
 export interface CrawledPage {

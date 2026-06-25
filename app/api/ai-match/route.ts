@@ -1,30 +1,43 @@
 import { NextResponse } from "next/server";
-import { flattenCrawlBlocks, runAiMatch } from "@/lib/ai-match/service";
+import {
+  getLlmApiKeyFromEnv,
+  getLlmEnvStatus,
+  missingLlmKeyMessage,
+} from "@/lib/ai-match/env-keys";
+import { flattenBlocksForMatching } from "@/lib/ai-match/flatten-blocks";
+import { runAiMatch } from "@/lib/ai-match/service";
 import { slimDiscoveryResult } from "@/lib/sitecore/discovery/slim-result";
-import type { AiMatchInput, AiMatchResult } from "@/types/ai-match";
+import type { AiMatchInput, AiMatchResult, LlmProvider } from "@/types/ai-match";
 import type { CrawlResult } from "@/types/crawl";
 import type { DiscoveryResult } from "@/types/discovery";
 
 export const maxDuration = 120;
 
+function normalizeProvider(value: unknown): LlmProvider {
+  if (value === "claude" || value === "groq" || value === "gemini") {
+    return value;
+  }
+  return "gemini";
+}
+
+export async function GET() {
+  return NextResponse.json({
+    configured: getLlmEnvStatus(),
+  });
+}
+
 export async function POST(request: Request) {
   try {
     const body = (await request.json()) as {
       provider?: AiMatchInput["provider"];
-      apiKey?: string;
       useRuleBasedMatching?: boolean;
       discovery?: DiscoveryResult;
       crawl?: CrawlResult;
     };
 
-    const provider =
-      body.provider === "claude"
-        ? "claude"
-        : body.provider === "groq"
-          ? "groq"
-          : "gemini";
-    const apiKey = body.apiKey?.trim() ?? "";
+    const provider = normalizeProvider(body.provider);
     const useRuleBasedMatching = body.useRuleBasedMatching === true;
+    const apiKey = getLlmApiKeyFromEnv(provider);
     const discovery = body.discovery
       ? slimDiscoveryResult(body.discovery)
       : undefined;
@@ -40,7 +53,17 @@ export async function POST(request: Request) {
       );
     }
 
-    const blocks = flattenCrawlBlocks(crawl.pages ?? []);
+    if (!useRuleBasedMatching && !apiKey) {
+      return NextResponse.json<AiMatchResult>(
+        {
+          success: false,
+          message: missingLlmKeyMessage(provider),
+        },
+        { status: 400 },
+      );
+    }
+
+    const blocks = flattenBlocksForMatching(crawl.pages ?? []);
 
     const result = await runAiMatch({
       provider,

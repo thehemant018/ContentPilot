@@ -1,6 +1,13 @@
 import { buildHeuristicFieldMappings } from "@/lib/ai-match/heuristic-field-map";
 import {
-  blockTypeKeywords,
+  isLikelyUnmatchableBlock,
+  noMatchReason,
+} from "@/lib/ai-match/catalog-fit";
+import {
+  matchKeywordsForBlock,
+  refineBlockForMatching,
+} from "@/lib/ai-match/block-intent";
+import {
   scoreNameAgainstKeywords,
 } from "@/lib/ai-match/block-keywords";
 import type {
@@ -33,11 +40,15 @@ function scoreRenderingForBlock(
   block: FlatContentBlock,
   rendering: DiscoveryItem,
 ): number {
-  const keywords = blockTypeKeywords(block.type);
+  const keywords = matchKeywordsForBlock(block);
   let score = scoreNameAgainstKeywords(rendering.name, keywords);
 
   if (block.heading) {
-    score += scoreNameAgainstKeywords(block.heading, keywords) * 0.25;
+    score += scoreNameAgainstKeywords(block.heading, keywords) * 0.35;
+  }
+
+  if (block.selector) {
+    score += scoreNameAgainstKeywords(block.selector, keywords) * 0.2;
   }
 
   return score;
@@ -48,7 +59,7 @@ function scoreTemplateForBlock(
   template: TemplateDefinition,
   rendering?: DiscoveryItem,
 ): number {
-  const keywords = blockTypeKeywords(block.type);
+  const keywords = matchKeywordsForBlock(block);
   let score = scoreNameAgainstKeywords(template.name, keywords);
 
   const fieldNames = template.fields.map((field) => field.name).join(" ");
@@ -106,16 +117,46 @@ function buildReason(
   return `Crawl ${crawlLabel} block matched to Sitecore ${rendering.name} / ${template.name} (${score}% name match).`;
 }
 
+export function buildNoMatchResult(
+  block: FlatContentBlock,
+  renderings: DiscoveryItem[],
+  reason?: string,
+): BlockMatchResult {
+  const refinedBlock = refineBlockForMatching(block);
+
+  return {
+    blockId: block.id,
+    pageUrl: block.pageUrl,
+    blockType: refinedBlock.type,
+    blockHeading: block.heading,
+    parentBlockId: block.parentBlockId,
+    matchScore: 0,
+    confidence: "low",
+    renderingName: "",
+    templateName: "",
+    reasoning: reason ?? noMatchReason(refinedBlock, renderings),
+    fieldMappings: [],
+    needsReview: false,
+    unmatched: true,
+  };
+}
+
 export function matchBlockToSitecore(
   block: FlatContentBlock,
   renderings: DiscoveryItem[],
   templates: TemplateDefinition[],
 ): BlockMatchResult {
-  const renderingMatch = pickRendering(block, renderings);
+  const refinedBlock = refineBlockForMatching(block);
+
+  if (isLikelyUnmatchableBlock(refinedBlock, renderings)) {
+    return buildNoMatchResult(refinedBlock, renderings);
+  }
+
+  const renderingMatch = pickRendering(refinedBlock, renderings);
   const rendering = renderingMatch?.item;
   const renderingScore = renderingMatch?.score ?? 0;
 
-  const templateMatch = pickTemplate(block, templates, rendering);
+  const templateMatch = pickTemplate(refinedBlock, templates, rendering);
   const template = templateMatch?.item;
   const templateScore = templateMatch?.score ?? 0;
 
@@ -126,42 +167,32 @@ export function matchBlockToSitecore(
   const confidence = scoreToConfidence(matchScore);
 
   if (!rendering || !template || matchScore < LOW_CONFIDENCE_SCORE) {
-    return {
-      blockId: block.id,
-      pageUrl: block.pageUrl,
-      blockType: block.type,
-      blockHeading: block.heading,
-      matchScore,
-      confidence,
-      renderingName: rendering?.name ?? "",
-      renderingPath: rendering?.path,
-      templateName: template?.name ?? "",
-      templatePath: template?.path,
-      reasoning: rendering
-        ? `Low-confidence match for crawl ${block.type} block. Review rendering/template choice.`
-        : `No Sitecore component found for crawl type "${block.type}". Available renderings did not match by name.`,
-      fieldMappings: template
-        ? buildHeuristicFieldMappings(block, template)
-        : [],
-      needsReview: true,
-    };
+    return buildNoMatchResult(
+      refinedBlock,
+      renderings,
+      rendering
+        ? `Low-confidence match for ${refinedBlock.type} block — no reliable Sitecore component.`
+        : noMatchReason(refinedBlock, renderings),
+    );
   }
 
   return {
     blockId: block.id,
     pageUrl: block.pageUrl,
-    blockType: block.type,
+    blockType: refinedBlock.type,
     blockHeading: block.heading,
+    parentBlockId: block.parentBlockId,
     matchScore,
     confidence,
     renderingName: rendering.name,
     renderingPath: rendering.path,
     templateName: template.name,
     templatePath: template.path,
-    reasoning: buildReason(block, rendering, template, matchScore),
+    reasoning: buildReason(refinedBlock, rendering, template, matchScore),
     fieldMappings: buildHeuristicFieldMappings(block, template),
     needsReview:
       matchScore < AUTO_MATCH_SCORE_THRESHOLD || confidence === "low",
+    unmatched: false,
   };
 }
 
@@ -204,9 +235,8 @@ export function summarizeComponentMapping(
   const sitecoreSuffix =
     renderings.length > 12 ? ` (+${renderings.length - 12} more)` : "";
 
-  const autoMatched = matches.filter(
-    (match) => match.matchScore >= AUTO_MATCH_SCORE_THRESHOLD,
-  ).length;
+  const matched = matches.filter((match) => !match.unmatched).length;
+  const skipped = matches.filter((match) => match.unmatched).length;
 
-  return `Crawl blocks: ${crawlSummary || "none"}. Sitecore renderings: ${sitecoreNames}${sitecoreSuffix}. ${autoMatched}/${matches.length} mapped by component type.`;
+  return `Crawl blocks: ${crawlSummary || "none"}. Sitecore renderings: ${sitecoreNames}${sitecoreSuffix}. ${matched}/${matches.length} matched${skipped > 0 ? `, ${skipped} skipped (no component)` : ""}.`;
 }

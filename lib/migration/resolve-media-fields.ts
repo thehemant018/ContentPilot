@@ -1,4 +1,14 @@
 import {
+  buildMediaCandidateStems,
+  resolveMediaDisplayName,
+  resolveMediaItemStem,
+} from "@/lib/migration/image-metadata";
+import {
+  findExistingMediaItem,
+  isSitecoreImageFieldValue,
+  resolveExistingMediaFromFieldValue,
+} from "@/lib/sitecore/media-lookup";
+import {
   formatSitecoreImageFieldValue,
   isHttpImageFieldValue,
   resolveAbsoluteImageUrl,
@@ -18,6 +28,7 @@ function isImageField(fieldName: string, fieldType?: string): boolean {
 export interface ResolveMediaFieldsResult {
   fields: Record<string, string>;
   uploadedCount: number;
+  reusedCount: number;
   warnings: string[];
 }
 
@@ -27,19 +38,43 @@ export async function resolveMediaFieldsForComponent(
   component: MigrationComponentExport,
   mediaLibraryPath: string,
   uploadCache: Map<string, UploadMediaResult>,
+  folderSearchCache?: Map<
+    string,
+    Array<{ itemId: string; name: string; path: string }>
+  >,
 ): Promise<ResolveMediaFieldsResult> {
   const fields = { ...component.datasource.fields };
   const warnings: string[] = [];
   let uploadedCount = 0;
+  let reusedCount = 0;
   const language = component.presentation.language || "en";
 
   for (const meta of component.datasource.fieldMeta) {
     const value = fields[meta.name];
-    if (!value || !isHttpImageFieldValue(value)) {
+    if (!value) {
       continue;
     }
 
     if (!isImageField(meta.name, meta.type)) {
+      continue;
+    }
+
+    if (isSitecoreImageFieldValue(value)) {
+      continue;
+    }
+
+    const existingFromValue = await resolveExistingMediaFromFieldValue(
+      instanceUrl,
+      accessToken,
+      value,
+    );
+    if (existingFromValue) {
+      fields[meta.name] = formatSitecoreImageFieldValue(existingFromValue.itemId);
+      reusedCount += 1;
+      continue;
+    }
+
+    if (!isHttpImageFieldValue(value)) {
       continue;
     }
 
@@ -49,23 +84,44 @@ export async function resolveMediaFieldsForComponent(
     );
 
     try {
-      let uploaded = uploadCache.get(absoluteUrl);
-      if (!uploaded) {
-        uploaded = await uploadImageFromUrl(
+      let resolved = uploadCache.get(absoluteUrl);
+      if (!resolved) {
+        const imageAlt = meta.imageAlt?.trim();
+        const candidateStems = buildMediaCandidateStems(imageAlt, absoluteUrl);
+        const existing = await findExistingMediaItem(
           instanceUrl,
           accessToken,
-          absoluteUrl,
-          {
-            mediaFolderPath: mediaLibraryPath,
-            uniqueSuffix: component.queueItemId,
-            language,
-          },
+          mediaLibraryPath,
+          candidateStems,
+          folderSearchCache,
         );
-        uploadCache.set(absoluteUrl, uploaded);
-        uploadedCount += 1;
+
+        if (existing) {
+          resolved = { ...existing, sourceUrl: absoluteUrl };
+          reusedCount += 1;
+        } else {
+          const alt = resolveMediaDisplayName(imageAlt, absoluteUrl);
+          resolved = await uploadImageFromUrl(
+            instanceUrl,
+            accessToken,
+            absoluteUrl,
+            {
+              mediaFolderPath: mediaLibraryPath,
+              uniqueSuffix: component.queueItemId,
+              language,
+              alt,
+              displayName: resolveMediaItemStem(imageAlt, absoluteUrl),
+            },
+          );
+          uploadedCount += 1;
+        }
+
+        uploadCache.set(absoluteUrl, resolved);
+      } else {
+        reusedCount += 1;
       }
 
-      fields[meta.name] = formatSitecoreImageFieldValue(uploaded.itemId);
+      fields[meta.name] = formatSitecoreImageFieldValue(resolved.itemId);
     } catch (error) {
       warnings.push(
         error instanceof Error
@@ -75,5 +131,5 @@ export async function resolveMediaFieldsForComponent(
     }
   }
 
-  return { fields, uploadedCount, warnings };
+  return { fields, uploadedCount, reusedCount, warnings };
 }

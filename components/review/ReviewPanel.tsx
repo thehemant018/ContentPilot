@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { PageMigrationGroup } from "@/components/review/PageMigrationGroup";
 import { NextPhaseButton } from "@/components/workflow/NextPhaseButton";
 import { ReturnToCrawlBanner } from "@/components/workflow/ReturnToCrawlBanner";
+import { validateMigrationQueue } from "@/lib/migration/validate-queue";
+import { normalizeSourcePageUrl } from "@/lib/migration/sitecore-path";
 import {
   getMigrationQueue,
   removeQueueItem,
@@ -18,13 +20,12 @@ import {
   getDiscoveryResult,
 } from "@/lib/storage/workflow-data";
 import {
+  advanceToWorkflowPhase,
   isAiMatchPhaseComplete,
   markReviewPhaseComplete,
-  notifyMigrationExportUpdated,
   setFurthestPhaseIndex,
 } from "@/lib/workflow/progress";
 import { WORKFLOW_PHASES } from "@/lib/workflow/phases";
-import type { MigrationExportResult } from "@/types/migration-export";
 import type { MigrationQueueItem } from "@/types/migration-queue";
 
 export function ReviewPanel({ embedded = false }: { embedded?: boolean }) {
@@ -34,10 +35,6 @@ export function ReviewPanel({ embedded = false }: { embedded?: boolean }) {
     type: "success" | "error";
     message: string;
   } | null>(null);
-  const [isExporting, setIsExporting] = useState(false);
-  const [lastExport, setLastExport] = useState<MigrationExportResult | null>(
-    null,
-  );
 
   const refreshQueue = useCallback(() => {
     setQueue(getMigrationQueue());
@@ -91,66 +88,32 @@ export function ReviewPanel({ embedded = false }: { embedded?: boolean }) {
     setFeedback({ type: "success", message: "Queue cleared." });
   }
 
-  async function handleExportToLocalData(): Promise<void> {
-    setIsExporting(true);
+  function handleContinueToMigrate(): void {
     setFeedback(null);
 
     const currentQueue = getMigrationQueue();
-    const missingTarget = currentQueue.filter(
-      (item) => !item.targetPagePath.trim(),
-    );
+    const validation = validateMigrationQueue(currentQueue);
 
-    if (missingTarget.length > 0) {
+    if (!validation.success) {
       setFeedback({
         type: "error",
-        message: `${missingTarget.length} item(s) are missing a target Sitecore page path.`,
+        message: validation.message,
       });
-      setIsExporting(false);
       return;
     }
 
-    try {
-      const discovery = getDiscoveryResult();
-      const response = await fetch("/api/migration/export", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          queue: currentQueue,
-          mediaLibraryPath: discovery?.mediaPath,
-        }),
-      });
-
-      const payload = (await response.json()) as MigrationExportResult;
-
-      if (!response.ok || !payload.success) {
-        setFeedback({
-          type: "error",
-          message: payload.message ?? "Export failed.",
-        });
-        return;
-      }
-
-      setLastExport(payload);
-      const migrateIndex = WORKFLOW_PHASES.findIndex(
-        (phase) => phase.id === "migrate",
-      );
-      if (migrateIndex >= 0) {
-        setFurthestPhaseIndex(migrateIndex);
-      }
-      notifyMigrationExportUpdated();
-      setFeedback({
-        type: "success",
-        message: payload.message,
-      });
-    } catch (error) {
-      setFeedback({
-        type: "error",
-        message:
-          error instanceof Error ? error.message : "Export to local data failed.",
-      });
-    } finally {
-      setIsExporting(false);
+    markReviewPhaseComplete();
+    const migrateIndex = WORKFLOW_PHASES.findIndex(
+      (phase) => phase.id === "migrate",
+    );
+    if (migrateIndex >= 0) {
+      setFurthestPhaseIndex(migrateIndex);
     }
+    advanceToWorkflowPhase("migrate");
+    setFeedback({
+      type: "success",
+      message: validation.message,
+    });
   }
 
   const crawlPages = getCrawlResult()?.pages ?? [];
@@ -161,9 +124,10 @@ export function ReviewPanel({ embedded = false }: { embedded?: boolean }) {
   const queueBySourcePage = useMemo(() => {
     const groups = new Map<string, MigrationQueueItem[]>();
     for (const item of queue) {
-      const existing = groups.get(item.sourcePageUrl) ?? [];
+      const key = normalizeSourcePageUrl(item.sourcePageUrl);
+      const existing = groups.get(key) ?? [];
       existing.push(item);
-      groups.set(item.sourcePageUrl, existing);
+      groups.set(key, existing);
     }
     return Array.from(groups.entries()).sort(([a], [b]) => a.localeCompare(b));
   }, [queue]);
@@ -182,7 +146,7 @@ export function ReviewPanel({ embedded = false }: { embedded?: boolean }) {
         </h3>
         <p className="mt-2 text-sm text-amber-800">
           Run AI matching and add components to the queue. Queued items appear
-          here for review and editing before export.
+          here for review and editing before push.
         </p>
       </div>
     );
@@ -200,9 +164,8 @@ export function ReviewPanel({ embedded = false }: { embedded?: boolean }) {
         <p className="mt-1 text-sm text-zinc-600">
           Set target page paths and SXA placeholders once per source page.
           Each component keeps its own datasource path and field content.
-          Export writes component JSON to the local{" "}
-          <span className="font-mono">data/migrations</span> folder. On push,
-          crawled image URLs are uploaded to the Discovery media library path.
+          When you push in Migrate, the queue is sent directly to Sitecore — nothing
+          is written to disk.
         </p>
         {getDiscoveryResult()?.mediaPath && (
           <p className="mt-2 text-xs text-zinc-500">
@@ -219,7 +182,7 @@ export function ReviewPanel({ embedded = false }: { embedded?: boolean }) {
           <span className="font-semibold text-zinc-900">{queue.length}</span>{" "}
           in queue ·{" "}
           <span className="font-semibold text-zinc-900">{readyCount}</span>{" "}
-          ready to export
+          ready to push
         </p>
         <div className="flex flex-wrap gap-2">
           {queue.length > 0 && (
@@ -233,11 +196,11 @@ export function ReviewPanel({ embedded = false }: { embedded?: boolean }) {
           )}
           <button
             type="button"
-            onClick={() => void handleExportToLocalData()}
-            disabled={isExporting || readyCount === 0}
+            onClick={handleContinueToMigrate}
+            disabled={readyCount === 0}
             className="rounded-lg bg-emerald-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {isExporting ? "Exporting…" : "Export to local data"}
+            Continue to Migrate
           </button>
         </div>
       </div>
@@ -264,11 +227,6 @@ export function ReviewPanel({ embedded = false }: { embedded?: boolean }) {
           }`}
         >
           {feedback.message}
-          {lastExport?.outputDir && feedback.type === "success" && (
-            <p className="mt-2 font-mono text-xs">
-              Folder: migratex/{lastExport.outputDir}
-            </p>
-          )}
         </div>
       )}
 

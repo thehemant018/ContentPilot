@@ -1,5 +1,7 @@
-import fs from "node:fs/promises";
-import path from "node:path";
+import {
+  buildComponentsFromQueue,
+  prepareQueueForMigration,
+} from "@/lib/migration/queue-sync";
 import { resolveMediaFieldsForComponent } from "@/lib/migration/resolve-media-fields";
 import {
   ensureSitecoreItemExists,
@@ -15,37 +17,12 @@ import {
   type UploadMediaResult,
 } from "@/lib/sitecore/media-upload";
 import { addRenderingToPage } from "@/lib/sitecore/presentation-client";
-import {
-  getMigrationDataRoot,
-  readLatestExportSummary,
-} from "@/lib/migration/write-local-data";
 import type {
   MigrationComponentExport,
-  MigrationExportManifest,
   MigrationPushComponentResult,
   MigrationPushResult,
 } from "@/types/migration-export";
-
-async function loadBatchComponents(
-  batchDir: string,
-  manifest: MigrationExportManifest,
-): Promise<MigrationComponentExport[]> {
-  const absoluteBatchDir = path.isAbsolute(batchDir)
-    ? batchDir
-    : path.join(process.cwd(), batchDir);
-
-  const components: MigrationComponentExport[] = [];
-
-  for (const relativePath of manifest.components) {
-    const raw = await fs.readFile(
-      path.join(absoluteBatchDir, relativePath),
-      "utf8",
-    );
-    components.push(JSON.parse(raw) as MigrationComponentExport);
-  }
-
-  return components;
-}
+import type { MigrationQueueItem } from "@/types/migration-queue";
 
 async function resolveDatasourceTemplateId(
   instanceUrl: string,
@@ -138,45 +115,36 @@ async function upsertDatasource(
   return { created: true, updated: false, path: datasourcePath };
 }
 
-export async function pushLatestBatchToSitecore(
+export async function pushQueueToSitecore(
   instanceUrl: string,
   accessToken: string,
-  batchId?: string,
-  options?: { mediaLibraryPath?: string },
+  options: { mediaLibraryPath: string; queue: MigrationQueueItem[] },
 ): Promise<MigrationPushResult> {
-  const latest = await readLatestExportSummary();
-  if (!latest) {
+  const preparedQueue = prepareQueueForMigration(options.queue);
+
+  if (preparedQueue.length === 0) {
     return {
       success: false,
-      message: "No local export found. Export from Review phase first.",
+      message: "Review queue is empty. Add components in AI Match first.",
     };
   }
 
-  if (batchId && batchId !== latest.batchId) {
+  const missingTargets = preparedQueue.filter(
+    (item) => !item.targetPagePath.trim(),
+  );
+  if (missingTargets.length > 0) {
     return {
       success: false,
-      message: `Batch "${batchId}" not found. Latest batch is "${latest.batchId}".`,
+      message: `${missingTargets.length} queued component(s) are missing a target Sitecore page path. Set paths in Review (Phase 5) before pushing.`,
     };
   }
 
-  const batchDir = latest.batchDir.startsWith("data")
-    ? path.join(process.cwd(), latest.batchDir)
-    : path.join(getMigrationDataRoot(), latest.batchId);
-
-  const components = await loadBatchComponents(batchDir, latest.manifest);
-  const results: MigrationPushComponentResult[] = [];
-  let pushedCount = 0;
-  let failedCount = 0;
-
-  const rawMediaPath =
-    options?.mediaLibraryPath?.trim() ||
-    latest.manifest.mediaLibraryPath?.trim();
-
+  const rawMediaPath = options.mediaLibraryPath.trim();
   if (!rawMediaPath) {
     return {
       success: false,
       message:
-        "Media library path is not set. Configure it in Discovery, then export from Review before pushing.",
+        "Media library path is not set. Configure it in Discovery (Phase 2) before pushing.",
     };
   }
 
@@ -193,17 +161,37 @@ export async function pushLatestBatchToSitecore(
     };
   }
 
+  const exportedAt = new Date().toISOString();
+  const components = buildComponentsFromQueue(preparedQueue, exportedAt);
+
+  if (components.length === 0) {
+    return {
+      success: false,
+      message: "No components could be built from the Review queue.",
+    };
+  }
+
+  const results: MigrationPushComponentResult[] = [];
+  let pushedCount = 0;
+  let failedCount = 0;
+
   const uploadCache = new Map<string, UploadMediaResult>();
+  const folderSearchCache = new Map<
+    string,
+    Array<{ itemId: string; name: string; path: string }>
+  >();
 
   for (const component of components) {
     const result: MigrationPushComponentResult = {
       queueItemId: component.queueItemId,
+      sourcePageUrl: component.sourcePageUrl,
       datasourcePath: component.datasource.path,
       targetPagePath: component.targetPagePath,
       datasourceCreated: false,
       datasourceUpdated: false,
       presentationAssigned: false,
       mediaUploaded: 0,
+      mediaReused: 0,
       warnings: [],
     };
 
@@ -214,8 +202,10 @@ export async function pushLatestBatchToSitecore(
         component,
         mediaLibraryPath,
         uploadCache,
+        folderSearchCache,
       );
       result.mediaUploaded = resolvedFields.uploadedCount;
+      result.mediaReused = resolvedFields.reusedCount;
       result.warnings.push(...resolvedFields.warnings);
 
       const datasource = await upsertDatasource(
@@ -270,9 +260,8 @@ export async function pushLatestBatchToSitecore(
   return {
     success,
     message: success
-      ? `Pushed ${pushedCount} component(s) to Sitecore from batch ${latest.batchId}.`
+      ? `Pushed ${pushedCount} component(s) to Sitecore from your Review queue.`
       : `Pushed ${pushedCount} component(s), ${failedCount} failed. See details below.`,
-    batchId: latest.batchId,
     results,
     pushedCount,
     failedCount,

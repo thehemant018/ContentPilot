@@ -17,6 +17,14 @@ const SCROLL_PANEL_CLASS =
   "mt-3 max-h-96 overflow-y-auto overscroll-contain pr-1 [scrollbar-gutter:stable]";
 
 function ConfidenceBadge({ match }: { match: BlockMatchResult }) {
+  if (match.unmatched) {
+    return (
+      <span className="rounded-full bg-zinc-200 px-2 py-0.5 text-[11px] font-semibold uppercase text-zinc-700">
+        No match
+      </span>
+    );
+  }
+
   const styles = {
     high: "bg-emerald-100 text-emerald-800",
     medium: "bg-amber-100 text-amber-800",
@@ -98,10 +106,16 @@ function MatchCard({
   inQueue: boolean;
   onAddToQueue: (match: BlockMatchResult) => void;
 }) {
+  const isUnmatched = match.unmatched === true;
+
   return (
     <article
       className={`rounded-xl border bg-white p-4 ${
-        match.needsReview ? "border-rose-200 ring-1 ring-rose-100" : "border-zinc-200"
+        isUnmatched
+          ? "border-zinc-200 bg-zinc-50"
+          : match.needsReview
+            ? "border-rose-200 ring-1 ring-rose-100"
+            : "border-zinc-200"
       }`}
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -111,7 +125,12 @@ function MatchCard({
               {match.blockHeading || `${match.blockType} block`}
             </h4>
             <ConfidenceBadge match={match} />
-            {match.needsReview && (
+            {match.parentBlockId && (
+              <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-semibold uppercase text-blue-800">
+                Sub-block
+              </span>
+            )}
+            {!isUnmatched && match.needsReview && (
               <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[11px] font-semibold uppercase text-rose-800">
                 Needs review
               </span>
@@ -125,52 +144,73 @@ function MatchCard({
           <p className="mt-1 break-all font-mono text-xs text-zinc-500">
             {match.pageUrl}
           </p>
+          {match.parentBlockId && (
+            <p className="mt-0.5 font-mono text-xs text-zinc-400">
+              from section {match.parentBlockId}
+            </p>
+          )}
         </div>
         <button
           type="button"
-          disabled={inQueue}
+          disabled={inQueue || isUnmatched}
+          title={
+            isUnmatched
+              ? "No Sitecore component in discovery fits this block"
+              : undefined
+          }
           onClick={() => onAddToQueue(match)}
           className="rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {inQueue ? "Queued" : "Add to queue"}
+          {isUnmatched ? "No component" : inQueue ? "Queued" : "Add to queue"}
         </button>
       </div>
 
-      <div className="mt-4 grid gap-3 md:grid-cols-2">
-        <div className="rounded-lg bg-orange-50 px-3 py-2">
-          <p className="text-xs font-semibold uppercase tracking-wide text-orange-700">
-            Rendering
+      {isUnmatched ? (
+        <div className="mt-4 rounded-lg border border-zinc-200 bg-white px-3 py-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+            Skipped — no Sitecore match
           </p>
-          <p className="mt-1 text-sm font-medium text-zinc-900">
-            {match.renderingName}
-          </p>
-          {match.renderingPath && (
-            <p className="mt-0.5 font-mono text-xs text-zinc-500">
-              {match.renderingPath}
-            </p>
-          )}
+          <p className="mt-2 text-sm text-zinc-700">{match.reasoning}</p>
         </div>
-        <div className="rounded-lg bg-teal-50 px-3 py-2">
-          <p className="text-xs font-semibold uppercase tracking-wide text-teal-700">
-            Template
-          </p>
-          <p className="mt-1 text-sm font-medium text-zinc-900">
-            {match.templateName}
-          </p>
-          {match.templatePath && (
-            <p className="mt-0.5 font-mono text-xs text-zinc-500">
-              {match.templatePath}
-            </p>
-          )}
-        </div>
-      </div>
+      ) : (
+        <>
+          <div className="mt-4 grid gap-3 md:grid-cols-2">
+            <div className="rounded-lg bg-orange-50 px-3 py-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-orange-700">
+                Rendering
+              </p>
+              <p className="mt-1 text-sm font-medium text-zinc-900">
+                {match.renderingName}
+              </p>
+              {match.renderingPath && (
+                <p className="mt-0.5 font-mono text-xs text-zinc-500">
+                  {match.renderingPath}
+                </p>
+              )}
+            </div>
+            <div className="rounded-lg bg-teal-50 px-3 py-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-teal-700">
+                Template
+              </p>
+              <p className="mt-1 text-sm font-medium text-zinc-900">
+                {match.templateName}
+              </p>
+              {match.templatePath && (
+                <p className="mt-0.5 font-mono text-xs text-zinc-500">
+                  {match.templatePath}
+                </p>
+              )}
+            </div>
+          </div>
 
-      <p className="mt-3 text-sm text-zinc-600">{match.reasoning}</p>
+          <p className="mt-3 text-sm text-zinc-600">{match.reasoning}</p>
 
-      <h5 className="mt-4 text-xs font-semibold uppercase tracking-wide text-zinc-500">
-        Field mapping
-      </h5>
-      <FieldMappingTable mappings={match.fieldMappings} />
+          <h5 className="mt-4 text-xs font-semibold uppercase tracking-wide text-zinc-500">
+            Field mapping
+          </h5>
+          <FieldMappingTable mappings={match.fieldMappings} />
+        </>
+      )}
     </article>
   );
 }
@@ -185,6 +225,8 @@ export function MatchResults({
   onQueueChange?: (message: string) => void;
 }) {
   const [, setQueueVersion] = useState(0);
+  const unmatchedCount = matches.filter((match) => match.unmatched).length;
+  const matchedCount = matches.length - unmatchedCount;
 
   useEffect(() => subscribeMigrationQueue(() => setQueueVersion((v) => v + 1)), []);
 
@@ -205,10 +247,19 @@ export function MatchResults({
 
   return (
     <div className="space-y-4">
+      {unmatchedCount > 0 && (
+        <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-700">
+          {matchedCount} block(s) matched to Sitecore components; {unmatchedCount}{" "}
+          skipped because no rendering in discovery fits (card grids, stats, rich
+          text, etc.). Add matching components in Sitecore or migrate those sections
+          manually.
+        </div>
+      )}
+
       {lowConfidenceCount ? (
         <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          {lowConfidenceCount} block(s) have low confidence. Add to queue to
-          review and edit in the next phase.
+          {lowConfidenceCount} block(s) have low confidence. Add to queue to review
+          and edit in the next phase.
         </div>
       ) : null}
 
