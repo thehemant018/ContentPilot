@@ -18,12 +18,14 @@ import {
   getAiMatchResult,
   getCrawlResult,
   getDiscoveryResult,
+  WORKFLOW_DATA_CHANGED_EVENT,
 } from "@/lib/storage/workflow-data";
 import {
   advanceToWorkflowPhase,
   isAiMatchPhaseComplete,
   markReviewPhaseComplete,
   setFurthestPhaseIndex,
+  subscribeWorkflowProgress,
 } from "@/lib/workflow/progress";
 import { WORKFLOW_PHASES } from "@/lib/workflow/phases";
 import type { MigrationQueueItem } from "@/types/migration-queue";
@@ -40,15 +42,39 @@ export function ReviewPanel({ embedded = false }: { embedded?: boolean }) {
     setQueue(getMigrationQueue());
   }, []);
 
+  const refreshPrerequisites = useCallback(() => {
+    setPrerequisitesMet(
+      isAiMatchPhaseComplete() && Boolean(getAiMatchResult()),
+    );
+  }, []);
+
   useEffect(() => {
     queueMicrotask(() => {
       refreshQueue();
-      setPrerequisitesMet(
-        isAiMatchPhaseComplete() && Boolean(getAiMatchResult()),
-      );
+      refreshPrerequisites();
     });
     return subscribeMigrationQueue(refreshQueue);
-  }, [refreshQueue]);
+  }, [refreshQueue, refreshPrerequisites]);
+
+  useEffect(() => {
+    const unsubscribeProgress = subscribeWorkflowProgress(refreshPrerequisites);
+
+    function handleWorkflowDataChanged() {
+      refreshPrerequisites();
+    }
+
+    window.addEventListener(
+      WORKFLOW_DATA_CHANGED_EVENT,
+      handleWorkflowDataChanged,
+    );
+    return () => {
+      unsubscribeProgress();
+      window.removeEventListener(
+        WORKFLOW_DATA_CHANGED_EVENT,
+        handleWorkflowDataChanged,
+      );
+    };
+  }, [refreshPrerequisites]);
 
   function handleUpdatePageSettings(
     sourcePageUrl: string,
