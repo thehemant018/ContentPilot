@@ -1,9 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { CrawlResults } from "@/components/crawl/CrawlResults";
 import { NextPhaseButton } from "@/components/workflow/NextPhaseButton";
-import { isDiscoveryPhaseComplete, markCrawlPhaseComplete } from "@/lib/workflow/progress";
+import {
+  isDiscoveryPhaseComplete,
+  markCrawlPhaseComplete,
+  subscribeWorkflowProgress,
+} from "@/lib/workflow/progress";
 import { saveCrawlResult } from "@/lib/storage/workflow-data";
 import type { CrawlMode, CrawlResult } from "@/types/crawl";
 
@@ -19,11 +23,14 @@ export function CrawlPanel({ embedded = false }: { embedded?: boolean }) {
   } | null>(null);
   const [result, setResult] = useState<CrawlResult | null>(null);
 
-  useEffect(() => {
-    queueMicrotask(() => {
-      setDiscoveryComplete(isDiscoveryPhaseComplete());
-    });
+  const refreshDiscoveryComplete = useCallback(() => {
+    setDiscoveryComplete(isDiscoveryPhaseComplete());
   }, []);
+
+  useEffect(() => {
+    queueMicrotask(refreshDiscoveryComplete);
+    return subscribeWorkflowProgress(refreshDiscoveryComplete);
+  }, [refreshDiscoveryComplete]);
 
   async function handleCrawl(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();

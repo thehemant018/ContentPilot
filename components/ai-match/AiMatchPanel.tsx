@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { MatchResults } from "@/components/ai-match/MatchResults";
 import { MatchStrategyBadge } from "@/components/ai-match/MatchStrategyBadge";
 import { NextPhaseButton } from "@/components/workflow/NextPhaseButton";
@@ -14,12 +14,14 @@ import {
   getCrawlResult,
   getDiscoveryResult,
   saveAiMatchResult,
+  WORKFLOW_DATA_CHANGED_EVENT,
 } from "@/lib/storage/workflow-data";
 import {
   advanceToWorkflowPhase,
   isCrawlPhaseComplete,
   isDiscoveryPhaseComplete,
   markAiMatchPhaseComplete,
+  subscribeWorkflowProgress,
 } from "@/lib/workflow/progress";
 import type { AiMatchResult, LlmProvider } from "@/types/ai-match";
 
@@ -55,17 +57,41 @@ export function AiMatchPanel({ embedded = false }: { embedded?: boolean }) {
       ? `LLM · ${getDefaultModelLabel(provider)}`
       : `Set ${provider === "claude" ? "ANTHROPIC_API_KEY" : provider === "groq" ? "GROQ_API_KEY" : "GEMINI_API_KEY"} in .env.local`;
 
+  const refreshPrerequisites = useCallback(() => {
+    setPrerequisitesMet(
+      isDiscoveryPhaseComplete() &&
+        isCrawlPhaseComplete() &&
+        Boolean(getDiscoveryResult()) &&
+        Boolean(getCrawlResult()),
+    );
+  }, []);
+
+  useEffect(() => {
+    queueMicrotask(refreshPrerequisites);
+    const unsubscribeProgress = subscribeWorkflowProgress(refreshPrerequisites);
+
+    function handleWorkflowDataChanged() {
+      refreshPrerequisites();
+    }
+
+    window.addEventListener(
+      WORKFLOW_DATA_CHANGED_EVENT,
+      handleWorkflowDataChanged,
+    );
+    return () => {
+      unsubscribeProgress();
+      window.removeEventListener(
+        WORKFLOW_DATA_CHANGED_EVENT,
+        handleWorkflowDataChanged,
+      );
+    };
+  }, [refreshPrerequisites]);
+
   useEffect(() => {
     queueMicrotask(() => {
       const config = getLlmConfig();
       setProvider(config.provider);
       setUseRuleBasedMatching(config.useRuleBasedMatching === true);
-      setPrerequisitesMet(
-        isDiscoveryPhaseComplete() &&
-          isCrawlPhaseComplete() &&
-          Boolean(getDiscoveryResult()) &&
-          Boolean(getCrawlResult()),
-      );
     });
 
     void fetch("/api/ai-match")
