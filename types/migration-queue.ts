@@ -27,7 +27,7 @@ export interface MigrationQueueItem {
   reasoning: string;
   /** Sitecore item path where this component should be placed during migration. */
   targetPagePath: string;
-  /** Presentation placeholder key (e.g. headless-main for SXA headless). */
+  /** Base presentation placeholder key (e.g. headless-main). Resolved to dynamic keys at push. */
   placeholder?: string;
   /** Override auto-generated datasource item path. */
   datasourcePath?: string;

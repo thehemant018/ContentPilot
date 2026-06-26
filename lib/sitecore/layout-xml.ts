@@ -41,6 +41,69 @@ export function buildInitialLayoutXml(
   return `<r xmlns:p="p" xmlns:s="s" p:p="1"><d id="${formatSitecoreGuid(deviceId)}">${renderingElement}</d></r>`;
 }
 
+function splitDeviceRenderings(deviceInnerXml: string): string[] {
+  const elements: string[] = [];
+  for (const match of deviceInnerXml.matchAll(/<r\s[^>]+\/>/gi)) {
+    elements.push(match[0]!);
+  }
+  return elements;
+}
+
+export function insertRenderingInLayoutXml(
+  existingXml: string | undefined,
+  renderingElement: string,
+  placeholder: string,
+  index: number,
+  deviceId: string = DEFAULT_LAYOUT_DEVICE_ID,
+): string {
+  const trimmed = existingXml?.trim();
+  if (!trimmed) {
+    return buildInitialLayoutXml(deviceId, renderingElement);
+  }
+
+  const deviceToken = `id="${formatSitecoreGuid(deviceId)}"`;
+  const deviceOpen = trimmed.indexOf(deviceToken);
+  if (deviceOpen === -1) {
+    return appendRenderingToLayoutXml(
+      existingXml,
+      renderingElement,
+      deviceId,
+    );
+  }
+
+  const innerStart = trimmed.indexOf(">", deviceOpen) + 1;
+  const deviceClose = trimmed.indexOf("</d>", innerStart);
+  if (deviceClose === -1) {
+    return appendRenderingToLayoutXml(
+      existingXml,
+      renderingElement,
+      deviceId,
+    );
+  }
+
+  const deviceInner = trimmed.slice(innerStart, deviceClose);
+  const renderings = splitDeviceRenderings(deviceInner);
+  const normalizedPlaceholder = placeholder.trim();
+  const samePlaceholderIndexes = renderings
+    .map((element, elementIndex) =>
+      element.includes(`s:ph="${normalizedPlaceholder}"`)
+        ? elementIndex
+        : -1,
+    )
+    .filter((elementIndex) => elementIndex >= 0);
+
+  const insertAt =
+    samePlaceholderIndexes.length === 0
+      ? renderings.length
+      : samePlaceholderIndexes[
+          Math.min(index, samePlaceholderIndexes.length)
+        ]!;
+
+  renderings.splice(insertAt, 0, renderingElement);
+  const rebuiltInner = renderings.join("");
+  return `${trimmed.slice(0, innerStart)}${rebuiltInner}${trimmed.slice(deviceClose)}`;
+}
+
 export function appendRenderingToLayoutXml(
   existingXml: string | undefined,
   renderingElement: string,
