@@ -1,26 +1,39 @@
 "use client";
 
+import { getMappingSourceBackTarget } from "@/lib/workflow/migration-mode";
 import { startNewContentMigration } from "@/lib/workflow/progress";
 
-const DEFAULT_CONFIRM_MESSAGE =
+const DEFAULT_RESTART_CONFIRM =
   "Start over with a different page? Crawl, AI Match, Review queue, and Migrate progress for the current page will be cleared. Auth and Discovery stay connected.";
 
-interface ReturnToCrawlButtonProps {
+interface ReturnToMappingSourceButtonProps {
   variant?: "link" | "button" | "primary";
   className?: string;
   label?: string;
   confirmMessage?: string;
   showArrow?: "left" | "right" | "none";
+  /** back = return to Visual Mapper or Crawl; restart = clear progress and start fresh */
+  intent?: "back" | "restart";
 }
 
-export function ReturnToCrawlButton({
+export function ReturnToMappingSourceButton({
   variant = "link",
   className = "",
-  label = "Crawl a different page",
-  confirmMessage = DEFAULT_CONFIRM_MESSAGE,
+  label,
+  confirmMessage = DEFAULT_RESTART_CONFIRM,
   showArrow = "left",
-}: ReturnToCrawlButtonProps) {
+  intent = "restart",
+}: ReturnToMappingSourceButtonProps) {
+  const backTarget = getMappingSourceBackTarget();
+  const resolvedLabel =
+    label ?? (intent === "back" ? backTarget.label : "Crawl a different page");
+
   function handleClick(): void {
+    if (intent === "back") {
+      getMappingSourceBackTarget().navigate();
+      return;
+    }
+
     if (!window.confirm(confirmMessage)) {
       return;
     }
@@ -29,7 +42,7 @@ export function ReturnToCrawlButton({
 
   const arrowPrefix = showArrow === "left" ? "← " : "";
   const arrowSuffix = showArrow === "right" ? " →" : "";
-  const text = `${arrowPrefix}${label}${arrowSuffix}`;
+  const text = `${arrowPrefix}${resolvedLabel}${arrowSuffix}`;
 
   if (variant === "primary") {
     return (
@@ -65,3 +78,6 @@ export function ReturnToCrawlButton({
     </button>
   );
 }
+
+/** @deprecated Use ReturnToMappingSourceButton */
+export const ReturnToCrawlButton = ReturnToMappingSourceButton;

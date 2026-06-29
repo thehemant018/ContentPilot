@@ -188,7 +188,7 @@ export function ReviewPanel({ embedded = false }: { embedded?: boolean }) {
     <div className={embedded ? "space-y-6" : "mx-auto max-w-5xl space-y-6"}>
       <div>
         <p className="text-xs font-semibold uppercase tracking-wider text-rose-600">
-          Phase 5 — Review
+          Phase 6 — Review
         </p>
         <h3 className="mt-1 text-lg font-semibold text-zinc-900">
           Migration queue

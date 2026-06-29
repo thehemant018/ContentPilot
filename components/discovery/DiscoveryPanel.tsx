@@ -13,6 +13,7 @@ import { SiteSelector } from "@/components/discovery/SiteSelector";
 import { NextPhaseButton } from "@/components/workflow/NextPhaseButton";
 import { markDiscoveryPhaseComplete } from "@/lib/workflow/progress";
 import { saveDiscoveryResult } from "@/lib/storage/workflow-data";
+import { saveVisualMapperSiteId } from "@/lib/visual-mapper/session-storage";
 
 const DEFAULT_RENDERINGS_PATH = "/sitecore/layout/Renderings";
 const DEFAULT_MEDIA_PATH = "/sitecore/media";
@@ -138,6 +139,9 @@ export function DiscoveryPanel({ embedded = false }: { embedded?: boolean }) {
       if (payload.success) {
         markDiscoveryPhaseComplete();
         saveDiscoveryResult(payload);
+        if (selectedSite) {
+          saveVisualMapperSiteId(selectedSite.name);
+        }
       }
     } catch (error) {
       setFeedback({
@@ -318,7 +322,7 @@ export function DiscoveryPanel({ embedded = false }: { embedded?: boolean }) {
         {result?.success && (
           <div className="flex flex-wrap items-center justify-end gap-3 border-t border-zinc-200 pt-6">
             <p className="text-sm text-zinc-600">
-              Discovery complete. Continue to crawl your source site.
+              Discovery complete. Choose how you want to map content.
             </p>
             <NextPhaseButton
               currentPhaseId="discovery"

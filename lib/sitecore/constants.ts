@@ -7,6 +7,8 @@ export const STORAGE_KEYS = {
   session: "migratex_sitecore_session",
   workflowFurthestPhase: "migratex_workflow_furthest_phase",
   discoveryComplete: "migratex_discovery_complete",
+  mapModeComplete: "migratex_map_mode_complete",
+  migrationMode: "migratex_migration_mode",
   crawlComplete: "migratex_crawl_complete",
   aiMatchComplete: "migratex_ai_match_complete",
   discoveryResult: "migratex_discovery_result",

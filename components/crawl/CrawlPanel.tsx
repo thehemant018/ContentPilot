@@ -5,9 +5,11 @@ import { CrawlResults } from "@/components/crawl/CrawlResults";
 import { NextPhaseButton } from "@/components/workflow/NextPhaseButton";
 import {
   isDiscoveryPhaseComplete,
+  isMapModePhaseComplete,
   markCrawlPhaseComplete,
   subscribeWorkflowProgress,
 } from "@/lib/workflow/progress";
+import { isAiMigrationMode } from "@/lib/workflow/migration-mode";
 import { saveCrawlResult } from "@/lib/storage/workflow-data";
 import type { CrawlFetchMode, CrawlMode, CrawlResult } from "@/types/crawl";
 
@@ -25,7 +27,11 @@ export function CrawlPanel({ embedded = false }: { embedded?: boolean }) {
   const [result, setResult] = useState<CrawlResult | null>(null);
 
   const refreshDiscoveryComplete = useCallback(() => {
-    setDiscoveryComplete(isDiscoveryPhaseComplete());
+    setDiscoveryComplete(
+      isDiscoveryPhaseComplete() &&
+        isMapModePhaseComplete() &&
+        isAiMigrationMode(),
+    );
   }, []);
 
   useEffect(() => {
@@ -92,8 +98,8 @@ export function CrawlPanel({ embedded = false }: { embedded?: boolean }) {
           Complete Discovery first
         </h3>
         <p className="mt-2 text-sm text-amber-800">
-          Phase 3 crawls your source site after Sitecore discovery is finished.
-          Go back to the Discovery tab and run path validation first.
+          Complete Discovery and Map (step 3) first, then return here to crawl
+          your source site.
         </p>
       </div>
     );
@@ -103,7 +109,7 @@ export function CrawlPanel({ embedded = false }: { embedded?: boolean }) {
     <div className={embedded ? "space-y-6" : "mx-auto max-w-4xl space-y-6"}>
       <div>
         <h3 className="text-lg font-semibold text-zinc-900">
-          Source URL crawl
+          Phase 4 — Source URL crawl
         </h3>
         <p className="mt-1 text-sm text-zinc-600">
           Paste a page URL or domain root. We detect semantic content blocks such
