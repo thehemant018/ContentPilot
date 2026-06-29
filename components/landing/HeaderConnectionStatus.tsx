@@ -26,13 +26,18 @@ export function HeaderConnectionStatus({ mobile = false }: { mobile?: boolean })
   }, []);
 
   if (!connected) {
+    const session = getStoredSession();
+    const expired = session && isSessionExpired(session);
+
     return (
       <span
-        className={`rounded-full border border-zinc-200 bg-zinc-50 px-3 py-1 text-xs font-medium text-zinc-600 ${
-          mobile ? "inline-flex w-fit" : "hidden sm:inline-flex"
-        }`}
+        className={`rounded-full border px-3 py-1 text-xs font-medium ${
+          expired
+            ? "border-amber-200 bg-amber-50 text-amber-800"
+            : "border-zinc-200 bg-zinc-50 text-zinc-600"
+        } ${mobile ? "inline-flex w-fit" : "hidden sm:inline-flex"}`}
       >
-        Not connected
+        {expired ? "Session expired" : "Not connected"}
       </span>
     );
   }

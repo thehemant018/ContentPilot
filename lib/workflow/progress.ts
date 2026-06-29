@@ -219,6 +219,9 @@ export function canNavigateToPhase(
     if (phaseId === "review" && canReturnToReviewForEditing()) {
       return true;
     }
+    if (phaseId === "auth" && !isAuthPhaseComplete()) {
+      return true;
+    }
     return false;
   }
 
@@ -238,6 +241,10 @@ export function canNavigateToPhase(
 
 export function getDefaultPhaseFromHash(): WorkflowPhaseId {
   if (typeof window === "undefined") {
+    return "auth";
+  }
+
+  if (!isAuthPhaseComplete()) {
     return "auth";
   }
 

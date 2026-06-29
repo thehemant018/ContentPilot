@@ -40,13 +40,16 @@ function MenuIcon({ open }: { open: boolean }) {
   );
 }
 
-function useSitecoreConnected() {
+function useSitecoreConnectionState() {
   const [connected, setConnected] = useState(false);
+  const [needsReconnect, setNeedsReconnect] = useState(false);
 
   useEffect(() => {
     function refresh() {
       const session = getStoredSession();
-      setConnected(Boolean(session && !isSessionExpired(session)));
+      const isValid = Boolean(session && !isSessionExpired(session));
+      setConnected(isValid);
+      setNeedsReconnect(Boolean(session && isSessionExpired(session)));
     }
 
     refresh();
@@ -58,12 +61,12 @@ function useSitecoreConnected() {
     };
   }, []);
 
-  return connected;
+  return { connected, needsReconnect };
 }
 
 export function Header() {
   const [menuOpen, setMenuOpen] = useState(false);
-  const isConnected = useSitecoreConnected();
+  const { connected: isConnected, needsReconnect } = useSitecoreConnectionState();
 
   useEffect(() => {
     function handleHashChange() {
@@ -109,7 +112,7 @@ export function Header() {
               href="#auth"
               className="inline-flex items-center justify-center rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-violet-700"
             >
-              Get started
+              {needsReconnect ? "Reconnect" : "Get started"}
             </a>
           )}
         </div>
@@ -143,7 +146,7 @@ export function Header() {
                 onClick={() => setMenuOpen(false)}
                 className="inline-flex items-center justify-center rounded-lg bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-violet-700"
               >
-                Get started
+                {needsReconnect ? "Reconnect" : "Get started"}
               </a>
             )}
           </div>

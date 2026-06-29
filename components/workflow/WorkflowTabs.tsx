@@ -21,6 +21,7 @@ import {
   getDefaultPhaseFromHash,
   getFurthestPhaseIndex,
   getMigrationCycleId,
+  isAuthPhaseComplete,
   isPhaseComplete,
   setFurthestPhaseIndex,
   subscribeWorkflowProgress,
@@ -46,6 +47,13 @@ export function WorkflowTabs() {
     setFurthestIndex(getFurthestPhaseIndex());
     setMigrationCycleId(getMigrationCycleId());
     setProgressVersion((value) => value + 1);
+
+    if (!isAuthPhaseComplete()) {
+      setActiveTab("auth");
+      if (window.location.hash.replace("#", "") !== "auth") {
+        window.history.replaceState(null, "", "#auth");
+      }
+    }
   }, []);
 
   const selectTab = useCallback(
@@ -150,8 +158,13 @@ export function WorkflowTabs() {
               hydrated &&
               phase.id === "review" &&
               canReturnToReviewForEditing();
+            const canReturnToAuth =
+              hydrated && phase.id === "auth" && !isAuthPhaseComplete();
             const isPreviousStep =
-              hydrated && phaseIndex < furthestIndex && !canEditReview;
+              hydrated &&
+              phaseIndex < furthestIndex &&
+              !canEditReview &&
+              !canReturnToAuth;
 
             return (
               <button
@@ -164,15 +177,17 @@ export function WorkflowTabs() {
                 aria-disabled={isDisabled}
                 disabled={isDisabled}
                 title={
-                  canEditReview
-                    ? "Edit migration queue before pushing"
-                    : isPreviousStep
-                      ? "This step is already completed"
-                      : isDisabled && !phase.available
-                        ? "Coming soon"
-                        : isDisabled
-                          ? "Complete the previous phase first"
-                          : undefined
+                  canReturnToAuth
+                    ? "Your session expired — reconnect to Sitecore"
+                    : canEditReview
+                      ? "Edit migration queue before pushing"
+                      : isPreviousStep
+                        ? "This step is already completed"
+                        : isDisabled && !phase.available
+                          ? "Coming soon"
+                          : isDisabled
+                            ? "Complete the previous phase first"
+                            : undefined
                 }
                 onClick={() => selectTab(phase.id)}
                 className={`flex shrink-0 items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors ${
