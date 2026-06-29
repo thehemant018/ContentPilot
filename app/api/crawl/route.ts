@@ -22,6 +22,7 @@ export async function POST(request: Request) {
       url,
       mode,
       maxPages: body.maxPages,
+      fetchMode: body.fetchMode === "static" ? "static" : "browser",
     });
 
     return NextResponse.json<CrawlResult>(result, {

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { PageMigrationGroup } from "@/components/review/PageMigrationGroup";
 import { NextPhaseButton } from "@/components/workflow/NextPhaseButton";
 import { ReturnToCrawlBanner } from "@/components/workflow/ReturnToCrawlBanner";
+import { buildPageTitleMap } from "@/lib/ai-match/group-by-page";
 import { validateMigrationQueue } from "@/lib/migration/validate-queue";
 import { normalizeSourcePageUrl } from "@/lib/migration/sitecore-path";
 import {
@@ -143,6 +144,10 @@ export function ReviewPanel({ embedded = false }: { embedded?: boolean }) {
   }
 
   const crawlPages = getCrawlResult()?.pages ?? [];
+  const pageTitleMap = useMemo(
+    () => buildPageTitleMap(crawlPages),
+    [crawlPages],
+  );
   const targetHints = [
     ...new Set(crawlPages.map((page) => page.url).filter(Boolean)),
   ];
@@ -157,6 +162,7 @@ export function ReviewPanel({ embedded = false }: { embedded?: boolean }) {
     }
     return Array.from(groups.entries()).sort(([a], [b]) => a.localeCompare(b));
   }, [queue]);
+  const multiPage = queueBySourcePage.length > 1;
 
   if (!prerequisitesMet && queue.length === 0) {
     return (
@@ -231,7 +237,7 @@ export function ReviewPanel({ embedded = false }: { embedded?: boolean }) {
         </div>
       </div>
 
-      {targetHints.length > 0 && (
+      {targetHints.length > 0 && !multiPage && (
         <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-900">
           <p className="font-medium">Crawled source pages (reference)</p>
           <ul className="mt-2 space-y-1 font-mono text-xs">
@@ -266,11 +272,25 @@ export function ReviewPanel({ embedded = false }: { embedded?: boolean }) {
         </div>
       ) : (
         <div className="space-y-6">
-          {queueBySourcePage.map(([sourcePageUrl, items]) => (
+          {multiPage && (
+            <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+              <p className="font-medium">
+                {queueBySourcePage.length} source pages — queue grouped by page
+              </p>
+              <p className="mt-1 text-xs text-blue-800">
+                Expand each page to edit target paths, placeholders, and
+                component fields.
+              </p>
+            </div>
+          )}
+          {queueBySourcePage.map(([sourcePageUrl, items], index) => (
             <PageMigrationGroup
               key={sourcePageUrl}
               sourcePageUrl={sourcePageUrl}
+              pageTitle={pageTitleMap.get(sourcePageUrl)}
               items={items}
+              collapsible={multiPage}
+              defaultOpen={index === 0}
               onUpdatePageSettings={handleUpdatePageSettings}
               onUpdateItem={handleUpdateItem}
               onRemoveItem={handleRemove}

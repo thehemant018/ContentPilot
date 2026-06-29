@@ -9,11 +9,12 @@ import {
   subscribeWorkflowProgress,
 } from "@/lib/workflow/progress";
 import { saveCrawlResult } from "@/lib/storage/workflow-data";
-import type { CrawlMode, CrawlResult } from "@/types/crawl";
+import type { CrawlFetchMode, CrawlMode, CrawlResult } from "@/types/crawl";
 
 export function CrawlPanel({ embedded = false }: { embedded?: boolean }) {
   const [sourceUrl, setSourceUrl] = useState("");
   const [mode, setMode] = useState<CrawlMode>("single");
+  const [fetchMode, setFetchMode] = useState<CrawlFetchMode>("browser");
   const [maxPages, setMaxPages] = useState(10);
   const [isCrawling, setIsCrawling] = useState(false);
   const [discoveryComplete, setDiscoveryComplete] = useState(false);
@@ -46,6 +47,7 @@ export function CrawlPanel({ embedded = false }: { embedded?: boolean }) {
           url: sourceUrl,
           mode,
           maxPages: mode === "site" ? maxPages : undefined,
+          fetchMode,
         }),
       });
 
@@ -104,10 +106,11 @@ export function CrawlPanel({ embedded = false }: { embedded?: boolean }) {
           Source URL crawl
         </h3>
         <p className="mt-1 text-sm text-zinc-600">
-          Paste a page URL or domain root. We fetch the HTML and detect semantic
-          content blocks such as heroes, card grids, media, CTAs, and rich text.
-          Headers, footers, navigation, and ads are excluded from the crawl JSON.
-          JavaScript-rendered pages may need a browser-based crawler later.
+          Paste a page URL or domain root. We detect semantic content blocks such
+          as heroes, card grids, accordions, media, CTAs, and rich text.
+          Browser render (default) runs JavaScript for React/Next.js sites like
+          Seismic. Static fetch is faster for simple HTML pages. Headers,
+          footers, navigation, and ads are excluded.
         </p>
       </div>
 
@@ -157,6 +160,34 @@ export function CrawlPanel({ embedded = false }: { embedded?: boolean }) {
                 onChange={() => setMode("site")}
               />
               Full site (same domain)
+            </label>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend className="text-sm font-medium text-zinc-700">
+            Page rendering
+          </legend>
+          <div className="mt-2 flex flex-wrap gap-4">
+            <label className="flex items-center gap-2 text-sm text-zinc-700">
+              <input
+                type="radio"
+                name="fetch-mode"
+                value="browser"
+                checked={fetchMode === "browser"}
+                onChange={() => setFetchMode("browser")}
+              />
+              Browser render (React / Next.js)
+            </label>
+            <label className="flex items-center gap-2 text-sm text-zinc-700">
+              <input
+                type="radio"
+                name="fetch-mode"
+                value="static"
+                checked={fetchMode === "static"}
+                onChange={() => setFetchMode("static")}
+              />
+              Static HTML only
             </label>
           </div>
         </fieldset>

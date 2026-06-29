@@ -1,132 +1,174 @@
 import type { CheerioAPI } from "cheerio";
 import type { Element } from "domhandler";
-import type { ContentBlock, CrawlLink, CrawlImage, SemanticBlockType } from "@/types/crawl";
+import type { ContentBlock, SemanticBlockType } from "@/types/crawl";
+import {
+  buildSelector,
+  collectImages,
+  collectLinks,
+  countStructuralItems,
+  elementIdentity,
+  getHeading,
+  isMeaningfulElement,
+  pickLargestDirectGridChildren,
+  truncate,
+} from "@/lib/crawl/dom-utils";
 
 const MAX_SUB_BLOCKS = 12;
 const MAX_TEXT = 2000;
 const MAX_HTML = 1500;
 
-function truncate(value: string, max: number): string {
-  if (value.length <= max) {
-    return value;
+function inferSubBlockType($: CheerioAPI, element: Element): SemanticBlockType {
+  const html = $(element).html() ?? "";
+  const classAndId =
+    `${$(element).attr("id") ?? ""} ${$(element).attr("class") ?? ""}`.toLowerCase();
+
+  if (/<iframe[^>]+src=["'][^"']*(youtube|youtu\.be|vimeo)/i.test(html)) {
+    return "video";
   }
-  return `${value.slice(0, max)}…`;
-}
 
-function buildSelector($: CheerioAPI, element: Element): string {
-  const $element = $(element);
-  const id = $element.attr("id");
-  if (id) {
-    return `#${id}`;
+  if (
+    $(element).find("blockquote").length > 0 ||
+    /testimonial|quote/i.test(classAndId)
+  ) {
+    return "quote";
   }
-  const tag = element.tagName.toLowerCase();
-  const className = ($element.attr("class") ?? "")
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .join(".");
-  return className ? `${tag}.${className}` : tag;
-}
 
-function elementIdentity($: CheerioAPI, element: Element): string {
-  const parent = element.parent;
-  if (!parent || parent.type !== "tag") {
-    return buildSelector($, element);
+  if (
+    $(element).is("article") ||
+    /\bcard\b|tile|feature-item|resource|group\b/i.test(classAndId) ||
+    $(element).find("img").length > 0
+  ) {
+    return "card-grid";
   }
-  const index = $(parent).children().index(element);
-  return `${buildSelector($, element)}@${index}`;
+
+  if ($(element).find('[role="button"][aria-controls]').length > 0) {
+    return "rich-text";
+  }
+
+  return "rich-text";
 }
 
-function collectLinks($: CheerioAPI, root: Element): CrawlLink[] {
-  const links = new Map<string, CrawlLink>();
-  $(root)
-    .find("a[href]")
-    .each((_, anchor) => {
-      const href = $(anchor).attr("href")?.trim();
-      if (!href || href.startsWith("#") || href.startsWith("javascript:")) {
-        return;
-      }
-      const text = $(anchor).text().replace(/\s+/g, " ").trim();
-      links.set(`${href}::${text}`, { href, text });
-    });
-  return Array.from(links.values()).slice(0, 10);
-}
-
-function collectImages($: CheerioAPI, root: Element): CrawlImage[] {
-  const images = new Map<string, CrawlImage>();
-  $(root)
-    .find("img[src]")
-    .each((_, node) => {
-      const src = $(node).attr("src")?.trim();
-      if (src) {
-        images.set(src, { src, alt: $(node).attr("alt")?.trim() ?? "" });
-      }
-    });
-  return Array.from(images.values()).slice(0, 8);
-}
-
-function getHeading($: CheerioAPI, element: Element): string | undefined {
-  const text = $(element)
-    .find("h1, h2, h3, h4")
+function getSubBlockHeading($: CheerioAPI, element: Element): string | undefined {
+  const accordionLabel = $(element)
+    .find('[role="button"][aria-controls]')
     .first()
     .text()
     .replace(/\s+/g, " ")
     .trim();
-  return text || undefined;
+  if (accordionLabel) {
+    return accordionLabel;
+  }
+
+  const heading = getHeading($, element);
+  if (heading) {
+    return heading;
+  }
+
+  const imageAlt = $(element).find("img[alt]").first().attr("alt")?.trim();
+  if (imageAlt && imageAlt.length > 1) {
+    return imageAlt;
+  }
+
+  return undefined;
 }
 
-function inferSubBlockType($: CheerioAPI, element: Element): SemanticBlockType {
-  const html = $(element).html() ?? "";
-  if (/<iframe[^>]+src=["'][^"']*(youtube|youtu\.be|vimeo)/i.test(html)) {
-    return "video";
-  }
-  if (
-    $(element).find("blockquote").length > 0 ||
-    /testimonial|quote/i.test($(element).attr("class") ?? "")
-  ) {
-    return "quote";
-  }
-  if ($(element).is("article") || /\bcard\b/i.test($(element).attr("class") ?? "")) {
-    return "card-grid";
-  }
-  return "rich-text";
-}
-
-function pickGridChildElements($: CheerioAPI, root: Element): Element[] {
+function pickAccordionItems($: CheerioAPI, root: Element): Element[] {
   const $root = $(root);
-  let best: Element[] = [];
+  const items = new Map<string, Element>();
 
-  $root.find("[class*='grid'], [class*='flex']").each((_, container) => {
-    if (container.type !== "tag") {
+  $root.find('[role="button"][aria-controls]').each((_, trigger) => {
+    if (trigger.type !== "tag") {
       return;
     }
 
-    const children = $(container)
-      .children()
-      .toArray()
-      .filter((node): node is Element => node.type === "tag")
-      .filter((node) => {
-        const text = $(node).text().replace(/\s+/g, " ").trim();
-        return text.length >= 2 || $(node).find("img, a, video").length > 0;
-      });
-
-    if (children.length >= 2 && children.length > best.length) {
-      best = children;
+    const wrapper =
+      $(trigger).closest("div[class*='mt-'], div[class*='accordion'], li").get(0) ??
+      trigger.parent;
+    if (wrapper?.type === "tag") {
+      items.set(elementIdentity($, wrapper), wrapper);
     }
   });
 
-  return best.slice(0, MAX_SUB_BLOCKS);
+  if (items.size >= 2) {
+    return Array.from(items.values()).slice(0, MAX_SUB_BLOCKS);
+  }
+
+  $root.find('[id*="accordion-panel"], [id*="accordion_panel"]').each((_, panel) => {
+    if (panel.type !== "tag") {
+      return;
+    }
+
+    const wrapper =
+      $(panel).closest("div[class*='mt-'], div[class*='accordion'], li").get(0) ?? panel;
+    if (wrapper.type === "tag") {
+      items.set(elementIdentity($, wrapper), wrapper);
+    }
+  });
+
+  return Array.from(items.values()).slice(0, MAX_SUB_BLOCKS);
+}
+
+function pickResourceTiles($: CheerioAPI, root: Element): Element[] {
+  const tiles = new Map<string, Element>();
+
+  $(root)
+    .find(
+      "a.group, div.group, article, [class*='resource'], [class*='tile'], [class*='card']:not([class*='card-grid'])",
+    )
+    .each((_, node) => {
+      if (node.type !== "tag" || !isMeaningfulElement($, node)) {
+        return;
+      }
+
+      const hasContent =
+        $(node).find("img, h2, h3, h4, p").length > 0 ||
+        $(node).text().replace(/\s+/g, " ").trim().length >= 12;
+      if (!hasContent) {
+        return;
+      }
+
+      tiles.set(elementIdentity($, node), node);
+    });
+
+  return Array.from(tiles.values()).slice(0, MAX_SUB_BLOCKS);
+}
+
+function pickLogoWallItems($: CheerioAPI, root: Element): Element[] {
+  const items = new Map<string, Element>();
+
+  pickLargestDirectGridChildren($, root).forEach((child) => {
+    const imageCount = $(child).find("img").length;
+    const textLength = $(child).text().replace(/\s+/g, " ").trim().length;
+    if (imageCount > 0 && textLength < 80) {
+      items.set(elementIdentity($, child), child);
+    }
+  });
+
+  return Array.from(items.values()).slice(0, MAX_SUB_BLOCKS);
 }
 
 function pickChildElements($: CheerioAPI, root: Element): Element[] {
-  const gridChildren = pickGridChildElements($, root);
-  if (gridChildren.length >= 2) {
-    return gridChildren;
+  const strategies = [
+    pickAccordionItems,
+    pickLargestDirectGridChildren,
+    pickResourceTiles,
+    pickLogoWallItems,
+    pickArticleLikeElements,
+  ];
+
+  for (const strategy of strategies) {
+    const children = strategy($, root);
+    if (children.length >= 2) {
+      return children;
+    }
   }
 
+  return [];
+}
+
+function pickArticleLikeElements($: CheerioAPI, root: Element): Element[] {
   const $root = $(root);
   const candidates: Element[] = [];
-
   const selectors = [
     "article",
     "figure:has(blockquote)",
@@ -136,7 +178,7 @@ function pickChildElements($: CheerioAPI, root: Element): Element[] {
 
   for (const selector of selectors) {
     $root.find(selector).each((_, node) => {
-      if (node.type === "tag") {
+      if (node.type === "tag" && isMeaningfulElement($, node)) {
         candidates.push(node);
       }
     });
@@ -144,13 +186,58 @@ function pickChildElements($: CheerioAPI, root: Element): Element[] {
 
   const unique = new Map<string, Element>();
   for (const element of candidates) {
-    const key = elementIdentity($, element);
-    if (!unique.has(key)) {
-      unique.set(key, element);
-    }
+    unique.set(elementIdentity($, element), element);
   }
 
   return Array.from(unique.values()).slice(0, MAX_SUB_BLOCKS);
+}
+
+function isMultiItemParent(
+  $: CheerioAPI,
+  parent: ContentBlock,
+  rootElement: Element,
+): boolean {
+  if (["hero", "cta", "video", "quote", "form", "navigation", "footer"].includes(parent.type)) {
+    return false;
+  }
+
+  const classAndId = `${parent.selector} ${parent.heading ?? ""}`.toLowerCase();
+  const signals = countStructuralItems($, rootElement);
+
+  if (parent.type === "card-grid") {
+    return true;
+  }
+
+  if (
+    /\b(services|features|cards|grid|stories|testimonials|resources|integrations|accordion|platform)\b/i.test(
+      classAndId,
+    )
+  ) {
+    return true;
+  }
+
+  if (signals.accordionTriggers >= 2 || signals.accordionPanels >= 2) {
+    return true;
+  }
+
+  if (signals.articles >= 2 || signals.figures >= 2) {
+    return true;
+  }
+
+  if (signals.gridChildren >= 2) {
+    return true;
+  }
+
+  if (parent.type === "section" && signals.gridChildren >= 2) {
+    return true;
+  }
+
+  return (
+    parent.type === "rich-text" &&
+    (signals.gridChildren >= 3 ||
+      signals.accordionTriggers >= 2 ||
+      signals.articles >= 2)
+  );
 }
 
 export function extractSubBlocks(
@@ -158,16 +245,7 @@ export function extractSubBlocks(
   parent: ContentBlock,
   rootElement: Element,
 ): ContentBlock[] {
-  const parentType = parent.type;
-  const classAndId = `${parent.selector} ${parent.heading ?? ""}`.toLowerCase();
-  const isGrid =
-    parentType === "card-grid" ||
-    /\b(services|features|cards|grid|stories|testimonials)\b/i.test(classAndId);
-  const figureCount = (parent.htmlSnippet.match(/<figure\b/gi) ?? []).length;
-  const articleCount = (parent.htmlSnippet.match(/<article\b/gi) ?? []).length;
-  const isMultiItem = isGrid || figureCount >= 2 || articleCount >= 2;
-
-  if (!isMultiItem) {
+  if (!isMultiItemParent($, parent, rootElement)) {
     return [];
   }
 
@@ -186,11 +264,11 @@ export function extractSubBlocks(
       type,
       tagName: element.tagName.toLowerCase(),
       selector: `${parent.selector} > ${buildSelector($, element)}`,
-      heading: getHeading($, element),
+      heading: getSubBlockHeading($, element),
       text,
       htmlSnippet: truncate($element.html() ?? "", MAX_HTML),
-      links: collectLinks($, element),
-      images: collectImages($, element),
+      links: collectLinks($, element, 10),
+      images: collectImages($, element, 8),
       order: parent.order,
       parentBlockId: parent.id,
     };

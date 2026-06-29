@@ -1,11 +1,19 @@
 import { extractSubBlocks } from "@/lib/crawl/extract-sub-blocks";
+import {
+  buildSelector,
+  collectImages,
+  collectLinks,
+  countStructuralItems,
+  getHeading,
+  isMeaningfulElement,
+  LOADING_PLACEHOLDER_PATTERN,
+  truncate,
+} from "@/lib/crawl/dom-utils";
 import * as cheerio from "cheerio";
 import type { CheerioAPI } from "cheerio";
 import type { AnyNode, Element } from "domhandler";
 import type {
   ContentBlock,
-  CrawlImage,
-  CrawlLink,
   SemanticBlockType,
 } from "@/types/crawl";
 
@@ -13,101 +21,20 @@ const MAX_TEXT_LENGTH = 4000;
 const MAX_HTML_SNIPPET = 2000;
 const MAX_BLOCKS = 60;
 
-function truncate(value: string, max: number): string {
-  if (value.length <= max) {
-    return value;
-  }
-  return `${value.slice(0, max)}…`;
-}
-
-function buildSelector($: CheerioAPI, element: Element): string {
-  const $element = $(element);
-  const id = $element.attr("id");
-  if (id) {
-    return `#${id}`;
-  }
-
-  const tag = element.tagName.toLowerCase();
-  const className = ($element.attr("class") ?? "")
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .join(".");
-
-  if (className) {
-    return `${tag}.${className}`;
-  }
-
-  return tag;
-}
-
-function collectLinks($: CheerioAPI, root: Element): CrawlLink[] {
-  const links = new Map<string, CrawlLink>();
-
-  $(root)
-    .find("a[href]")
-    .each((_, anchor) => {
-      const href = $(anchor).attr("href")?.trim();
-      if (!href || href.startsWith("#") || href.startsWith("javascript:")) {
-        return;
-      }
-
-      const text = $(anchor).text().replace(/\s+/g, " ").trim();
-      const key = `${href}::${text}`;
-      if (!links.has(key)) {
-        links.set(key, { href, text });
-      }
-    });
-
-  return Array.from(links.values()).slice(0, 25);
-}
-
-function collectImages($: CheerioAPI, root: Element): CrawlImage[] {
-  const images = new Map<string, CrawlImage>();
-
-  $(root)
-    .find("img[src]")
-    .each((_, node) => {
-      const src = $(node).attr("src")?.trim();
-      if (!src) {
-        return;
-      }
-      images.set(src, { src, alt: $(node).attr("alt")?.trim() ?? "" });
-    });
-
-  $(root)
-    .find("video[src]")
-    .each((_, node) => {
-      const src = $(node).attr("src")?.trim();
-      if (src) {
-        images.set(src, { src, alt: "" });
-      }
-    });
-
-  $(root)
-    .find("picture source[srcset]")
-    .each((_, node) => {
-      const srcset = $(node).attr("srcset")?.trim();
-      const src = srcset?.split(",")[0]?.trim().split(/\s+/)[0];
-      if (src) {
-        images.set(src, { src, alt: "" });
-      }
-    });
-
-  return Array.from(images.values()).slice(0, 20);
-}
-
 function inferBlockType($: CheerioAPI, element: Element): SemanticBlockType {
   const $element = $(element);
   const tag = element.tagName.toLowerCase();
-  const classAndId = `${$element.attr("id") ?? ""} ${$element.attr("class") ?? ""}`.toLowerCase();
+  const classAndId =
+    `${$element.attr("id") ?? ""} ${$element.attr("class") ?? ""}`.toLowerCase();
   const role = $element.attr("role")?.toLowerCase() ?? "";
+  const signals = countStructuralItems($, element);
+  const heading = getHeading($, element) ?? "";
 
   if (
     tag === "nav" ||
     tag === "header" ||
     role === "navigation" ||
-    /nav|menu|navbar/.test(classAndId)
+    /\b(nav|menu|navbar|breadcrumb)\b/.test(classAndId)
   ) {
     return "navigation";
   }
@@ -115,7 +42,7 @@ function inferBlockType($: CheerioAPI, element: Element): SemanticBlockType {
   if (
     tag === "footer" ||
     role === "contentinfo" ||
-    /footer/.test(classAndId)
+    /\bfooter\b/.test(classAndId)
   ) {
     return "footer";
   }
@@ -125,9 +52,13 @@ function inferBlockType($: CheerioAPI, element: Element): SemanticBlockType {
   }
 
   if (
-    /hero|banner|jumbotron|masthead/.test(classAndId) ||
+    /hero|banner|jumbotron|masthead|cloud-linear|display-1/.test(classAndId) ||
     (tag === "section" &&
-      $element.find("h1").length > 0 &&
+      $element.find("h1, [class*='text-display'], [class*='typography-display']").length >
+        0 &&
+      $element.find("img, video, picture, iframe").length > 0) ||
+    ($element.find("h1").length > 0 &&
+      $element.find("a, button").length > 0 &&
       $element.find("img, video, picture").length > 0)
   ) {
     return "hero";
@@ -145,37 +76,43 @@ function inferBlockType($: CheerioAPI, element: Element): SemanticBlockType {
   if (
     $element.find("blockquote").length > 0 ||
     /quote|testimonial|pull-quote|featured-quote|blockquote/.test(classAndId) ||
-    /featured quote|pull quote/i.test(getHeading($, element) ?? "")
+    /featured quote|pull quote/i.test(heading)
   ) {
-    const figures = $element.find("figure").length;
-    const articles = $element.find("article").length;
     if (
-      figures <= 1 &&
-      articles === 0 &&
+      signals.figures <= 1 &&
+      signals.articles === 0 &&
+      signals.gridChildren < 2 &&
       !/stories|testimonials|cards|grid|services|features/.test(classAndId)
     ) {
       return "quote";
     }
-    if (
-      /featured.?quote|pull.?quote|quote-heading/.test(classAndId) ||
-      /featured quote/i.test(getHeading($, element) ?? "")
-    ) {
+    if (/featured.?quote|pull.?quote|quote-heading/i.test(classAndId)) {
       return "quote";
     }
   }
 
-  const cards = $element.find("article, .card, [class*='card'], li > a");
+  const text = $element.text().replace(/\s+/g, " ").trim();
+
   if (
-    cards.length >= 3 ||
-    (cards.length >= 2 &&
-      /grid|cards|listing|features|services|stories|testimonials/.test(
-        classAndId,
-      ))
+    $element.find("input[type='email'], input[type='text'], textarea").length >
+      0 &&
+    $element.find("button, a[href]").length > 0
+  ) {
+    return "cta";
+  }
+
+  if (
+    signals.gridChildren >= 2 ||
+    signals.articles >= 2 ||
+    signals.accordionTriggers >= 2 ||
+    $element.find("article, .card, [class*='card'], li > a").length >= 2 ||
+    /\b(grid|cards|listing|features|services|stories|testimonials|resources|integrations|accordion|platform)\b/.test(
+      classAndId,
+    )
   ) {
     return "card-grid";
   }
 
-  const text = $element.text().replace(/\s+/g, " ").trim();
   if (
     $element.find("img, video, picture, figure").length > 0 &&
     text.length < 120
@@ -185,9 +122,9 @@ function inferBlockType($: CheerioAPI, element: Element): SemanticBlockType {
 
   if (
     /cta|call-to-action|btn-primary|button-group/.test(classAndId) ||
-    ($element.find("a, button").length > 0 &&
-      text.length < 220 &&
-      $element.find("p").length === 0)
+    ($element.find("a, button, input[type='email']").length > 0 &&
+      text.length < 280 &&
+      $element.find("p").length <= 2)
   ) {
     return "cta";
   }
@@ -196,26 +133,19 @@ function inferBlockType($: CheerioAPI, element: Element): SemanticBlockType {
     tag === "article" ||
     tag === "main" ||
     $element.find("p").length > 0 ||
-    /content|richtext|prose|body-copy/.test(classAndId)
+    /content|richtext|rte|prose|body-copy|text-body/.test(classAndId)
   ) {
     return "rich-text";
   }
 
-  if (tag === "section") {
-    return "section";
+  if (
+    tag === "section" ||
+    (tag === "div" && (heading || $element.find("h1, h2, h3, h4").length > 0))
+  ) {
+    return signals.accordionTriggers >= 2 ? "card-grid" : "section";
   }
 
   return "unknown";
-}
-
-function getHeading($: CheerioAPI, element: Element): string | undefined {
-  const text = $(element)
-    .find("h1, h2, h3, h4")
-    .first()
-    .text()
-    .replace(/\s+/g, " ")
-    .trim();
-  return text || undefined;
 }
 
 const SEMANTIC_CHROME_SELECTOR =
@@ -231,6 +161,15 @@ function isSemanticChromeTag(tag: string): boolean {
 function stripChromeFromDom($: CheerioAPI): void {
   $(SEMANTIC_CHROME_SELECTOR).remove();
   $(AD_SELECTOR).remove();
+  $("[aria-hidden='true']").each((_, node) => {
+    if (node.type !== "tag") {
+      return;
+    }
+    const text = $(node).text().replace(/\s+/g, " ").trim();
+    if (LOADING_PLACEHOLDER_PATTERN.test(text)) {
+      $(node).remove();
+    }
+  });
 }
 
 function isExcludedChromeElement($: CheerioAPI, element: Element): boolean {
@@ -262,8 +201,13 @@ function isExcludedChromeElement($: CheerioAPI, element: Element): boolean {
   }
 
   if (
-    $element.closest(SEMANTIC_CHROME_SELECTOR).length > 0
+    /\b(copyright|legal|privacy|trust center|newsroom)\b/.test(classAndId) ||
+    /©\s*\d{4}/.test($(element).text())
   ) {
+    return true;
+  }
+
+  if ($element.closest(SEMANTIC_CHROME_SELECTOR).length > 0) {
     return true;
   }
 
@@ -300,9 +244,7 @@ function isAdElement($: CheerioAPI, element: Element): boolean {
     return true;
   }
 
-  if (
-    $element.closest(AD_SELECTOR).length > 0
-  ) {
+  if ($element.closest(AD_SELECTOR).length > 0) {
     return true;
   }
 
@@ -311,16 +253,20 @@ function isAdElement($: CheerioAPI, element: Element): boolean {
 
 function shouldSkipElement($: CheerioAPI, element: Element): boolean {
   const tag = element.tagName.toLowerCase();
-  if (["script", "style", "noscript", "svg", "iframe"].includes(tag)) {
+  if (["script", "style", "noscript", "svg"].includes(tag)) {
+    return true;
+  }
+
+  if (tag === "iframe" && $(element).parent().closest("section, article, main, div").length === 0) {
     return true;
   }
 
   const text = $(element).text().replace(/\s+/g, " ").trim();
-  const hasMedia =
-    $(element).find("img, video, picture, a, button, input, textarea").length >
-    0;
+  if (LOADING_PLACEHOLDER_PATTERN.test(text) && text.length < 80) {
+    return true;
+  }
 
-  return text.length < 2 && !hasMedia;
+  return !isMeaningfulElement($, element);
 }
 
 function isNested($: CheerioAPI, existing: Element, candidate: Element): boolean {
@@ -334,7 +280,10 @@ function createBlock(
   order: number,
 ): ContentBlock {
   const $element = $(element);
-  const text = truncate($element.text().replace(/\s+/g, " ").trim(), MAX_TEXT_LENGTH);
+  const text = truncate(
+    $element.text().replace(/\s+/g, " ").trim(),
+    MAX_TEXT_LENGTH,
+  );
 
   return {
     id: `block-${order}`,
@@ -356,48 +305,88 @@ function isElement(node: AnyNode): node is Element {
 
 function isLayoutContainer($: CheerioAPI, element: Element): boolean {
   const tag = element.tagName.toLowerCase();
+  const $element = $(element);
 
   if (tag === "main") {
-    return $(element).children("section").length > 0;
+    return $element.children("section, article, div[data-uid]").length > 0;
   }
 
   if (tag === "div") {
-    if ($(element).children("section").length > 0) {
+    if ($element.children("section").length > 0) {
       return true;
     }
     if (
-      $(element).children("main").length > 0 &&
-      $(element).children().length <= 2
+      $element.children("main").length > 0 &&
+      $element.children().length <= 2
     ) {
       return true;
+    }
+    if (
+      $element.attr("id") === "__next" ||
+      /page-wrapper|layout-wrapper|app-root/i.test($element.attr("class") ?? "")
+    ) {
+      return $element.children().length > 0;
     }
   }
 
   return false;
 }
 
+function isGridLeafCell($: CheerioAPI, element: Element): boolean {
+  const parent = element.parent;
+  if (!parent || parent.type !== "tag") {
+    return false;
+  }
+
+  const $parent = $(parent);
+  const parentClass = `${$parent.attr("class") ?? ""} ${$parent.attr("role") ?? ""}`;
+  if (!/grid|flex|list/.test(parentClass)) {
+    return false;
+  }
+
+  const meaningfulSiblings = $parent
+    .children()
+    .toArray()
+    .filter((node): node is Element => node.type === "tag")
+    .filter((node) => isMeaningfulElement($, node));
+
+  return meaningfulSiblings.length >= 2;
+}
+
 function pickCandidateRoots($: CheerioAPI): Element[] {
   const selectors = [
-    "main",
-    "section",
-    "article",
+    "main section",
+    "body > section",
+    "section[id]",
+    "section[class*='hero'], section[class*='banner']",
+    "main > article",
+    "article[id]",
     "form",
-    ".hero, [class*='hero'], [class*='banner']",
-    "[class*='card-grid'], [class*='cards'], [class*='features']",
+    "[data-uid]",
+    "#__next section",
   ].join(", ");
 
   let roots = $(selectors)
     .toArray()
     .filter(isElement)
     .filter((element) => !isExcludedChromeElement($, element))
-    .filter((element) => !isLayoutContainer($, element));
+    .filter((element) => !isLayoutContainer($, element))
+    .filter((element) => {
+      const tag = element.tagName.toLowerCase();
+      if (tag === "section" || tag === "form") {
+        return true;
+      }
+      return !isGridLeafCell($, element);
+    })
+    .filter((element) => !shouldSkipElement($, element));
 
   const sectionRoots = roots.filter(
     (element) => element.tagName.toLowerCase() === "section",
   );
   if (sectionRoots.length > 0) {
     roots = roots.filter((element) => {
-      if (element.tagName.toLowerCase() !== "article") {
+      const tag = element.tagName.toLowerCase();
+      if (tag !== "article" && tag !== "div") {
         return true;
       }
       return !sectionRoots.some(
@@ -419,11 +408,12 @@ function pickCandidateRoots($: CheerioAPI): Element[] {
 
   if (roots.length === 0) {
     return $("body")
-      .children()
+      .children("div, section, article")
       .toArray()
       .filter(isElement)
       .filter((element) => !isExcludedChromeElement($, element))
-      .filter((element) => !isLayoutContainer($, element));
+      .filter((element) => !isLayoutContainer($, element))
+      .filter((element) => !shouldSkipElement($, element));
   }
 
   return roots;
@@ -440,11 +430,7 @@ export function extractBlocksFromHtml(html: string): ContentBlock[] {
       return;
     }
 
-    if (shouldSkipElement($, element)) {
-      return;
-    }
-
-    if (isExcludedChromeElement($, element)) {
+    if (shouldSkipElement($, element) || isExcludedChromeElement($, element)) {
       return;
     }
 
@@ -467,11 +453,12 @@ export function extractBlocksFromHtml(html: string): ContentBlock[] {
   pickCandidateRoots($).forEach((element) => addElement(element));
 
   if (blocks.length < 3) {
-    $("body > div, body > section, body > article")
+    $("body section, body article, body > div, main > div")
       .toArray()
       .filter(isElement)
       .filter((element) => !isExcludedChromeElement($, element))
       .filter((element) => !isLayoutContainer($, element))
+      .filter((element) => !isGridLeafCell($, element))
       .forEach((element) => addElement(element));
   }
 
@@ -479,12 +466,32 @@ export function extractBlocksFromHtml(html: string): ContentBlock[] {
     (block) =>
       block.type !== "navigation" &&
       block.type !== "footer" &&
-      !isSemanticChromeTag(block.tagName),
+      !isSemanticChromeTag(block.tagName) &&
+      !LOADING_PLACEHOLDER_PATTERN.test(block.text) &&
+      !(
+        !block.heading &&
+        block.text.replace(/\s+/g, " ").trim().length < 30 &&
+        block.images.length === 0
+      ) &&
+      !isFooterNoiseBlock(block),
+  );
+}
+
+function isFooterNoiseBlock(block: ContentBlock): boolean {
+  const text = block.text.toLowerCase();
+  return (
+    !block.heading &&
+    (/copyright|privacy policy|trust center|all rights reserved|©/.test(text) ||
+      (block.type === "section" && block.links.length === 0 && text.length < 80))
   );
 }
 
 export function extractPageTitle(html: string): string {
   const $ = cheerio.load(html);
+  const ogTitle = $('meta[property="og:title"]').attr("content")?.trim();
+  if (ogTitle) {
+    return ogTitle;
+  }
   return $("title").first().text().replace(/\s+/g, " ").trim();
 }
 
