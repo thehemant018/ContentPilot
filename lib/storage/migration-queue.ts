@@ -120,6 +120,30 @@ export function addMatchToQueue(
   };
 }
 
+export function removeMatchFromQueue(
+  match: BlockMatchResult,
+): { success: boolean; message: string } {
+  const key = queueItemKey(match.blockId, match.pageUrl);
+  const items = getMigrationQueue();
+  const item = items.find(
+    (entry) => queueItemKey(entry.blockId, entry.sourcePageUrl) === key,
+  );
+
+  if (!item) {
+    return {
+      success: false,
+      message: "This component is not in the review queue.",
+    };
+  }
+
+  removeQueueItem(item.id);
+
+  return {
+    success: true,
+    message: "Removed from review queue.",
+  };
+}
+
 export function updateQueueItemsForSourcePage(
   sourcePageUrl: string,
   updates: Partial<
