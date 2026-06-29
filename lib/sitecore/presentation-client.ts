@@ -1,11 +1,13 @@
 import { executeGraphQL } from "@/lib/sitecore/graphql-client";
 import { getSitecoreItemByPath } from "@/lib/sitecore/item-lookup";
+import { resolvePresentationPlaceholder } from "@/lib/sitecore/dynamic-placeholder";
 import {
   DEFAULT_LAYOUT_DEVICE_ID,
   FINAL_RENDERINGS_FIELD,
   SHARED_RENDERINGS_FIELD,
   appendRenderingToLayoutXml,
   buildRenderingElement,
+  insertRenderingInLayoutXml,
   layoutContainsRendering,
 } from "@/lib/sitecore/layout-xml";
 import {
@@ -140,17 +142,31 @@ export async function addRenderingToPage(
     return;
   }
 
+  const resolvedPlaceholder = resolvePresentationPlaceholder(
+    input.placeHolder,
+    currentLayout,
+  );
+
   const renderingElement = buildRenderingElement({
     renderingId: renderingItem.itemId,
-    placeholder: input.placeHolder,
+    placeholder: resolvedPlaceholder,
     datasourceId: datasourceItem.itemId,
   });
 
-  const updatedLayout = appendRenderingToLayoutXml(
-    currentLayout,
-    renderingElement,
-    DEFAULT_LAYOUT_DEVICE_ID,
-  );
+  const updatedLayout =
+    typeof input.index === "number" && input.index >= 0
+      ? insertRenderingInLayoutXml(
+          currentLayout,
+          renderingElement,
+          resolvedPlaceholder,
+          input.index,
+          DEFAULT_LAYOUT_DEVICE_ID,
+        )
+      : appendRenderingToLayoutXml(
+          currentLayout,
+          renderingElement,
+          DEFAULT_LAYOUT_DEVICE_ID,
+        );
 
   await updatePageRenderingsFieldValue(
     instanceUrl,

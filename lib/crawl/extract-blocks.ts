@@ -354,6 +354,28 @@ function isElement(node: AnyNode): node is Element {
   return node.type === "tag";
 }
 
+function isLayoutContainer($: CheerioAPI, element: Element): boolean {
+  const tag = element.tagName.toLowerCase();
+
+  if (tag === "main") {
+    return $(element).children("section").length > 0;
+  }
+
+  if (tag === "div") {
+    if ($(element).children("section").length > 0) {
+      return true;
+    }
+    if (
+      $(element).children("main").length > 0 &&
+      $(element).children().length <= 2
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 function pickCandidateRoots($: CheerioAPI): Element[] {
   const selectors = [
     "main",
@@ -364,17 +386,44 @@ function pickCandidateRoots($: CheerioAPI): Element[] {
     "[class*='card-grid'], [class*='cards'], [class*='features']",
   ].join(", ");
 
-  const roots = $(selectors)
+  let roots = $(selectors)
     .toArray()
     .filter(isElement)
-    .filter((element) => !isExcludedChromeElement($, element));
+    .filter((element) => !isExcludedChromeElement($, element))
+    .filter((element) => !isLayoutContainer($, element));
+
+  const sectionRoots = roots.filter(
+    (element) => element.tagName.toLowerCase() === "section",
+  );
+  if (sectionRoots.length > 0) {
+    roots = roots.filter((element) => {
+      if (element.tagName.toLowerCase() !== "article") {
+        return true;
+      }
+      return !sectionRoots.some(
+        (section) => $(section).find(element).length > 0,
+      );
+    });
+  }
+
+  const deepest = roots.filter(
+    (element) =>
+      !roots.some(
+        (other) => other !== element && $(element).find(other).length > 0,
+      ),
+  );
+
+  if (deepest.length > 0) {
+    return deepest;
+  }
 
   if (roots.length === 0) {
     return $("body")
       .children()
       .toArray()
       .filter(isElement)
-      .filter((element) => !isExcludedChromeElement($, element));
+      .filter((element) => !isExcludedChromeElement($, element))
+      .filter((element) => !isLayoutContainer($, element));
   }
 
   return roots;
@@ -422,6 +471,7 @@ export function extractBlocksFromHtml(html: string): ContentBlock[] {
       .toArray()
       .filter(isElement)
       .filter((element) => !isExcludedChromeElement($, element))
+      .filter((element) => !isLayoutContainer($, element))
       .forEach((element) => addElement(element));
   }
 

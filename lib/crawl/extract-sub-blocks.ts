@@ -28,6 +28,15 @@ function buildSelector($: CheerioAPI, element: Element): string {
   return className ? `${tag}.${className}` : tag;
 }
 
+function elementIdentity($: CheerioAPI, element: Element): string {
+  const parent = element.parent;
+  if (!parent || parent.type !== "tag") {
+    return buildSelector($, element);
+  }
+  const index = $(parent).children().index(element);
+  return `${buildSelector($, element)}@${index}`;
+}
+
 function collectLinks($: CheerioAPI, root: Element): CrawlLink[] {
   const links = new Map<string, CrawlLink>();
   $(root)
@@ -83,7 +92,38 @@ function inferSubBlockType($: CheerioAPI, element: Element): SemanticBlockType {
   return "rich-text";
 }
 
+function pickGridChildElements($: CheerioAPI, root: Element): Element[] {
+  const $root = $(root);
+  let best: Element[] = [];
+
+  $root.find("[class*='grid'], [class*='flex']").each((_, container) => {
+    if (container.type !== "tag") {
+      return;
+    }
+
+    const children = $(container)
+      .children()
+      .toArray()
+      .filter((node): node is Element => node.type === "tag")
+      .filter((node) => {
+        const text = $(node).text().replace(/\s+/g, " ").trim();
+        return text.length >= 2 || $(node).find("img, a, video").length > 0;
+      });
+
+    if (children.length >= 2 && children.length > best.length) {
+      best = children;
+    }
+  });
+
+  return best.slice(0, MAX_SUB_BLOCKS);
+}
+
 function pickChildElements($: CheerioAPI, root: Element): Element[] {
+  const gridChildren = pickGridChildElements($, root);
+  if (gridChildren.length >= 2) {
+    return gridChildren;
+  }
+
   const $root = $(root);
   const candidates: Element[] = [];
 
@@ -104,7 +144,7 @@ function pickChildElements($: CheerioAPI, root: Element): Element[] {
 
   const unique = new Map<string, Element>();
   for (const element of candidates) {
-    const key = buildSelector($, element);
+    const key = elementIdentity($, element);
     if (!unique.has(key)) {
       unique.set(key, element);
     }

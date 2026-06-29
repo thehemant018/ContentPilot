@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import {
   addMatchToQueue,
   isMatchInQueue,
+  removeMatchFromQueue,
   subscribeMigrationQueue,
 } from "@/lib/storage/migration-queue";
 import {
@@ -101,10 +102,12 @@ function MatchCard({
   match,
   inQueue,
   onAddToQueue,
+  onRemoveFromQueue,
 }: {
   match: BlockMatchResult;
   inQueue: boolean;
   onAddToQueue: (match: BlockMatchResult) => void;
+  onRemoveFromQueue: (match: BlockMatchResult) => void;
 }) {
   const isUnmatched = match.unmatched === true;
 
@@ -150,19 +153,29 @@ function MatchCard({
             </p>
           )}
         </div>
-        <button
-          type="button"
-          disabled={inQueue || isUnmatched}
-          title={
-            isUnmatched
-              ? "No Sitecore component in discovery fits this block"
-              : undefined
-          }
-          onClick={() => onAddToQueue(match)}
-          className="rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {isUnmatched ? "No component" : inQueue ? "Queued" : "Add to queue"}
-        </button>
+        {inQueue ? (
+          <button
+            type="button"
+            onClick={() => onRemoveFromQueue(match)}
+            className="rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-700 transition-colors hover:bg-zinc-50"
+          >
+            Remove from queue
+          </button>
+        ) : (
+          <button
+            type="button"
+            disabled={isUnmatched}
+            title={
+              isUnmatched
+                ? "No Sitecore component in discovery fits this block"
+                : undefined
+            }
+            onClick={() => onAddToQueue(match)}
+            className="rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {isUnmatched ? "No component" : "Add to queue"}
+          </button>
+        )}
       </div>
 
       {isUnmatched ? (
@@ -245,6 +258,12 @@ export function MatchResults({
     setQueueVersion((value) => value + 1);
   }
 
+  function handleRemoveFromQueue(match: BlockMatchResult): void {
+    const outcome = removeMatchFromQueue(match);
+    onQueueChange?.(outcome.message);
+    setQueueVersion((value) => value + 1);
+  }
+
   return (
     <div className="space-y-4">
       {unmatchedCount > 0 && (
@@ -270,6 +289,7 @@ export function MatchResults({
             match={match}
             inQueue={isMatchInQueue(match)}
             onAddToQueue={handleAddToQueue}
+            onRemoveFromQueue={handleRemoveFromQueue}
           />
         ))}
       </div>

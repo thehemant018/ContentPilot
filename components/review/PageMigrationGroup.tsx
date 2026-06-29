@@ -104,11 +104,14 @@ export function PageMigrationGroup({
               className={reviewInputClass}
             />
             <p className="mt-1.5 text-xs text-zinc-600">
-              SXA headless pages typically use{" "}
+              Enter the base placeholder key (for example{" "}
               <span className="font-mono font-medium text-zinc-800">
                 headless-main
               </span>
-              .
+              ). MigrateX resolves dynamic keys from the page layout at push
+              time, including partial-design{" "}
+              <span className="font-mono font-medium text-zinc-800">sig</span>{" "}
+              placeholders.
             </p>
           </div>
           <div>
