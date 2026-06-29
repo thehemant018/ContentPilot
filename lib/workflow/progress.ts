@@ -1,4 +1,5 @@
 import { clearContentMigrationData } from "@/lib/storage/workflow-data";
+import { clearMigrationMode, getMigrationMode } from "@/lib/workflow/migration-mode";
 import { SESSION_CHANGED_EVENT, STORAGE_KEYS } from "@/lib/sitecore/constants";
 import {
   getStoredSession,
@@ -50,6 +51,22 @@ export function isDiscoveryPhaseComplete(): boolean {
 export function markDiscoveryPhaseComplete(): void {
   localStorage.setItem(STORAGE_KEYS.discoveryComplete, "true");
   window.dispatchEvent(new Event(WORKFLOW_PROGRESS_EVENT));
+}
+
+export function isMapModePhaseComplete(): boolean {
+  if (typeof window === "undefined") {
+    return false;
+  }
+  return localStorage.getItem(STORAGE_KEYS.mapModeComplete) === "true";
+}
+
+export function markMapModePhaseComplete(): void {
+  localStorage.setItem(STORAGE_KEYS.mapModeComplete, "true");
+  window.dispatchEvent(new Event(WORKFLOW_PROGRESS_EVENT));
+}
+
+export function clearMapModePhaseComplete(): void {
+  localStorage.removeItem(STORAGE_KEYS.mapModeComplete);
 }
 
 export function isCrawlPhaseComplete(): boolean {
@@ -123,6 +140,8 @@ export function clearDiscoveryPhaseComplete(): void {
 export function resetWorkflowProgress(): void {
   localStorage.setItem(STORAGE_KEYS.workflowFurthestPhase, "0");
   clearDiscoveryPhaseComplete();
+  clearMapModePhaseComplete();
+  clearMigrationMode();
   clearCrawlPhaseComplete();
   clearAiMatchPhaseComplete();
   clearReviewPhaseComplete();
@@ -142,8 +161,11 @@ export function getMigrationCycleId(): number {
 
 /** Reset crawl → migrate phases so the user can migrate another component. */
 export function startNewContentMigration(): void {
-  const crawlIndex = getPhaseIndex("crawl");
-  if (crawlIndex < 0) {
+  const migrationMode = getMigrationMode();
+  const nextPhaseId =
+    migrationMode === "visual-mapper" ? "map-mode" : "crawl";
+  const nextIndex = getPhaseIndex(nextPhaseId);
+  if (nextIndex < 0) {
     return;
   }
 
@@ -153,7 +175,7 @@ export function startNewContentMigration(): void {
   clearReviewPhaseComplete();
   clearMigratePhaseComplete();
 
-  localStorage.setItem(STORAGE_KEYS.workflowFurthestPhase, String(crawlIndex));
+  localStorage.setItem(STORAGE_KEYS.workflowFurthestPhase, String(nextIndex));
   localStorage.setItem(
     STORAGE_KEYS.migrationCycleId,
     String(getMigrationCycleId() + 1),
@@ -161,6 +183,12 @@ export function startNewContentMigration(): void {
 
   window.dispatchEvent(new Event(WORKFLOW_PROGRESS_EVENT));
   window.dispatchEvent(new Event(CONTENT_MIGRATION_RESET_EVENT));
+
+  if (migrationMode === "visual-mapper") {
+    window.location.href = "/visual-mapper";
+    return;
+  }
+
   window.location.hash = "crawl";
 }
 
@@ -170,6 +198,9 @@ export function isPhaseComplete(phaseId: WorkflowPhaseId): boolean {
   }
   if (phaseId === "discovery") {
     return isDiscoveryPhaseComplete();
+  }
+  if (phaseId === "map-mode") {
+    return isMapModePhaseComplete();
   }
   if (phaseId === "crawl") {
     return isCrawlPhaseComplete();
@@ -229,8 +260,23 @@ export function canNavigateToPhase(
     return false;
   }
 
+  const migrationMode = getMigrationMode();
+
+  if (
+    migrationMode === "visual-mapper" &&
+    (phaseId === "crawl" || phaseId === "ai-match")
+  ) {
+    return false;
+  }
+
   for (let i = 0; i < index; i += 1) {
     const prerequisite = WORKFLOW_PHASES[i];
+    if (
+      migrationMode === "visual-mapper" &&
+      (prerequisite.id === "crawl" || prerequisite.id === "ai-match")
+    ) {
+      continue;
+    }
     if (!isPhaseComplete(prerequisite.id)) {
       return false;
     }

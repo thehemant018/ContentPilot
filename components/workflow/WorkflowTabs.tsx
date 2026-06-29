@@ -8,6 +8,7 @@ import { AiMatchPanel } from "@/components/ai-match/AiMatchPanel";
 import { MatchStrategyBadge } from "@/components/ai-match/MatchStrategyBadge";
 import { ReviewPanel } from "@/components/review/ReviewPanel";
 import { MigratePanel } from "@/components/migrate/MigratePanel";
+import { MappingModePanel } from "@/components/workflow/MappingModePanel";
 import { PhasePlaceholder } from "@/components/workflow/PhasePlaceholder";
 import { PhaseTabBadge } from "@/components/workflow/PhaseTabBadge";
 import {
@@ -112,6 +113,11 @@ export function WorkflowTabs() {
   useEffect(() => {
     function handleMigrationReset() {
       refreshProgress();
+      const hash = window.location.hash.replace("#", "");
+      if (hash === "map-mode" || hash === "visual-mapper") {
+        setActiveTab("map-mode");
+        return;
+      }
       setActiveTab("crawl");
     }
 
@@ -136,8 +142,8 @@ export function WorkflowTabs() {
           Migration workflow
         </h2>
         <p className="mt-1 text-sm text-zinc-600">
-          Complete each phase in order. From AI Match onward you can return to
-          Crawl anytime to work on a different page.
+          Complete each phase in order. After Map (step 3), use Crawl + AI Match
+          or Visual Mapper — then Review and Migrate.
         </p>
       </div>
 
@@ -238,6 +244,7 @@ export function WorkflowTabs() {
               >
                 {phase.id === "auth" && <ConnectSitecoreForm embedded />}
                 {phase.id === "discovery" && <DiscoveryPanel embedded />}
+                {phase.id === "map-mode" && <MappingModePanel embedded />}
                 {phase.id === "crawl" && (
                   <CrawlPanel key={`crawl-${migrationCycleId}`} embedded />
                 )}
@@ -252,6 +259,7 @@ export function WorkflowTabs() {
                 )}
                 {phase.id !== "auth" &&
                   phase.id !== "discovery" &&
+                  phase.id !== "map-mode" &&
                   phase.id !== "crawl" &&
                   phase.id !== "ai-match" &&
                   phase.id !== "review" &&

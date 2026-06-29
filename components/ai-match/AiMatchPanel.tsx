@@ -206,7 +206,7 @@ export function AiMatchPanel({ embedded = false }: { embedded?: boolean }) {
     <div className={embedded ? "space-y-6" : "mx-auto max-w-5xl space-y-6"}>
       <div>
         <p className="text-xs font-semibold uppercase tracking-wider text-orange-600">
-          Phase 4 — AI Match
+          Phase 5 — AI Match
         </p>
         <div className="mt-1 flex flex-wrap items-center gap-2">
           <h3 className="text-lg font-semibold text-zinc-900">

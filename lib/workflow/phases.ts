@@ -1,6 +1,7 @@
 export type WorkflowPhaseId =
   | "auth"
   | "discovery"
+  | "map-mode"
   | "crawl"
   | "ai-match"
   | "review"
@@ -45,8 +46,20 @@ export const WORKFLOW_PHASES: WorkflowPhase[] = [
     available: true,
   },
   {
-    id: "crawl",
+    id: "map-mode",
     number: 3,
+    name: "Map",
+    description: "Choose crawl + AI matching or Visual Mapper.",
+    color: "bg-indigo-600",
+    activeRing: "ring-indigo-500",
+    activeBorder: "border-indigo-600",
+    activeBg: "bg-indigo-50",
+    labelColor: "text-indigo-800",
+    available: true,
+  },
+  {
+    id: "crawl",
+    number: 4,
     name: "Crawl",
     description: "Parse source pages and detect semantic content blocks.",
     color: "bg-blue-600",
@@ -58,7 +71,7 @@ export const WORKFLOW_PHASES: WorkflowPhase[] = [
   },
   {
     id: "ai-match",
-    number: 4,
+    number: 5,
     name: "AI Match",
     description: "Match blocks to Sitecore renderings with field previews.",
     color: "bg-orange-500",
@@ -70,7 +83,7 @@ export const WORKFLOW_PHASES: WorkflowPhase[] = [
   },
   {
     id: "review",
-    number: 5,
+    number: 6,
     name: "Review",
     description: "Confirm, override, or skip suggested mappings.",
     color: "bg-rose-500",
@@ -82,7 +95,7 @@ export const WORKFLOW_PHASES: WorkflowPhase[] = [
   },
   {
     id: "migrate",
-    number: 6,
+    number: 7,
     name: "Migrate",
     description: "Create items, upload media, and populate fields.",
     color: "bg-emerald-600",

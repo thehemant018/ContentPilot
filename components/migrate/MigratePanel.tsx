@@ -14,7 +14,8 @@ import {
   subscribeWorkflowProgress,
 } from "@/lib/workflow/progress";
 import { ReturnToCrawlBanner } from "@/components/workflow/ReturnToCrawlBanner";
-import { ReturnToCrawlButton } from "@/components/workflow/ReturnToCrawlButton";
+import { ReturnToMappingSourceButton } from "@/components/workflow/ReturnToMappingSourceButton";
+import { isVisualMapperMode } from "@/lib/workflow/migration-mode";
 import { ReturnToReviewBanner } from "@/components/workflow/ReturnToReviewBanner";
 import { normalizeMediaUploadPath } from "@/lib/sitecore/media-upload";
 import { getDiscoveryResult } from "@/lib/storage/workflow-data";
@@ -190,7 +191,7 @@ export function MigratePanel({ embedded = false }: { embedded?: boolean }) {
     <div className={embedded ? "space-y-6" : "mx-auto max-w-4xl space-y-6"}>
       <div>
         <p className="text-xs font-semibold uppercase tracking-wider text-emerald-600">
-          Phase 6 — Migrate
+          Phase 7 — Migrate
         </p>
         <h3 className="mt-1 text-lg font-semibold text-zinc-900">
           Push to Sitecore
@@ -306,15 +307,17 @@ export function MigratePanel({ embedded = false }: { embedded?: boolean }) {
           {feedback?.type === "success" && (
             <p className="mt-1 text-sm text-emerald-800">{feedback.message}</p>
           )}
-          <ReturnToCrawlButton
+          <ReturnToMappingSourceButton
             variant="primary"
             label="Migrate another component"
             showArrow="right"
             className="mt-4"
+            intent="restart"
           />
           <p className="mt-2 text-xs text-emerald-700">
-            Returns to Crawl so you can parse a new page and run the workflow
-            again. Auth and Discovery stay connected.
+            {isVisualMapperMode()
+              ? "Returns to Visual Mapper so you can map another page. Auth and Discovery stay connected."
+              : "Returns to Crawl so you can parse a new page and run the workflow again. Auth and Discovery stay connected."}
           </p>
         </div>
       )}
