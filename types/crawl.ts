@@ -1,5 +1,7 @@
 export type CrawlMode = "single" | "site";
 
+export type CrawlFetchMode = "browser" | "static";
+
 export type SemanticBlockType =
   | "navigation"
   | "hero"
@@ -51,12 +53,15 @@ export interface CrawlInput {
   url: string;
   mode: CrawlMode;
   maxPages?: number;
+  /** browser = Playwright render (default); static = raw HTML fetch only */
+  fetchMode?: CrawlFetchMode;
 }
 
 export interface CrawlResult {
   success: boolean;
   message: string;
   mode?: CrawlMode;
+  fetchMode?: CrawlFetchMode;
   startUrl?: string;
   pages?: CrawledPage[];
   pageCount?: number;

@@ -3,60 +3,57 @@ import {
   extractInternalLinks,
   extractPageTitle,
 } from "@/lib/crawl/extract-blocks";
+import { buildCrawlSuccessMessage } from "@/lib/crawl/crawl-messages";
+import { fetchPageHtml } from "@/lib/crawl/fetch-html";
 import {
   normalizeCrawlUrl,
   normalizeDiscoveredLink,
   resolveCrawlMaxPages,
 } from "@/lib/crawl/url-utils";
-import type { CrawlInput, CrawlResult, CrawledPage } from "@/types/crawl";
+import type { CrawlFetchMode, CrawlInput, CrawlResult, CrawledPage } from "@/types/crawl";
 
-const FETCH_TIMEOUT_MS = 30_000;
-
-async function fetchHtml(url: string): Promise<string> {
-  const response = await fetch(url, {
-    headers: {
-      Accept: "text/html,application/xhtml+xml",
-      "User-Agent": "MigrateX/1.0 (content migration crawler)",
-    },
-    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-    redirect: "follow",
-  });
-
-  if (!response.ok) {
-    throw new Error(`Failed to fetch ${url} (${response.status}).`);
-  }
-
-  const contentType = response.headers.get("content-type") ?? "";
-  if (
-    contentType &&
-    !contentType.includes("text/html") &&
-    !contentType.includes("application/xhtml")
-  ) {
-    throw new Error(`URL did not return HTML content: ${url}`);
-  }
-
-  return response.text();
+function countSubBlocks(pages: CrawledPage[]): number {
+  return pages.reduce(
+    (total, crawledPage) =>
+      total +
+      crawledPage.blocks.reduce(
+        (sum, block) => sum + (block.subBlocks?.length ?? 0),
+        0,
+      ),
+    0,
+  );
 }
 
-async function parsePage(url: string): Promise<CrawledPage> {
-  const html = await fetchHtml(url);
+async function parsePage(
+  url: string,
+  fetchMode: CrawlFetchMode,
+): Promise<{ page: CrawledPage; effectiveFetchMode: CrawlFetchMode }> {
+  const { html, fetchMode: effectiveFetchMode } = await fetchPageHtml(
+    url,
+    fetchMode,
+  );
   const title = extractPageTitle(html) || url;
   const blocks = extractBlocksFromHtml(html);
 
   return {
-    url,
-    title,
-    blocks,
+    page: {
+      url,
+      title,
+      blocks,
+    },
+    effectiveFetchMode,
   };
 }
 
 async function crawlSite(
   startUrl: string,
   maxPages: number,
-): Promise<CrawledPage[]> {
+  fetchMode: CrawlFetchMode,
+): Promise<{ pages: CrawledPage[]; effectiveFetchMode: CrawlFetchMode }> {
   const queue = [startUrl];
   const visited = new Set<string>();
   const pages: CrawledPage[] = [];
+  let effectiveFetchMode: CrawlFetchMode = fetchMode;
 
   while (queue.length > 0 && pages.length < maxPages) {
     const currentUrl = queue.shift()!;
@@ -68,7 +65,12 @@ async function crawlSite(
     visited.add(currentUrl);
 
     try {
-      const html = await fetchHtml(currentUrl);
+      const { html, fetchMode: usedMode } = await fetchPageHtml(
+        currentUrl,
+        fetchMode,
+      );
+      effectiveFetchMode = usedMode;
+
       const title = extractPageTitle(html) || currentUrl;
       const blocks = extractBlocksFromHtml(html);
 
@@ -96,44 +98,71 @@ async function crawlSite(
     }
   }
 
-  return pages;
+  return { pages, effectiveFetchMode };
 }
 
 export async function runCrawl(input: CrawlInput): Promise<CrawlResult> {
   const startUrl = normalizeCrawlUrl(input.url);
   const maxPages = resolveCrawlMaxPages(input.maxPages);
   const mode = input.mode === "site" ? "site" : "single";
+  const fetchMode = input.fetchMode ?? "browser";
 
   try {
-    const pages =
-      mode === "site"
-        ? await crawlSite(startUrl, maxPages)
-        : [await parsePage(startUrl)];
+    if (mode === "site") {
+      const { pages, effectiveFetchMode } = await crawlSite(
+        startUrl,
+        maxPages,
+        fetchMode,
+      );
 
-    if (pages.length === 0) {
+      if (pages.length === 0) {
+        return {
+          success: false,
+          message: "No pages could be crawled from the provided URL.",
+          mode,
+          startUrl,
+          fetchMode,
+        };
+      }
+
+      const blockCount = pages.reduce(
+        (total, crawledPage) => total + crawledPage.blocks.length,
+        0,
+      );
+
       return {
-        success: false,
-        message: "No pages could be crawled from the provided URL.",
+        success: true,
+        message: buildCrawlSuccessMessage({
+          mode: "site",
+          pageCount: pages.length,
+          blockCount,
+          subBlockCount: countSubBlocks(pages),
+          effectiveFetchMode,
+        }),
         mode,
         startUrl,
+        fetchMode: effectiveFetchMode,
+        pages,
+        pageCount: pages.length,
       };
     }
 
-    const blockCount = pages.reduce(
-      (total, crawledPage) => total + crawledPage.blocks.length,
-      0,
-    );
+    const { page, effectiveFetchMode } = await parsePage(startUrl, fetchMode);
 
     return {
       success: true,
-      message:
-        mode === "site"
-          ? `Crawled ${pages.length} page(s) and found ${blockCount} content block(s).`
-          : `Parsed 1 page and found ${blockCount} content block(s).`,
+      message: buildCrawlSuccessMessage({
+        mode: "single",
+        pageCount: 1,
+        blockCount: page.blocks.length,
+        subBlockCount: countSubBlocks([page]),
+        effectiveFetchMode,
+      }),
       mode,
       startUrl,
-      pages,
-      pageCount: pages.length,
+      fetchMode: effectiveFetchMode,
+      pages: [page],
+      pageCount: 1,
     };
   } catch (error) {
     const message =
@@ -144,6 +173,7 @@ export async function runCrawl(input: CrawlInput): Promise<CrawlResult> {
       message,
       mode,
       startUrl,
+      fetchMode,
     };
   }
 }
