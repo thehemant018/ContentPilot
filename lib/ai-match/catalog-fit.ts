@@ -31,6 +31,10 @@ export function hasCatalogFit(
 
 /** Blocks that are structurally unlikely to map to a single datasource component. */
 export function isCompoundContainerBlock(block: FlatContentBlock): boolean {
+  if (block.matchRole === "section-container") {
+    return false;
+  }
+
   if (block.subBlocks && block.subBlocks.length >= 2) {
     return true;
   }
@@ -80,7 +84,7 @@ export function noMatchReason(
     if (block.subBlocks && block.subBlocks.length >= 2) {
       return `Compound section split into ${block.subBlocks.length} sub-block(s) for matching. Parent container is not migrated as one item.`;
     }
-    return `Compound ${block.type} section (grid/slider) — no matching list/grid rendering in Sitecore discovery. Add a card or testimonial list component, or match sub-items individually.`;
+    return `Compound ${block.type} section (grid/slider) — no matching list/grid rendering in Sitecore discovery. Add a container component, or match sub-items individually.`;
   }
 
   const intent = inferMatchingBlockType(block);

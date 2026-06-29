@@ -4,17 +4,20 @@ import type { CrawledPage, ContentBlock } from "@/types/crawl";
 function toFlatBlock(
   block: ContentBlock,
   page: CrawledPage,
+  matchRole?: FlatContentBlock["matchRole"],
 ): FlatContentBlock {
   return {
     ...block,
     pageUrl: page.url,
     pageTitle: page.title,
+    matchRole,
   };
 }
 
 /**
- * Expands compound blocks into their sub-blocks for AI matching.
- * Parent containers with 2+ sub-blocks are omitted from the match pass.
+ * Expands compound blocks into a section container (heading + intro) plus child
+ * blocks. Which Sitecore rendering/template fits each role is resolved from the
+ * discovery catalog at match time — not hardcoded here.
  */
 export function flattenBlocksForMatching(pages: CrawledPage[]): FlatContentBlock[] {
   const flat: FlatContentBlock[] = [];
@@ -24,6 +27,17 @@ export function flattenBlocksForMatching(pages: CrawledPage[]): FlatContentBlock
       const subBlocks = block.subBlocks ?? [];
 
       if (subBlocks.length >= 2) {
+        flat.push(
+          toFlatBlock(
+            {
+              ...block,
+              subBlocks: undefined,
+            },
+            page,
+            "section-container",
+          ),
+        );
+
         for (const subBlock of subBlocks) {
           flat.push(toFlatBlock(subBlock, page));
         }

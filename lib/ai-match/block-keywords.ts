@@ -1,5 +1,32 @@
 import type { SemanticBlockType } from "@/types/crawl";
 
+/** Keywords that commonly appear in list/grid container component names. */
+export const COMPOUND_CONTAINER_KEYWORDS = [
+  "list",
+  "grid",
+  "collection",
+  "group",
+  "container",
+  "listing",
+  "carousel",
+  "wrapper",
+  "stack",
+  "features",
+  "cards",
+] as const;
+
+/** Keywords that commonly appear in leaf/card item component names. */
+export const COMPOUND_LEAF_KEYWORDS = [
+  "item",
+  "tile",
+  "entry",
+  "element",
+  "feature",
+  "promo",
+  "teaser",
+  "card",
+] as const;
+
 /** Crawl block type → keywords used to find matching Sitecore rendering/template names. */
 export const BLOCK_TYPE_COMPONENT_KEYWORDS: Record<
   SemanticBlockType,
@@ -47,6 +74,8 @@ export function blockTypeKeywords(type: string): string[] {
 
 export function normalizeComponentName(value: string): string {
   return value
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/([A-Z]+)([A-Z][a-z])/g, "$1 $2")
     .toLowerCase()
     .replace(/[_-]/g, " ")
     .replace(/\s+/g, " ")

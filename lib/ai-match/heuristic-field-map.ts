@@ -154,6 +154,15 @@ function findFieldByPatterns(
   );
 }
 
+function extractSectionIntro(htmlSnippet: string): string | undefined {
+  const paragraphMatch = htmlSnippet.match(/<p[^>]*>([\s\S]*?)<\/p>/i);
+  if (!paragraphMatch?.[1]) {
+    return undefined;
+  }
+
+  return paragraphMatch[1].replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+}
+
 export function buildHeuristicFieldMappings(
   block: FlatContentBlock,
   template: TemplateDefinition | undefined,
@@ -195,6 +204,21 @@ export function buildHeuristicFieldMappings(
       imageAlt: region === "image" ? imageAlt?.trim() || undefined : undefined,
     });
   };
+
+  if (block.matchRole === "section-container") {
+    if (block.heading) {
+      addMapping("heading", block.heading);
+    }
+
+    const intro =
+      extractSectionIntro(block.htmlSnippet) ??
+      block.text.replace(block.heading ?? "", "").trim();
+    if (intro) {
+      addMapping("description", intro);
+    }
+
+    return mappings;
+  }
 
   if (block.heading) {
     addMapping("heading", block.heading);

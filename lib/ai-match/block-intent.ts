@@ -1,4 +1,9 @@
-import { blockTypeKeywords } from "@/lib/ai-match/block-keywords";
+import {
+  blockTypeKeywords,
+  COMPOUND_CONTAINER_KEYWORDS,
+  COMPOUND_LEAF_KEYWORDS,
+} from "@/lib/ai-match/block-keywords";
+import { resolveCatalogShapeRole } from "@/lib/ai-match/catalog-shape";
 import type { FlatContentBlock } from "@/types/ai-match";
 import type { ContentBlock, SemanticBlockType } from "@/types/crawl";
 
@@ -122,6 +127,10 @@ export function describeBlockSignals(block: FlatContentBlock): string {
   const signals = blockSignals(block);
   const parts: string[] = [];
 
+  const shapeRole = resolveCatalogShapeRole(block);
+  if (shapeRole) {
+    parts.push(`shape:${shapeRole}`);
+  }
   if (block.parentBlockId) {
     parts.push(`parent:${block.parentBlockId}`);
   }
@@ -150,6 +159,17 @@ export function matchKeywordsForBlock(block: FlatContentBlock): string[] {
 
   for (const keyword of blockTypeKeywords(matchingType)) {
     keywords.add(keyword);
+  }
+
+  const shapeRole = resolveCatalogShapeRole(block);
+  if (shapeRole === "container") {
+    for (const keyword of COMPOUND_CONTAINER_KEYWORDS) {
+      keywords.add(keyword);
+    }
+  } else if (shapeRole === "leaf") {
+    for (const keyword of COMPOUND_LEAF_KEYWORDS) {
+      keywords.add(keyword);
+    }
   }
 
   if (matchingType === "quote") {

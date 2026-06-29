@@ -4,6 +4,10 @@ import {
   noMatchReason,
 } from "@/lib/ai-match/catalog-fit";
 import {
+  scoreRenderingCatalogShape,
+  scoreTemplateCatalogShape,
+} from "@/lib/ai-match/catalog-shape";
+import {
   matchKeywordsForBlock,
   refineBlockForMatching,
 } from "@/lib/ai-match/block-intent";
@@ -51,6 +55,8 @@ function scoreRenderingForBlock(
     score += scoreNameAgainstKeywords(block.selector, keywords) * 0.2;
   }
 
+  score += scoreRenderingCatalogShape(block, rendering);
+
   return score;
 }
 
@@ -68,6 +74,8 @@ function scoreTemplateForBlock(
   if (rendering) {
     score += scoreNameAgainstKeywords(template.name, [rendering.name]) * 0.5;
   }
+
+  score += scoreTemplateCatalogShape(block, template);
 
   return score;
 }
@@ -113,6 +121,14 @@ function buildReason(
   template: TemplateDefinition,
   score: number,
 ): string {
+  if (block.matchRole === "section-container") {
+    return `Multi-item section header matched to ${rendering.name} / ${template.name} from discovery catalog (${score}% fit).`;
+  }
+
+  if (block.parentBlockId) {
+    return `Child block matched to ${rendering.name} / ${template.name} from discovery catalog (${score}% fit).`;
+  }
+
   const crawlLabel = block.type === "rich-text" ? "rich text" : block.type;
   return `Crawl ${crawlLabel} block matched to Sitecore ${rendering.name} / ${template.name} (${score}% name match).`;
 }

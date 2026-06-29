@@ -9,9 +9,14 @@ export interface LlmConfig {
   useRuleBasedMatching?: boolean;
 }
 
+/** Section header extracted from a multi-item crawl block (maps via discovery catalog, not a fixed component name). */
+export type BlockMatchRole = "section-container";
+
 export interface FlatContentBlock extends ContentBlock {
   pageUrl: string;
   pageTitle: string;
+  /** When set, steers matching toward a list/container component vs leaf items. */
+  matchRole?: BlockMatchRole;
 }
 
 export interface FieldMapping {

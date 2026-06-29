@@ -255,12 +255,12 @@ export function buildCombinedMatchPrompt(
 Use only names from the lists below. Pick datasource templates (with fields), never *Parameters* templates.
 Match by heading, body text, HTML structure signals, and intent — not only raw crawl type.
 Each block line includes crawl type, inferred intent, structure counts (links, images, articles, blockquote, etc.), and selector.
-Priority mapping: hero/banner→Hero; blockquote/featured quote/pull quote→Quote; iframe/youtube/vimeo/video-embed→Video; card/articles grid→card/feature component; image-only→media; default text→rich text component.
-Semantic hints: hero/banner/jumbotron→Hero; blockquote/featured quote/testimonial/pull quote→Quote; video/youtube/embed/video-embed→Video; image-only→media component if listed; rich text/article→text component; card grid/features/testimonials→grid/card component if listed.
+Priority mapping: hero/banner→hero-like rendering; blockquote/featured quote→quote-like; iframe/youtube/vimeo→video-like; multi-item section header (shape:container) → list/grid container from discovery; child blocks (shape:leaf or parent:id set) → leaf/card item from discovery; image-only→media; default text→text/rich-text component.
+Semantic hints: use structure signals (shape:container vs shape:leaf, articles count, images) and pick the best-fitting name from the discovery lists below — never invent component names.
 Return JSON only: {"matches":[{"blockId":"","matchScore":0-100,"confidence":"high|medium|low","renderingName":"","templateName":"","reason":""}]}
 Rules: one match per block; use only listed names; reason max 8 words; no field mappings.
-When no rendering/template fits a block (card grid, stats, rich text, compound section, etc.), set renderingName and templateName to empty strings, matchScore to 0, and explain why in reason — do not force Hero/Video/Quote.
-Compound blocks with multiple articles or testimonial figures should map to individual sub-blocks when listed separately; skip parent containers.
+When no rendering/template fits a block, set renderingName and templateName to empty strings, matchScore to 0, and explain why in reason — do not force a poor fit.
+Blocks with shape:container are section headers for a repeated child pattern — pick the container/list/grid component from discovery. Blocks with parent:id are individual items — pick the leaf/card/item component from discovery.
 
 RENDERINGS: ${compactRenderings(renderings)}
 TEMPLATES:
