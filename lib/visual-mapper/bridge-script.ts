@@ -147,15 +147,43 @@ export function buildBridgeScript(pageSourceUrl: string): string {
     }
   }
 
+  function findLinkElement(el) {
+    if (!el) return null;
+    if (el.tagName === 'A') return el;
+    if (!el.closest) return null;
+    var anchor = el.closest('a');
+    if (anchor) return anchor;
+    var roleLink = el.closest('[role="link"]');
+    if (roleLink) return roleLink;
+    return null;
+  }
+
+  function extractLinkText(el) {
+    var linkEl = findLinkElement(el);
+    if (linkEl) {
+      return (linkEl.innerText && linkEl.innerText.trim().slice(0, 500)) || '';
+    }
+    return (el.innerText && el.innerText.trim().slice(0, 500)) || '';
+  }
+
   function extractHref(el) {
-    var anchor = el.tagName === 'A' ? el : (el.closest ? el.closest('a') : null);
-    if (anchor) {
-      return resolveNavigationHref(anchor.getAttribute('href') || '');
+    var linkEl = findLinkElement(el);
+    if (linkEl) {
+      var href = linkEl.getAttribute('href') || '';
+      if (!href && linkEl.getAttribute('role') === 'link') {
+        href = linkEl.getAttribute('data-href') || linkEl.getAttribute('data-url') || linkEl.getAttribute('data-link') || '';
+      }
+      return resolveNavigationHref(href);
     }
     var dataHref = el.getAttribute('data-href') || el.getAttribute('data-url') || el.getAttribute('data-link');
     if (dataHref) return resolveNavigationHref(dataHref);
-    if (el.href) return resolveNavigationHref(el.getAttribute('href') || el.href);
     return '';
+  }
+
+  function extractLinkTarget(el) {
+    var linkEl = findLinkElement(el);
+    if (!linkEl) return '';
+    return linkEl.getAttribute('target') || '';
   }
 
   function extractSrc(el) {
@@ -166,18 +194,19 @@ export function buildBridgeScript(pageSourceUrl: string): string {
   }
 
   function extractFromElement(el) {
-    var anchor = el.tagName === 'A' ? el : (el.closest ? el.closest('a') : null);
+    var linkEl = findLinkElement(el);
     return {
-      text: (el.innerText && el.innerText.trim().slice(0, 500)) || '',
+      text: extractLinkText(el),
       html: (el.innerHTML && el.innerHTML.slice(0, 1000)) || '',
       src: extractSrc(el),
       href: extractHref(el),
       alt: el.alt || '',
       tagName: el.tagName,
       isImage: el.tagName === 'IMG' || (el.querySelector && el.querySelector('img') !== null),
-      isLink: el.tagName === 'A' || !!anchor,
+      isLink: el.tagName === 'A' || !!linkEl,
       isHeading: /^H[1-6]$/.test(el.tagName),
-      isRichText: el.tagName === 'P' || (el.tagName === 'DIV' && el.children.length > 1)
+      isRichText: el.tagName === 'P' || (el.tagName === 'DIV' && el.children.length > 1),
+      linkTarget: extractLinkTarget(el)
     };
   }
 })();

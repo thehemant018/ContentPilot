@@ -2,6 +2,7 @@ import {
   buildComponentsFromQueue,
   prepareQueueForMigration,
 } from "@/lib/migration/queue-sync";
+import { resolveLinkFieldsForComponent } from "@/lib/migration/resolve-link-fields";
 import { resolveMediaFieldsForComponent } from "@/lib/migration/resolve-media-fields";
 import {
   ensureSitecoreItemExists,
@@ -196,7 +197,7 @@ export async function pushQueueToSitecore(
     };
 
     try {
-      const resolvedFields = await resolveMediaFieldsForComponent(
+      const resolvedMedia = await resolveMediaFieldsForComponent(
         instanceUrl,
         accessToken,
         component,
@@ -204,15 +205,28 @@ export async function pushQueueToSitecore(
         uploadCache,
         folderSearchCache,
       );
-      result.mediaUploaded = resolvedFields.uploadedCount;
-      result.mediaReused = resolvedFields.reusedCount;
-      result.warnings.push(...resolvedFields.warnings);
+      result.mediaUploaded = resolvedMedia.uploadedCount;
+      result.mediaReused = resolvedMedia.reusedCount;
+      result.warnings.push(...resolvedMedia.warnings);
+
+      const resolvedLinks = await resolveLinkFieldsForComponent(
+        instanceUrl,
+        accessToken,
+        {
+          ...component,
+          datasource: {
+            ...component.datasource,
+            fields: resolvedMedia.fields,
+          },
+        },
+      );
+      result.warnings.push(...resolvedLinks.warnings);
 
       const datasource = await upsertDatasource(
         instanceUrl,
         accessToken,
         component,
-        resolvedFields.fields,
+        resolvedLinks.fields,
       );
       result.datasourceCreated = datasource.created;
       result.datasourceUpdated = datasource.updated;

@@ -238,7 +238,7 @@ export function buildHeuristicFieldMappings(
 
   const link = block.links[0];
   if (link) {
-    addMapping("link", link.text || link.href);
+    addMapping("link", link.href || link.text);
   }
 
   const intent = inferMatchingBlockType(block);
