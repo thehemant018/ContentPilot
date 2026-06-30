@@ -16,6 +16,7 @@ export interface ExtractedContent {
   isLink: boolean;
   isHeading: boolean;
   isRichText: boolean;
+  linkTarget?: string;
 }
 
 export interface FieldAssignment {

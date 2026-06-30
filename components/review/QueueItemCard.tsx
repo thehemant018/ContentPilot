@@ -6,6 +6,8 @@ import {
 } from "@/lib/migration/build-export";
 import { isHttpImageFieldValue } from "@/lib/sitecore/media-upload";
 import { isSitecoreMediaPathValue } from "@/lib/sitecore/media-lookup";
+import { LinkFieldValueEditor } from "@/components/review/LinkFieldValueEditor";
+import { isLinkField } from "@/lib/migration/link-field";
 import {
   reviewFieldInputClass,
   reviewFieldLabelClass,
@@ -284,24 +286,38 @@ export function QueueItemCard({ item, onUpdate, onRemove }: QueueItemCardProps) 
                   <label className={reviewFieldLabelClass}>
                     Content value
                   </label>
-                  <textarea
-                    value={field.value}
-                    onChange={(event) => updateField(field.id, event.target.value)}
-                    rows={3}
-                    className={reviewTextareaClass}
-                    placeholder={
-                      field.fieldType?.toLowerCase().includes("image") ||
-                      /\b(image|photo|media)\b/i.test(field.sitecoreField)
-                        ? "https://... or /sitecore/media/Project/YourFolder/image-name"
-                        : undefined
-                    }
-                  />
-                  {(field.fieldType?.toLowerCase().includes("image") ||
-                    /\b(image|photo|media)\b/i.test(field.sitecoreField)) && (
-                    <p className="mt-1.5 text-xs text-zinc-600">
-                      Paste a crawled image URL to upload, or an existing Sitecore
-                      media item path to reuse without uploading.
-                    </p>
+                  {isLinkField(field.sitecoreField, field.fieldType) ? (
+                    <LinkFieldValueEditor
+                      fieldName={field.sitecoreField}
+                      fieldType={field.fieldType}
+                      value={field.value}
+                      sourcePageUrl={item.sourcePageUrl}
+                      onChange={(nextValue) => updateField(field.id, nextValue)}
+                    />
+                  ) : (
+                    <>
+                      <textarea
+                        value={field.value}
+                        onChange={(event) =>
+                          updateField(field.id, event.target.value)
+                        }
+                        rows={3}
+                        className={reviewTextareaClass}
+                        placeholder={
+                          field.fieldType?.toLowerCase().includes("image") ||
+                          /\b(image|photo|media)\b/i.test(field.sitecoreField)
+                            ? "https://... or /sitecore/media/Project/YourFolder/image-name"
+                            : undefined
+                        }
+                      />
+                      {(field.fieldType?.toLowerCase().includes("image") ||
+                        /\b(image|photo|media)\b/i.test(field.sitecoreField)) && (
+                        <p className="mt-1.5 text-xs text-zinc-600">
+                          Paste a crawled image URL to upload, or an existing
+                          Sitecore media item path to reuse without uploading.
+                        </p>
+                      )}
+                    </>
                   )}
                 </div>
                 {isHttpImageFieldValue(field.value) &&

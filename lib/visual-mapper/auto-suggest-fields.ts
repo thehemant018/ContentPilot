@@ -1,4 +1,17 @@
 import { buildHeuristicFieldMappings } from "@/lib/ai-match/heuristic-field-map";
+import {
+  buildLinkFieldAssignment,
+  ensureLinkFieldStoredValue,
+  formatLinkPreview,
+  isLinkField,
+  parseLinkFieldValue,
+  rebuildLinkField,
+  type LinkKind,
+} from "@/lib/migration/link-field";
+import {
+  resolveMediaSrc,
+  resolveNavigationHref,
+} from "@/lib/visual-mapper/resolve-extracted-url";
 import type { FlatContentBlock } from "@/types/ai-match";
 import type { TemplateDefinition } from "@/types/discovery";
 import type {
@@ -24,6 +37,7 @@ function fieldValueFromContent(
   fieldType: string,
   fieldName: string,
   content: ExtractedContent,
+  pageUrl: string,
 ): { value: string; preview: string } {
   const typeLower = fieldType.toLowerCase();
   const nameLower = fieldName.toLowerCase();
@@ -33,17 +47,24 @@ function fieldValueFromContent(
     IMAGE_FIELD_PATTERN.test(nameLower) ||
     content.isImage
   ) {
-    const src = content.src || content.html.match(/src=["']([^"']+)["']/i)?.[1] || "";
+    const raw =
+      content.src || content.html.match(/src=["']([^"']+)["']/i)?.[1] || "";
+    const src = resolveMediaSrc(raw, pageUrl);
     return { value: src, preview: src ? truncatePreview(src, 60) : "" };
   }
 
-  if (
-    typeLower.includes("link") ||
-    LINK_FIELD_PATTERN.test(nameLower) ||
-    content.isLink
-  ) {
-    const href = content.href || content.text;
-    return { value: href, preview: truncatePreview(href) };
+  if (isLinkField(fieldName, fieldType)) {
+    if (!content.href?.trim()) {
+      return { value: "", preview: "" };
+    }
+    const href = resolveNavigationHref(content.href, pageUrl);
+    const built = buildLinkFieldAssignment(
+      href,
+      pageUrl,
+      content.text,
+      content.linkTarget,
+    );
+    return { value: built.value, preview: built.valuePreview };
   }
 
   if (content.isRichText || typeLower.includes("rich")) {
@@ -92,6 +113,31 @@ function extractedToFlatBlock(
   };
 }
 
+function normalizeLinkAssignment(
+  assignment: FieldAssignment,
+  pageUrl: string,
+  linkText?: string,
+): FieldAssignment {
+  if (!isLinkField(assignment.sitecoreField, assignment.fieldType)) {
+    return assignment;
+  }
+
+  const value = ensureLinkFieldStoredValue(
+    assignment.value,
+    assignment.sitecoreField,
+    assignment.fieldType,
+    pageUrl,
+    linkText,
+  );
+
+  const parsed = parseLinkFieldValue(value, pageUrl);
+  return {
+    ...assignment,
+    value,
+    valuePreview: parsed ? formatLinkPreview(parsed, pageUrl) : assignment.valuePreview,
+  };
+}
+
 export function autoSuggestFieldAssignments(
   element: SelectedElement,
   template: TemplateDefinition,
@@ -103,7 +149,7 @@ export function autoSuggestFieldAssignments(
 
   const fromHeuristic: FieldAssignment[] = heuristicMappings.map((mapping) => {
     usedFields.add(mapping.sitecoreField);
-    return {
+    const assignment: FieldAssignment = {
       sitecoreField: mapping.sitecoreField,
       fieldType: mapping.fieldType ?? "Single-Line Text",
       sourceSelector: element.selector,
@@ -111,6 +157,7 @@ export function autoSuggestFieldAssignments(
       valuePreview: mapping.sourcePreview,
       assignedManually: false,
     };
+    return normalizeLinkAssignment(assignment, pageUrl, element.extracted.text);
   });
 
   if (fromHeuristic.length > 0) {
@@ -130,7 +177,7 @@ export function autoSuggestFieldAssignments(
       shouldMap = true;
     } else if (IMAGE_FIELD_PATTERN.test(field.name) && extracted.isImage) {
       shouldMap = true;
-    } else if (LINK_FIELD_PATTERN.test(field.name) && extracted.isLink) {
+    } else if (LINK_FIELD_PATTERN.test(field.name) && extracted.isLink && extracted.href) {
       shouldMap = true;
     } else if (TEXT_FIELD_PATTERN.test(field.name) && extracted.text) {
       shouldMap = true;
@@ -144,6 +191,7 @@ export function autoSuggestFieldAssignments(
       field.type,
       field.name,
       extracted,
+      pageUrl,
     );
     if (!value) {
       continue;
@@ -167,8 +215,18 @@ export function fieldValueFromPick(
   fieldType: string,
   fieldName: string,
   content: ExtractedContent,
+  pageUrl: string,
 ): { value: string; preview: string } {
-  return fieldValueFromContent(fieldType, fieldName, content);
+  return fieldValueFromContent(fieldType, fieldName, content, pageUrl);
+}
+
+export function updateLinkFieldType(
+  currentValue: string,
+  linkType: LinkKind,
+  sourcePageUrl: string,
+): { value: string; preview: string } {
+  const rebuilt = rebuildLinkField(currentValue, sourcePageUrl, { linkType });
+  return { value: rebuilt.value, preview: rebuilt.valuePreview };
 }
 
 export function emptyFieldAssignments(

@@ -1,3 +1,4 @@
+import { ensureLinkFieldStoredValue, isLinkField } from "@/lib/migration/link-field";
 import { enrichImageFieldAlts } from "@/lib/migration/image-metadata";
 import {
   DEFAULT_MIGRATION_LANGUAGE,
@@ -21,7 +22,12 @@ export function queueItemFromMatch(
       sitecoreField: mapping.sitecoreField,
       fieldType: mapping.fieldType,
       section: mapping.section,
-      value: mapping.sourcePreview,
+      value: ensureLinkFieldStoredValue(
+        mapping.sourcePreview,
+        mapping.sitecoreField,
+        mapping.fieldType,
+        match.pageUrl,
+      ),
       imageAlt: mapping.imageAlt,
     })),
     blockImages,

@@ -67,6 +67,8 @@ export function MappingPanel({
   );
   const setActiveFieldId = useVisualMapperStore((s) => s.setActiveFieldId);
   const clearField = useVisualMapperStore((s) => s.clearField);
+  const setLinkFieldType = useVisualMapperStore((s) => s.setLinkFieldType);
+  const sourcePageUrl = useVisualMapperStore((s) => s.session.sourceUrl);
   const autoSuggestFields = useVisualMapperStore((s) => s.autoSuggestFields);
   const confirmComponent = useVisualMapperStore((s) => s.confirmComponent);
   const cancelComponentMapping = useVisualMapperStore(
@@ -248,8 +250,10 @@ export function MappingPanel({
               <FieldAssignmentTable
                 fields={draftFieldAssignments}
                 activeFieldId={activeFieldId}
+                sourcePageUrl={sourcePageUrl}
                 onPickFromPage={setActiveFieldId}
                 onClearField={clearField}
+                onLinkTypeChange={setLinkFieldType}
               />
 
               <div className="flex flex-wrap gap-2">

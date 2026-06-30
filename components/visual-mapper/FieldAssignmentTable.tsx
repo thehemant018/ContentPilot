@@ -1,15 +1,86 @@
 "use client";
 
+import {
+  formatInternalLinkDisplayPath,
+  isLinkField,
+  parseLinkFieldValue,
+  type LinkKind,
+} from "@/lib/migration/link-field";
 import type { FieldAssignment } from "@/types/visual-mapper";
 
 interface FieldAssignmentTableProps {
   fields: FieldAssignment[];
   activeFieldId: string | null;
+  sourcePageUrl: string;
   onPickFromPage: (fieldId: string) => void;
   onClearField: (fieldId: string) => void;
+  onLinkTypeChange: (fieldId: string, linkType: LinkKind) => void;
 }
 
-function ValuePreview({ field }: { field: FieldAssignment }) {
+function LinkValuePreview({
+  field,
+  sourcePageUrl,
+  onLinkTypeChange,
+}: {
+  field: FieldAssignment;
+  sourcePageUrl: string;
+  onLinkTypeChange: (linkType: LinkKind) => void;
+}) {
+  const parsed = parseLinkFieldValue(field.value, sourcePageUrl);
+
+  if (!parsed) {
+    return (
+      <span className="break-all font-mono text-xs text-blue-700">
+        {field.valuePreview || field.value}
+      </span>
+    );
+  }
+
+  return (
+    <div className="space-y-1.5">
+      <div className="flex flex-wrap gap-1">
+        {(["internal", "external"] as const).map((kind) => (
+          <button
+            key={kind}
+            type="button"
+            onClick={() => onLinkTypeChange(kind)}
+            className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+              parsed.linkType === kind
+                ? kind === "internal"
+                  ? "bg-violet-100 text-violet-800"
+                  : "bg-sky-100 text-sky-800"
+                : "bg-zinc-100 text-zinc-500 hover:bg-zinc-200"
+            }`}
+          >
+            {kind}
+          </button>
+        ))}
+      </div>
+      <p className="break-all text-xs text-zinc-700">
+        {field.valuePreview ||
+          (parsed.linkType === "internal"
+            ? formatInternalLinkDisplayPath(parsed.path || parsed.url, sourcePageUrl)
+            : parsed.url)}
+      </p>
+      {parsed.text && (
+        <p className="text-xs text-zinc-500">Label: {parsed.text}</p>
+      )}
+      {parsed.target && (
+        <p className="text-xs text-zinc-500">Target: {parsed.target}</p>
+      )}
+    </div>
+  );
+}
+
+function ValuePreview({
+  field,
+  sourcePageUrl,
+  onLinkTypeChange,
+}: {
+  field: FieldAssignment;
+  sourcePageUrl: string;
+  onLinkTypeChange: (linkType: LinkKind) => void;
+}) {
   if (!field.value) {
     return <span className="text-zinc-400 italic">empty</span>;
   }
@@ -24,11 +95,13 @@ function ValuePreview({ field }: { field: FieldAssignment }) {
     );
   }
 
-  if (/link/i.test(field.fieldType)) {
+  if (isLinkField(field.sitecoreField, field.fieldType)) {
     return (
-      <span className="break-all font-mono text-xs text-blue-700">
-        {field.valuePreview || field.value}
-      </span>
+      <LinkValuePreview
+        field={field}
+        sourcePageUrl={sourcePageUrl}
+        onLinkTypeChange={onLinkTypeChange}
+      />
     );
   }
 
@@ -42,8 +115,10 @@ function ValuePreview({ field }: { field: FieldAssignment }) {
 export function FieldAssignmentTable({
   fields,
   activeFieldId,
+  sourcePageUrl,
   onPickFromPage,
   onClearField,
+  onLinkTypeChange,
 }: FieldAssignmentTableProps) {
   if (fields.length === 0) {
     return (
@@ -78,8 +153,14 @@ export function FieldAssignmentTable({
               <td className="px-2 py-2 text-xs text-zinc-500">
                 {field.fieldType}
               </td>
-              <td className="max-w-[180px] px-2 py-2">
-                <ValuePreview field={field} />
+              <td className="max-w-[200px] px-2 py-2">
+                <ValuePreview
+                  field={field}
+                  sourcePageUrl={sourcePageUrl}
+                  onLinkTypeChange={(linkType) =>
+                    onLinkTypeChange(field.sitecoreField, linkType)
+                  }
+                />
               </td>
               <td className="px-2 py-2">
                 <div className="flex flex-wrap gap-1">

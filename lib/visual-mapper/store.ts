@@ -5,7 +5,10 @@ import {
   emptyFieldAssignments,
   fieldValueFromPick,
   mergeAssignmentsWithTemplate,
+  updateLinkFieldType,
 } from "@/lib/visual-mapper/auto-suggest-fields";
+import type { LinkKind } from "@/lib/migration/link-field";
+import { ensureLinkFieldStoredValue, formatLinkPreview, isLinkField, parseLinkFieldValue } from "@/lib/migration/link-field";
 import {
   buildDraftRenderingInfo,
   findTemplateForRendering,
@@ -59,6 +62,7 @@ interface VisualMapperStore {
     selector: string,
   ) => void;
   clearField: (fieldId: string) => void;
+  setLinkFieldType: (fieldId: string, linkType: LinkKind) => void;
   setActiveFieldId: (fieldId: string | null) => void;
   autoSuggestFields: () => void;
   confirmComponent: () => boolean;
@@ -216,6 +220,7 @@ export const useVisualMapperStore = create<VisualMapperStore>((set, get) => ({
       field.fieldType,
       field.sitecoreField,
       content,
+      get().session.sourceUrl,
     );
     get().assignField(fieldId, value, selector, preview, true);
   },
@@ -233,6 +238,28 @@ export const useVisualMapperStore = create<VisualMapperStore>((set, get) => ({
             }
           : field,
       ),
+    });
+  },
+
+  setLinkFieldType: (fieldId, linkType) => {
+    const sourcePageUrl = get().session.sourceUrl;
+    set({
+      draftFieldAssignments: get().draftFieldAssignments.map((field) => {
+        if (field.sitecoreField !== fieldId || !field.value) {
+          return field;
+        }
+        const { value, preview } = updateLinkFieldType(
+          field.value,
+          linkType,
+          sourcePageUrl,
+        );
+        return {
+          ...field,
+          value,
+          valuePreview: preview,
+          assignedManually: true,
+        };
+      }),
     });
   },
 
@@ -303,7 +330,23 @@ export const useVisualMapperStore = create<VisualMapperStore>((set, get) => ({
       renderingPath: draftRendering.renderingPath,
       templateName: draftRendering.templateName,
       templatePath: draftRendering.templatePath,
-      fieldAssignments: [...draftFieldAssignments],
+      fieldAssignments: draftFieldAssignments.map((field) => {
+        const value = ensureLinkFieldStoredValue(
+          field.value,
+          field.sitecoreField,
+          field.fieldType,
+          session.sourceUrl,
+          selectedElement.extracted.text,
+        );
+        const parsed = parseLinkFieldValue(value, session.sourceUrl);
+        return {
+          ...field,
+          value,
+          valuePreview: parsed
+            ? formatLinkPreview(parsed, session.sourceUrl)
+            : field.valuePreview || value,
+        };
+      }),
       createdAt: new Date(),
     };
 
