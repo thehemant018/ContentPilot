@@ -216,6 +216,7 @@ export const useVisualMapperStore = create<VisualMapperStore>((set, get) => ({
       field.fieldType,
       field.sitecoreField,
       content,
+      get().session.sourceUrl,
     );
     get().assignField(fieldId, value, selector, preview, true);
   },

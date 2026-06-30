@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { VISUAL_MAPPER_BRIDGE_SCRIPT } from "@/lib/visual-mapper/bridge-script";
+import { buildBridgeScript } from "@/lib/visual-mapper/bridge-script";
+import { injectConsentCleanup } from "@/lib/visual-mapper/consent-cleanup";
+import { injectMediaCleanup } from "@/lib/visual-mapper/media-cleanup";
 import {
   injectBridgeScript,
   rewriteRelativeUrls,
@@ -58,8 +60,14 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     }
 
     const html = await response.text();
-    const rewritten = rewriteRelativeUrls(html, targetUrl);
-    const withBridge = injectBridgeScript(rewritten, VISUAL_MAPPER_BRIDGE_SCRIPT);
+    const proxyOrigin = request.nextUrl.origin;
+    const rewritten = rewriteRelativeUrls(html, targetUrl, { proxyOrigin });
+    const withoutConsent = injectConsentCleanup(rewritten);
+    const withoutAutoplayMedia = injectMediaCleanup(withoutConsent);
+    const withBridge = injectBridgeScript(
+      withoutAutoplayMedia,
+      buildBridgeScript(targetUrl.href),
+    );
 
     return new NextResponse(withBridge, {
       status: 200,

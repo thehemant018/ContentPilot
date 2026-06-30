@@ -1,4 +1,8 @@
 import { buildHeuristicFieldMappings } from "@/lib/ai-match/heuristic-field-map";
+import {
+  resolveMediaSrc,
+  resolveNavigationHref,
+} from "@/lib/visual-mapper/resolve-extracted-url";
 import type { FlatContentBlock } from "@/types/ai-match";
 import type { TemplateDefinition } from "@/types/discovery";
 import type {
@@ -24,6 +28,7 @@ function fieldValueFromContent(
   fieldType: string,
   fieldName: string,
   content: ExtractedContent,
+  pageUrl: string,
 ): { value: string; preview: string } {
   const typeLower = fieldType.toLowerCase();
   const nameLower = fieldName.toLowerCase();
@@ -33,7 +38,9 @@ function fieldValueFromContent(
     IMAGE_FIELD_PATTERN.test(nameLower) ||
     content.isImage
   ) {
-    const src = content.src || content.html.match(/src=["']([^"']+)["']/i)?.[1] || "";
+    const raw =
+      content.src || content.html.match(/src=["']([^"']+)["']/i)?.[1] || "";
+    const src = resolveMediaSrc(raw, pageUrl);
     return { value: src, preview: src ? truncatePreview(src, 60) : "" };
   }
 
@@ -42,7 +49,7 @@ function fieldValueFromContent(
     LINK_FIELD_PATTERN.test(nameLower) ||
     content.isLink
   ) {
-    const href = content.href || content.text;
+    const href = resolveNavigationHref(content.href || content.text, pageUrl);
     return { value: href, preview: truncatePreview(href) };
   }
 
@@ -144,6 +151,7 @@ export function autoSuggestFieldAssignments(
       field.type,
       field.name,
       extracted,
+      pageUrl,
     );
     if (!value) {
       continue;
@@ -167,8 +175,9 @@ export function fieldValueFromPick(
   fieldType: string,
   fieldName: string,
   content: ExtractedContent,
+  pageUrl: string,
 ): { value: string; preview: string } {
-  return fieldValueFromContent(fieldType, fieldName, content);
+  return fieldValueFromContent(fieldType, fieldName, content, pageUrl);
 }
 
 export function emptyFieldAssignments(

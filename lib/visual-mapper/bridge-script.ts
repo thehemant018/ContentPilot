@@ -1,6 +1,11 @@
 /** Bridge script injected into proxied pages for element selection and field picking. */
-export const VISUAL_MAPPER_BRIDGE_SCRIPT = `
+import { CONSENT_SELECTOR } from "@/lib/visual-mapper/consent-cleanup";
+
+export function buildBridgeScript(pageSourceUrl: string): string {
+  return `
 (function() {
+  var CONSENT_SELECTOR = ${JSON.stringify(CONSENT_SELECTOR)};
+  var PAGE_SOURCE_URL = ${JSON.stringify(pageSourceUrl)};
   let activeOverlay = null;
   let pickingMode = false;
   let pickingFieldId = null;
@@ -41,7 +46,19 @@ export const VISUAL_MAPPER_BRIDGE_SCRIPT = `
     }
   });
 
+  function isConsentTarget(target) {
+    if (!target || !target.closest) return false;
+    try {
+      return target.closest(CONSENT_SELECTOR) !== null;
+    } catch (err) {
+      return false;
+    }
+  }
+
   document.addEventListener('click', (e) => {
+    if (isConsentTarget(e.target)) {
+      return;
+    }
     e.preventDefault();
     e.stopPropagation();
 
@@ -105,19 +122,67 @@ export const VISUAL_MAPPER_BRIDGE_SCRIPT = `
     return classes ? tag + '.' + classes : tag;
   }
 
+  function unwrapProxiedUrl(url) {
+    var trimmed = String(url || '').trim();
+    if (!trimmed) return '';
+    try {
+      var parsed = new URL(trimmed, PAGE_SOURCE_URL);
+      if (parsed.pathname.endsWith('/api/proxy-asset') || parsed.pathname.endsWith('/api/proxy-page')) {
+        var inner = parsed.searchParams.get('url');
+        if (inner) return decodeURIComponent(inner);
+      }
+    } catch (err) {}
+    return trimmed;
+  }
+
+  function resolveNavigationHref(raw) {
+    var trimmed = String(raw || '').trim();
+    if (!trimmed || /^(#|javascript:|mailto:|tel:)/i.test(trimmed)) return trimmed;
+    var unwrapped = unwrapProxiedUrl(trimmed);
+    if (/^https?:\\/\\//i.test(unwrapped)) return unwrapped;
+    try {
+      return new URL(unwrapped, PAGE_SOURCE_URL).href;
+    } catch (err) {
+      return unwrapped;
+    }
+  }
+
+  function extractHref(el) {
+    var anchor = el.tagName === 'A' ? el : (el.closest ? el.closest('a') : null);
+    if (anchor) {
+      return resolveNavigationHref(anchor.getAttribute('href') || '');
+    }
+    var dataHref = el.getAttribute('data-href') || el.getAttribute('data-url') || el.getAttribute('data-link');
+    if (dataHref) return resolveNavigationHref(dataHref);
+    if (el.href) return resolveNavigationHref(el.getAttribute('href') || el.href);
+    return '';
+  }
+
+  function extractSrc(el) {
+    var img = el.tagName === 'IMG' ? el : (el.querySelector ? el.querySelector('img') : null);
+    var target = img || el;
+    var raw = target.getAttribute('src') || target.getAttribute('data-src') || target.src || target.currentSrc || '';
+    return resolveNavigationHref(unwrapProxiedUrl(raw));
+  }
+
   function extractFromElement(el) {
+    var anchor = el.tagName === 'A' ? el : (el.closest ? el.closest('a') : null);
     return {
       text: (el.innerText && el.innerText.trim().slice(0, 500)) || '',
       html: (el.innerHTML && el.innerHTML.slice(0, 1000)) || '',
-      src: el.src || el.currentSrc || '',
-      href: el.href || '',
+      src: extractSrc(el),
+      href: extractHref(el),
       alt: el.alt || '',
       tagName: el.tagName,
-      isImage: el.tagName === 'IMG' || el.querySelector('img') !== null,
-      isLink: el.tagName === 'A',
+      isImage: el.tagName === 'IMG' || (el.querySelector && el.querySelector('img') !== null),
+      isLink: el.tagName === 'A' || !!anchor,
       isHeading: /^H[1-6]$/.test(el.tagName),
       isRichText: el.tagName === 'P' || (el.tagName === 'DIV' && el.children.length > 1)
     };
   }
 })();
 `.trim();
+}
+
+/** @deprecated Use buildBridgeScript(pageSourceUrl) */
+export const VISUAL_MAPPER_BRIDGE_SCRIPT = buildBridgeScript("");
