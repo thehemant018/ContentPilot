@@ -2,12 +2,14 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { MissingTargetPageDialog } from "@/components/migration/TargetPageDialogs";
 import { IframeViewer } from "@/components/visual-mapper/IframeViewer";
 import { MappingPanel } from "@/components/visual-mapper/MappingPanel";
 import {
   visualMapperInputClass,
 } from "@/components/visual-mapper/form-styles";
 import { sitecoreApiFetch } from "@/lib/sitecore/api-client";
+import { validateTargetPages } from "@/lib/migration/validate-target-pages-client";
 import { getDiscoveryResult } from "@/lib/storage/workflow-data";
 import {
   getStoredSession,
@@ -30,6 +32,7 @@ import {
   markMigratePhaseComplete,
 } from "@/lib/workflow/progress";
 import { saveMigrationMode } from "@/lib/workflow/migration-mode";
+import { summarizePushResult } from "@/lib/migration/push-feedback";
 import type { MigrationPushResult } from "@/types/migration-export";
 
 export function VisualMapperPage() {
@@ -42,6 +45,8 @@ export function VisualMapperPage() {
     message: string;
   } | null>(null);
   const [isMigrating, setIsMigrating] = useState(false);
+  const [missingPageDialogOpen, setMissingPageDialogOpen] = useState(false);
+  const [pendingTargetPagePath, setPendingTargetPagePath] = useState("");
 
   const session = useVisualMapperStore((s) => s.session);
   const resetStore = useVisualMapperStore((s) => s.resetStore);
@@ -141,6 +146,85 @@ export function VisualMapperPage() {
     });
   }
 
+  async function runMigratePush(createMissingPages: boolean) {
+    const targetPagePath = useVisualMapperStore.getState().targetPagePath;
+    const mediaLibraryPath = getDiscoveryResult()?.mediaPath?.trim();
+    const pageTemplatePath = getDiscoveryResult()?.pageTemplatePath?.trim();
+    const sxaPageDataTemplatePath =
+      getDiscoveryResult()?.sxaPageDataTemplatePath?.trim();
+
+    if (!mediaLibraryPath) {
+      setFeedback({
+        type: "error",
+        message: "Discovery media path is required. Complete Phase 2 first.",
+      });
+      return;
+    }
+
+    startMigration();
+    setIsMigrating(true);
+    setFeedback(null);
+
+    try {
+      const { items, partialCount } = enqueueVisualMapperMappings(
+        session.mappings,
+        session.sourceUrl,
+        document.title,
+        targetPagePath,
+      );
+
+      if (partialCount > 0) {
+        setFeedback({
+          type: "warning",
+          message: `${partialCount} mapping(s) have no field values assigned. Migration will continue with partial data.`,
+        });
+      }
+
+      const response = await sitecoreApiFetch("/api/migration/push", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mediaLibraryPath,
+          queue: items,
+          createMissingPages,
+          pageTemplatePath,
+          sxaPageDataTemplatePath,
+        }),
+      });
+
+      const payload = (await response.json()) as MigrationPushResult;
+
+      if (!response.ok) {
+        migrationFailed(payload.message ?? "Migration failed.");
+        setFeedback({
+          type: "error",
+          message: payload.message ?? "Migration failed.",
+        });
+        return;
+      }
+
+      const summary = summarizePushResult(payload);
+
+      if (summary.type === "error") {
+        migrationFailed(summary.message);
+        setFeedback(summary);
+        return;
+      }
+
+      migrationComplete();
+      markMigratePhaseComplete();
+      setFeedback(summary);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Migration failed.";
+      migrationFailed(message);
+      setFeedback({ type: "error", message });
+    } finally {
+      setIsMigrating(false);
+      setMissingPageDialogOpen(false);
+    }
+  }
+
   async function handleMigrate() {
     if (session.mappings.length === 0) {
       setFeedback({
@@ -178,59 +262,30 @@ export function VisualMapperPage() {
       return;
     }
 
-    startMigration();
-    setIsMigrating(true);
-    setFeedback(null);
-
     try {
-      const { items, partialCount } = enqueueVisualMapperMappings(
-        session.mappings,
-        session.sourceUrl,
-        document.title,
-        targetPagePath,
-      );
+      const validation = await validateTargetPages([targetPagePath]);
+      const missing = validation.results.find((item) => !item.exists);
 
-      if (partialCount > 0) {
-        setFeedback({
-          type: "warning",
-          message: `${partialCount} mapping(s) have no field values assigned. Migration will continue with partial data.`,
-        });
-      }
-
-      const response = await sitecoreApiFetch("/api/migration/push", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          mediaLibraryPath,
-          queue: items,
-        }),
-      });
-
-      const payload = (await response.json()) as MigrationPushResult;
-
-      if (!response.ok || !payload.success) {
-        migrationFailed(payload.message ?? "Migration failed.");
-        setFeedback({
-          type: "error",
-          message: payload.message ?? "Migration failed.",
-        });
+      if (missing) {
+        setPendingTargetPagePath(missing.path);
+        setMissingPageDialogOpen(true);
         return;
       }
 
-      migrationComplete();
-      markMigratePhaseComplete();
-      setFeedback({
-        type: "success",
-        message: payload.message ?? "Migration completed successfully.",
-      });
+      await runMigratePush(false);
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Migration failed.";
-      migrationFailed(message);
-      setFeedback({ type: "error", message });
-    } finally {
-      setIsMigrating(false);
+      setFeedback({
+        type: "error",
+        message:
+          error instanceof Error
+            ? error.message
+            : "Failed to validate target page.",
+      });
     }
+  }
+
+  async function handleCreateMissingPageAndMigrate() {
+    await runMigratePush(true);
   }
 
   const canMigrate =
@@ -284,9 +339,14 @@ export function VisualMapperPage() {
           type="button"
           onClick={() => void handleMigrate()}
           disabled={!canMigrate}
+          title={
+            canMigrate
+              ? "Push the queued components on this template page to Sitecore"
+              : "Add components to the queue and map at least one field"
+          }
           className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {isMigrating ? "Migrating…" : "Migrate Selected"}
+          {isMigrating ? "Migrating…" : "Migrate template page"}
         </button>
 
         <Link
@@ -325,6 +385,14 @@ export function VisualMapperPage() {
           />
         </div>
       </div>
+
+      <MissingTargetPageDialog
+        open={missingPageDialogOpen}
+        targetPagePath={pendingTargetPagePath}
+        isLoading={isMigrating}
+        onCreatePage={() => void handleCreateMissingPageAndMigrate()}
+        onCancel={() => setMissingPageDialogOpen(false)}
+      />
     </div>
   );
 }

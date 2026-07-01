@@ -56,10 +56,12 @@ export function ConnectSitecoreForm({ embedded = false }: { embedded?: boolean }
 
       const result = (await response.json()) as SitecoreConnectionResult;
 
-      if (!result.success || !result.token || !result.instanceUrl) {
+      if (!response.ok || !result.success || !result.token || !result.instanceUrl) {
         setFeedback({
           type: "error",
-          message: result.message,
+          message:
+            result.message ??
+            `Connection failed (${response.status}). Check credentials and instance URL.`,
         });
         return;
       }

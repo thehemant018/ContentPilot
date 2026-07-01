@@ -4,6 +4,14 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { SESSION_CHANGED_EVENT } from "@/lib/sitecore/constants";
 import { sitecoreApiFetch } from "@/lib/sitecore/api-client";
 import {
+  BulkPushTargetPageDialog,
+  MissingTargetPageDialog,
+} from "@/components/migration/TargetPageDialogs";
+import {
+  uniqueTargetPaths,
+  validateTargetPages,
+} from "@/lib/migration/validate-target-pages-client";
+import {
   getStoredSession,
   isSessionExpired,
 } from "@/lib/storage/sitecore-session";
@@ -35,6 +43,16 @@ export function MigratePanel({ embedded = false }: { embedded?: boolean }) {
     type: "success" | "error";
     message: string;
   } | null>(null);
+  const [bulkDialogOpen, setBulkDialogOpen] = useState(false);
+  const [singleMissingDialogOpen, setSingleMissingDialogOpen] = useState(false);
+  const [pendingMissingPath, setPendingMissingPath] = useState("");
+  const [bulkDialogMeta, setBulkDialogMeta] = useState({
+    missingCount: 0,
+    existingCount: 0,
+    totalTargetPages: 0,
+    missingPaths: [] as string[],
+    existingPaths: [] as string[],
+  });
 
   const refreshQueue = useCallback(() => {
     setQueue(prepareQueueForMigration(getMigrationQueue()));
@@ -79,6 +97,69 @@ export function MigratePanel({ embedded = false }: { embedded?: boolean }) {
     [],
   );
 
+  async function runPushToSitecore(createMissingPages: boolean) {
+    const currentQueue = prepareQueueForMigration(getMigrationQueue());
+    const mediaLibraryPath = getDiscoveryResult()?.mediaPath?.trim();
+    const pageTemplatePath = getDiscoveryResult()?.pageTemplatePath?.trim();
+    const sxaPageDataTemplatePath =
+      getDiscoveryResult()?.sxaPageDataTemplatePath?.trim();
+
+    if (!mediaLibraryPath) {
+      setFeedback({
+        type: "error",
+        message: "Set the media library path in Discovery (Phase 2) before pushing.",
+      });
+      return;
+    }
+
+    setIsPushing(true);
+    setFeedback(null);
+    setPushResult(null);
+
+    try {
+      const response = await sitecoreApiFetch("/api/migration/push", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mediaLibraryPath,
+          queue: currentQueue,
+          createMissingPages,
+          pageTemplatePath,
+          sxaPageDataTemplatePath,
+        }),
+      });
+
+      const payload = (await response.json()) as MigrationPushResult;
+      setPushResult(payload);
+
+      if (!response.ok || !payload.success) {
+        setFeedback({
+          type: "error",
+          message: payload.message ?? "Push to Sitecore failed.",
+        });
+        return;
+      }
+
+      markMigratePhaseComplete();
+      setMigrationComplete(true);
+      setCanEditReview(false);
+      setFeedback({
+        type: "success",
+        message: payload.message,
+      });
+    } catch (error) {
+      setFeedback({
+        type: "error",
+        message:
+          error instanceof Error ? error.message : "Push to Sitecore failed.",
+      });
+    } finally {
+      setIsPushing(false);
+      setBulkDialogOpen(false);
+      setSingleMissingDialogOpen(false);
+    }
+  }
+
   async function handlePushToSitecore(): Promise<void> {
     const currentQueue = prepareQueueForMigration(getMigrationQueue());
     refreshQueue();
@@ -120,46 +201,41 @@ export function MigratePanel({ embedded = false }: { embedded?: boolean }) {
       return;
     }
 
-    setIsPushing(true);
-    setFeedback(null);
-    setPushResult(null);
+    const targetPaths = uniqueTargetPaths(
+      currentQueue.map((item) => item.targetPagePath),
+    );
 
     try {
-      const response = await sitecoreApiFetch("/api/migration/push", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          mediaLibraryPath,
-          queue: currentQueue,
-        }),
-      });
+      const validation = await validateTargetPages(targetPaths);
+      const missingPaths = validation.missingPaths ?? [];
 
-      const payload = (await response.json()) as MigrationPushResult;
-      setPushResult(payload);
-
-      if (!response.ok || !payload.success) {
-        setFeedback({
-          type: "error",
-          message: payload.message ?? "Push to Sitecore failed.",
-        });
+      if (targetPaths.length === 1 && missingPaths.length === 1) {
+        setPendingMissingPath(missingPaths[0] ?? targetPaths[0] ?? "");
+        setSingleMissingDialogOpen(true);
         return;
       }
 
-      markMigratePhaseComplete();
-      setMigrationComplete(true);
-      setCanEditReview(false);
-      setFeedback({
-        type: "success",
-        message: payload.message,
-      });
+      if (targetPaths.length > 1 || missingPaths.length > 0) {
+        setBulkDialogMeta({
+          missingCount: missingPaths.length,
+          existingCount: validation.existingCount,
+          totalTargetPages: targetPaths.length,
+          missingPaths,
+          existingPaths: validation.existingPaths ?? [],
+        });
+        setBulkDialogOpen(true);
+        return;
+      }
+
+      await runPushToSitecore(false);
     } catch (error) {
       setFeedback({
         type: "error",
         message:
-          error instanceof Error ? error.message : "Push to Sitecore failed.",
+          error instanceof Error
+            ? error.message
+            : "Failed to validate target pages.",
       });
-    } finally {
-      setIsPushing(false);
     }
   }
 
@@ -388,6 +464,24 @@ export function MigratePanel({ embedded = false }: { embedded?: boolean }) {
           </ul>
         </div>
       )}
+      <MissingTargetPageDialog
+        open={singleMissingDialogOpen}
+        targetPagePath={pendingMissingPath}
+        isLoading={isPushing}
+        onCreatePage={() => void runPushToSitecore(true)}
+        onCancel={() => setSingleMissingDialogOpen(false)}
+      />
+      <BulkPushTargetPageDialog
+        open={bulkDialogOpen}
+        missingCount={bulkDialogMeta.missingCount}
+        existingCount={bulkDialogMeta.existingCount}
+        totalTargetPages={bulkDialogMeta.totalTargetPages}
+        missingPaths={bulkDialogMeta.missingPaths}
+        existingPaths={bulkDialogMeta.existingPaths}
+        isLoading={isPushing}
+        onContinue={() => void runPushToSitecore(true)}
+        onCancel={() => setBulkDialogOpen(false)}
+      />
     </div>
   );
 }

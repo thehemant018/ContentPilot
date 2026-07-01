@@ -19,6 +19,9 @@ export async function POST(request: Request) {
     const body = (await request.json()) as {
       mediaLibraryPath?: string;
       queue?: MigrationQueueItem[];
+      createMissingPages?: boolean;
+      pageTemplatePath?: string;
+      sxaPageDataTemplatePath?: string;
     };
 
     if (!body.queue?.length) {
@@ -37,6 +40,9 @@ export async function POST(request: Request) {
       {
         mediaLibraryPath: body.mediaLibraryPath ?? "",
         queue: body.queue,
+        createMissingPages: body.createMissingPages ?? false,
+        pageTemplatePath: body.pageTemplatePath,
+        sxaPageDataTemplatePath: body.sxaPageDataTemplatePath,
       },
     );
 
