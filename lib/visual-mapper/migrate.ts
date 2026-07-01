@@ -1,5 +1,6 @@
 import type { BlockMatchResult } from "@/types/ai-match";
 import type { MappingEntry } from "@/types/visual-mapper";
+import { mappingEntryBlockId } from "@/lib/visual-mapper/template-key";
 
 export function mappingEntriesToBlockMatchResults(
   entries: MappingEntry[],
@@ -15,7 +16,7 @@ export function mappingEntriesToBlockMatchResults(
     );
 
     return {
-      blockId: entry.id,
+      blockId: mappingEntryBlockId(entry),
       pageUrl: entry.sourcePageUrl || pageUrl,
       blockType: "unknown",
       blockHeading: firstTextField?.value ?? pageTitle,

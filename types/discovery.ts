@@ -49,6 +49,10 @@ export interface DiscoveryResult {
   message: string;
   /** Media library folder for crawled image uploads during migrate push. */
   mediaPath?: string;
+  /** Optional Sitecore page template path used when creating missing target pages. */
+  pageTemplatePath?: string;
+  /** SXA Page Data template for the page-level Data item under new pages. */
+  sxaPageDataTemplatePath?: string;
   /** Included only on failed discovery (paths not found). */
   pathValidation?: PathValidationResult[];
   renderings?: DiscoveryItem[];

@@ -57,6 +57,72 @@ export function appendVisualMapperToMigrationQueue(
   };
 }
 
+export interface BulkQueuePageInput {
+  mappings: MappingEntry[];
+  pageUrl: string;
+  pageTitle: string;
+  targetPagePath: string;
+}
+
+/** Build queue items for bulk-applied pages without modifying the stored queue. */
+export function buildBulkApplyQueueItems(
+  pages: BulkQueuePageInput[],
+): MigrationQueueItem[] {
+  const items: MigrationQueueItem[] = [];
+
+  for (const page of pages) {
+    if (page.mappings.length === 0) {
+      continue;
+    }
+
+    items.push(
+      ...mappingEntriesToQueueItems(
+        page.mappings,
+        page.pageUrl,
+        page.pageTitle,
+        page.targetPagePath,
+      ),
+    );
+  }
+
+  return items;
+}
+
+/** Add bulk-applied pages to the review queue without duplicates. */
+export function appendBulkApplyToMigrationQueue(
+  pages: BulkQueuePageInput[],
+): { added: number; skipped: number; items: MigrationQueueItem[] } {
+  let added = 0;
+  let skipped = 0;
+  let items = getMigrationQueue();
+
+  for (const page of pages) {
+    if (page.mappings.length === 0) {
+      continue;
+    }
+
+    const newItems = mappingEntriesToQueueItems(
+      page.mappings,
+      page.pageUrl,
+      page.pageTitle,
+      page.targetPagePath,
+    );
+    const existingKeys = new Set(
+      items.map((item) => queueItemKey(item.blockId, item.sourcePageUrl)),
+    );
+    const toAdd = newItems.filter(
+      (item) =>
+        !existingKeys.has(queueItemKey(item.blockId, item.sourcePageUrl)),
+    );
+    skipped += newItems.length - toAdd.length;
+    added += toAdd.length;
+    items = [...items, ...toAdd];
+  }
+
+  saveMigrationQueue(items);
+  return { added, skipped, items };
+}
+
 export function enqueueVisualMapperMappings(
   entries: MappingEntry[],
   pageUrl: string,

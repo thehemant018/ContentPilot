@@ -3,6 +3,7 @@
 import { RenderingPicker } from "@/components/visual-mapper/RenderingPicker";
 import { FieldAssignmentTable } from "@/components/visual-mapper/FieldAssignmentTable";
 import { MappingsTable } from "@/components/visual-mapper/MappingsTable";
+import { BulkApplyPanel } from "@/components/visual-mapper/BulkApplyPanel";
 import { visualMapperInputMonoClass } from "@/components/visual-mapper/form-styles";
 import { useVisualMapperStore } from "@/lib/visual-mapper/store";
 
@@ -297,6 +298,14 @@ export function MappingPanel({
             />
           </div>
         </section>
+
+        {mappings.length > 0 && sourcePageUrl && (
+          <BulkApplyPanel
+            mappings={mappings}
+            templatePageUrl={sourcePageUrl}
+            defaultTargetPagePath={targetPagePath}
+          />
+        )}
       </div>
     </div>
   );

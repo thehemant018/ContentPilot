@@ -2,18 +2,27 @@ import { VALIDATE_PATH_QUERY } from "@/lib/sitecore/discovery/queries";
 import { normalizeSitecoreItemPath } from "@/lib/migration/sitecore-path";
 import { executeGraphQL } from "@/lib/sitecore/graphql-client";
 
+export interface SitecoreItemRef {
+  itemId: string;
+  name: string;
+  path: string;
+}
+
+export interface SitecoreItemWithTemplate extends SitecoreItemRef {
+  templateId?: string;
+  templateName?: string;
+}
+
 interface ValidatePathGraphResult {
   item?: {
     itemId?: string;
     name?: string;
     path?: string;
+    template?: {
+      name?: string;
+      templateId?: string;
+    } | null;
   } | null;
-}
-
-export interface SitecoreItemRef {
-  itemId: string;
-  name: string;
-  path: string;
 }
 
 export async function getSitecoreItemByPath(
@@ -21,6 +30,26 @@ export async function getSitecoreItemByPath(
   accessToken: string,
   itemPath: string,
 ): Promise<SitecoreItemRef | null> {
+  const item = await getSitecoreItemWithTemplate(
+    instanceUrl,
+    accessToken,
+    itemPath,
+  );
+  if (!item) {
+    return null;
+  }
+  return {
+    itemId: item.itemId,
+    name: item.name,
+    path: item.path,
+  };
+}
+
+export async function getSitecoreItemWithTemplate(
+  instanceUrl: string,
+  accessToken: string,
+  itemPath: string,
+): Promise<SitecoreItemWithTemplate | null> {
   const data = await executeGraphQL<ValidatePathGraphResult>(
     instanceUrl,
     accessToken,
@@ -36,6 +65,8 @@ export async function getSitecoreItemByPath(
     itemId: data.item.itemId,
     name: data.item.name ?? "",
     path: data.item.path,
+    templateId: data.item.template?.templateId,
+    templateName: data.item.template?.name,
   };
 }
 

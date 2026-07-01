@@ -9,6 +9,7 @@ import {
 } from "@/lib/visual-mapper/auto-suggest-fields";
 import type { LinkKind } from "@/lib/migration/link-field";
 import { ensureLinkFieldStoredValue, formatLinkPreview, isLinkField, parseLinkFieldValue } from "@/lib/migration/link-field";
+import { componentTemplateKey } from "@/lib/visual-mapper/template-key";
 import {
   buildDraftRenderingInfo,
   findTemplateForRendering,
@@ -322,8 +323,14 @@ export const useVisualMapperStore = create<VisualMapperStore>((set, get) => ({
       return false;
     }
 
+    const templateKey = componentTemplateKey(
+      draftRendering.renderingName,
+      selectedElement.selector,
+    );
+
     const entry: MappingEntry = {
       id: nanoid(),
+      templateKey,
       sourceSelector: selectedElement.selector,
       sourcePageUrl: session.sourceUrl,
       renderingName: draftRendering.renderingName,

@@ -47,6 +47,8 @@ export function slimDiscoveryResult(result: DiscoveryResult): DiscoveryResult {
     success: true,
     message: result.message,
     mediaPath: result.mediaPath,
+    pageTemplatePath: result.pageTemplatePath,
+    sxaPageDataTemplatePath: result.sxaPageDataTemplatePath,
     renderings: (result.renderings ?? []).map(slimRendering),
     templates: (result.templates ?? [])
       .filter(isDatasourceTemplate)

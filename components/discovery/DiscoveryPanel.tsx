@@ -12,7 +12,8 @@ import { DiscoveryResults } from "@/components/discovery/DiscoveryResults";
 import { SiteSelector } from "@/components/discovery/SiteSelector";
 import { NextPhaseButton } from "@/components/workflow/NextPhaseButton";
 import { markDiscoveryPhaseComplete } from "@/lib/workflow/progress";
-import { saveDiscoveryResult } from "@/lib/storage/workflow-data";
+import { saveDiscoveryResult, getDiscoveryResult } from "@/lib/storage/workflow-data";
+import { DEFAULT_SXA_PAGE_DATA_TEMPLATE_PATH } from "@/lib/migration/sxa-page-structure";
 import { saveVisualMapperSiteId } from "@/lib/visual-mapper/session-storage";
 
 const DEFAULT_RENDERINGS_PATH = "/sitecore/layout/Renderings";
@@ -26,6 +27,10 @@ export function DiscoveryPanel({ embedded = false }: { embedded?: boolean }) {
   const [renderingsPath, setRenderingsPath] = useState(DEFAULT_RENDERINGS_PATH);
   const [mediaPath, setMediaPath] = useState(DEFAULT_MEDIA_PATH);
   const [templatesPath, setTemplatesPath] = useState(DEFAULT_TEMPLATES_PATH);
+  const [pageTemplatePath, setPageTemplatePath] = useState("");
+  const [sxaPageDataTemplatePath, setSxaPageDataTemplatePath] = useState(
+    DEFAULT_SXA_PAGE_DATA_TEMPLATE_PATH,
+  );
   const [isLoadingSites, setIsLoadingSites] = useState(false);
   const [isDiscovering, setIsDiscovering] = useState(false);
   const [feedback, setFeedback] = useState<{
@@ -79,6 +84,13 @@ export function DiscoveryPanel({ embedded = false }: { embedded?: boolean }) {
   useEffect(() => {
     queueMicrotask(() => {
       refreshConnectionState();
+      const saved = getDiscoveryResult();
+      if (saved?.pageTemplatePath) {
+        setPageTemplatePath(saved.pageTemplatePath);
+      }
+      if (saved?.sxaPageDataTemplatePath) {
+        setSxaPageDataTemplatePath(saved.sxaPageDataTemplatePath);
+      }
     });
 
     function handleSessionChange() {
@@ -138,7 +150,11 @@ export function DiscoveryPanel({ embedded = false }: { embedded?: boolean }) {
 
       if (payload.success) {
         markDiscoveryPhaseComplete();
-        saveDiscoveryResult(payload);
+        saveDiscoveryResult({
+          ...payload,
+          pageTemplatePath: pageTemplatePath.trim() || undefined,
+          sxaPageDataTemplatePath: sxaPageDataTemplatePath.trim() || undefined,
+        });
         if (selectedSite) {
           saveVisualMapperSiteId(selectedSite.name);
         }
@@ -292,6 +308,48 @@ export function DiscoveryPanel({ embedded = false }: { embedded?: boolean }) {
                 placeholder="/sitecore/templates/Feature/YourProject"
                 className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 font-mono text-sm text-zinc-900 outline-none ring-teal-500 focus:border-teal-500 focus:ring-2"
               />
+            </div>
+
+            <div>
+              <label
+                htmlFor="pageTemplatePath"
+                className="block text-sm font-medium text-zinc-700"
+              >
+                Page template path (optional)
+              </label>
+              <input
+                id="pageTemplatePath"
+                value={pageTemplatePath}
+                onChange={(event) => setPageTemplatePath(event.target.value)}
+                placeholder="/sitecore/templates/Project/Page"
+                className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 font-mono text-sm text-zinc-900 outline-none ring-teal-500 focus:border-teal-500 focus:ring-2"
+              />
+              <p className="mt-1 text-xs text-zinc-500">
+                Used when creating missing target pages during migrate push. If
+                empty, MigrateX infers the template from a sibling page.
+              </p>
+            </div>
+
+            <div>
+              <label
+                htmlFor="sxaPageDataTemplatePath"
+                className="block text-sm font-medium text-zinc-700"
+              >
+                SXA Page Data template path (optional)
+              </label>
+              <input
+                id="sxaPageDataTemplatePath"
+                value={sxaPageDataTemplatePath}
+                onChange={(event) =>
+                  setSxaPageDataTemplatePath(event.target.value)
+                }
+                placeholder={DEFAULT_SXA_PAGE_DATA_TEMPLATE_PATH}
+                className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 font-mono text-sm text-zinc-900 outline-none ring-teal-500 focus:border-teal-500 focus:ring-2"
+              />
+              <p className="mt-1 text-xs text-zinc-500">
+                Template for the page-level <span className="font-mono">Data</span>{" "}
+                item created under new SXA pages during migrate push.
+              </p>
             </div>
           </div>
 
