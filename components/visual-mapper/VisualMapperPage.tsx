@@ -33,6 +33,15 @@ import {
 } from "@/lib/workflow/progress";
 import { saveMigrationMode } from "@/lib/workflow/migration-mode";
 import { summarizePushResult } from "@/lib/migration/push-feedback";
+import {
+  applyPushResultToPageProgress,
+  ensureTargetPagesWithProgress,
+  markPagesAsPushing,
+} from "@/lib/migration/ensure-target-page-client";
+import {
+  initialPageProgressItems,
+  type TargetPageProgressItem,
+} from "@/types/migration-page-progress";
 import type { MigrationPushResult } from "@/types/migration-export";
 
 export function VisualMapperPage() {
@@ -47,6 +56,12 @@ export function VisualMapperPage() {
   const [isMigrating, setIsMigrating] = useState(false);
   const [missingPageDialogOpen, setMissingPageDialogOpen] = useState(false);
   const [pendingTargetPagePath, setPendingTargetPagePath] = useState("");
+  const [pageProgressItems, setPageProgressItems] = useState<
+    TargetPageProgressItem[]
+  >([]);
+  const [pageProgressPhase, setPageProgressPhase] = useState<
+    "creating" | "pushing" | "done"
+  >("creating");
 
   const session = useVisualMapperStore((s) => s.session);
   const resetStore = useVisualMapperStore((s) => s.resetStore);
@@ -165,6 +180,9 @@ export function VisualMapperPage() {
     setIsMigrating(true);
     setFeedback(null);
 
+    let shouldCreatePages = createMissingPages;
+    let progressItems: TargetPageProgressItem[] = [];
+
     try {
       const { items, partialCount } = enqueueVisualMapperMappings(
         session.mappings,
@@ -180,13 +198,48 @@ export function VisualMapperPage() {
         });
       }
 
+      if (createMissingPages && targetPagePath.trim()) {
+        progressItems = initialPageProgressItems([targetPagePath], []);
+        setPageProgressItems(progressItems);
+        setPageProgressPhase("creating");
+
+        const ensureResult = await ensureTargetPagesWithProgress({
+          paths: [targetPagePath],
+          existingPaths: [],
+          pageTemplatePath,
+          sxaPageDataTemplatePath,
+          onProgress: (items) => {
+            progressItems = items;
+            setPageProgressItems(items);
+          },
+        });
+
+        if (!ensureResult.success) {
+          progressItems = ensureResult.items;
+          setPageProgressItems(progressItems);
+          setPageProgressPhase("done");
+          migrationFailed("Failed to create target page.");
+          setFeedback({
+            type: "error",
+            message: "Failed to create target page. See progress in the dialog.",
+          });
+          await new Promise((resolve) => setTimeout(resolve, 2500));
+          return;
+        }
+
+        progressItems = markPagesAsPushing(ensureResult.items);
+        setPageProgressItems(progressItems);
+        setPageProgressPhase("pushing");
+        shouldCreatePages = false;
+      }
+
       const response = await sitecoreApiFetch("/api/migration/push", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           mediaLibraryPath,
           queue: items,
-          createMissingPages,
+          createMissingPages: shouldCreatePages,
           pageTemplatePath,
           sxaPageDataTemplatePath,
         }),
@@ -194,12 +247,24 @@ export function VisualMapperPage() {
 
       const payload = (await response.json()) as MigrationPushResult;
 
+      if (createMissingPages && targetPagePath.trim()) {
+        progressItems = applyPushResultToPageProgress(
+          progressItems,
+          payload.results ?? [],
+        );
+        setPageProgressItems(progressItems);
+        setPageProgressPhase("done");
+      }
+
       if (!response.ok) {
         migrationFailed(payload.message ?? "Migration failed.");
         setFeedback({
           type: "error",
           message: payload.message ?? "Migration failed.",
         });
+        if (createMissingPages) {
+          await new Promise((resolve) => setTimeout(resolve, 1500));
+        }
         return;
       }
 
@@ -208,12 +273,19 @@ export function VisualMapperPage() {
       if (summary.type === "error") {
         migrationFailed(summary.message);
         setFeedback(summary);
+        if (createMissingPages) {
+          await new Promise((resolve) => setTimeout(resolve, 1500));
+        }
         return;
       }
 
       migrationComplete();
       markMigratePhaseComplete();
       setFeedback(summary);
+
+      if (createMissingPages) {
+        await new Promise((resolve) => setTimeout(resolve, 1200));
+      }
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Migration failed.";
@@ -222,6 +294,8 @@ export function VisualMapperPage() {
     } finally {
       setIsMigrating(false);
       setMissingPageDialogOpen(false);
+      setPageProgressItems([]);
+      setPageProgressPhase("creating");
     }
   }
 
@@ -390,8 +464,15 @@ export function VisualMapperPage() {
         open={missingPageDialogOpen}
         targetPagePath={pendingTargetPagePath}
         isLoading={isMigrating}
+        progressItems={pageProgressItems}
+        progressPhase={pageProgressPhase}
         onCreatePage={() => void handleCreateMissingPageAndMigrate()}
-        onCancel={() => setMissingPageDialogOpen(false)}
+        onCancel={() => {
+          if (!isMigrating) {
+            setMissingPageDialogOpen(false);
+            setPageProgressItems([]);
+          }
+        }}
       />
     </div>
   );

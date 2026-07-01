@@ -29,6 +29,15 @@ import { normalizeMediaUploadPath } from "@/lib/sitecore/media-upload";
 import { getDiscoveryResult } from "@/lib/storage/workflow-data";
 import { getMigrationQueue } from "@/lib/storage/migration-queue";
 import { prepareQueueForMigration } from "@/lib/migration/queue-sync";
+import {
+  applyPushResultToPageProgress,
+  ensureTargetPagesWithProgress,
+  markPagesAsPushing,
+} from "@/lib/migration/ensure-target-page-client";
+import {
+  initialPageProgressItems,
+  type TargetPageProgressItem,
+} from "@/types/migration-page-progress";
 import type { MigrationPushResult } from "@/types/migration-export";
 import type { MigrationQueueItem } from "@/types/migration-queue";
 
@@ -52,7 +61,14 @@ export function MigratePanel({ embedded = false }: { embedded?: boolean }) {
     totalTargetPages: 0,
     missingPaths: [] as string[],
     existingPaths: [] as string[],
+    allTargetPaths: [] as string[],
   });
+  const [pageProgressItems, setPageProgressItems] = useState<
+    TargetPageProgressItem[]
+  >([]);
+  const [pageProgressPhase, setPageProgressPhase] = useState<
+    "creating" | "pushing" | "done"
+  >("creating");
 
   const refreshQueue = useCallback(() => {
     setQueue(prepareQueueForMigration(getMigrationQueue()));
@@ -97,7 +113,13 @@ export function MigratePanel({ embedded = false }: { embedded?: boolean }) {
     [],
   );
 
-  async function runPushToSitecore(createMissingPages: boolean) {
+  async function runPushToSitecore(
+    createMissingPages: boolean,
+    progressContext?: {
+      allPaths: string[];
+      existingPaths: string[];
+    },
+  ) {
     const currentQueue = prepareQueueForMigration(getMigrationQueue());
     const mediaLibraryPath = getDiscoveryResult()?.mediaPath?.trim();
     const pageTemplatePath = getDiscoveryResult()?.pageTemplatePath?.trim();
@@ -116,14 +138,54 @@ export function MigratePanel({ embedded = false }: { embedded?: boolean }) {
     setFeedback(null);
     setPushResult(null);
 
+    let shouldCreatePages = createMissingPages;
+    let progressItems: TargetPageProgressItem[] = [];
+
     try {
+      if (createMissingPages && progressContext) {
+        progressItems = initialPageProgressItems(
+          progressContext.allPaths,
+          progressContext.existingPaths,
+        );
+        setPageProgressItems(progressItems);
+        setPageProgressPhase("creating");
+
+        const ensureResult = await ensureTargetPagesWithProgress({
+          paths: progressContext.allPaths,
+          existingPaths: progressContext.existingPaths,
+          pageTemplatePath,
+          sxaPageDataTemplatePath,
+          onProgress: (items) => {
+            progressItems = items;
+            setPageProgressItems(items);
+          },
+        });
+
+        if (!ensureResult.success) {
+          progressItems = ensureResult.items;
+          setPageProgressItems(progressItems);
+          setPageProgressPhase("done");
+          setFeedback({
+            type: "error",
+            message: "Some target pages could not be created. See progress below.",
+          });
+          await new Promise((resolve) => setTimeout(resolve, 2500));
+          return;
+        }
+
+        progressItems = markPagesAsPushing(ensureResult.items);
+        setPageProgressItems(progressItems);
+        setPageProgressPhase("pushing");
+        shouldCreatePages = false;
+      }
+
       const response = await sitecoreApiFetch("/api/migration/push", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           mediaLibraryPath,
           queue: currentQueue,
-          createMissingPages,
+          createMissingPages: shouldCreatePages,
           pageTemplatePath,
           sxaPageDataTemplatePath,
         }),
@@ -131,6 +193,20 @@ export function MigratePanel({ embedded = false }: { embedded?: boolean }) {
 
       const payload = (await response.json()) as MigrationPushResult;
       setPushResult(payload);
+
+      if (progressContext) {
+        progressItems = applyPushResultToPageProgress(
+          progressItems.length > 0
+            ? progressItems
+            : initialPageProgressItems(
+                progressContext.allPaths,
+                progressContext.existingPaths,
+              ),
+          payload.results ?? [],
+        );
+        setPageProgressItems(progressItems);
+        setPageProgressPhase("done");
+      }
 
       if (!response.ok || !payload.success) {
         setFeedback({
@@ -147,6 +223,10 @@ export function MigratePanel({ embedded = false }: { embedded?: boolean }) {
         type: "success",
         message: payload.message,
       });
+
+      if (progressContext) {
+        await new Promise((resolve) => setTimeout(resolve, 1200));
+      }
     } catch (error) {
       setFeedback({
         type: "error",
@@ -157,6 +237,8 @@ export function MigratePanel({ embedded = false }: { embedded?: boolean }) {
       setIsPushing(false);
       setBulkDialogOpen(false);
       setSingleMissingDialogOpen(false);
+      setPageProgressItems([]);
+      setPageProgressPhase("creating");
     }
   }
 
@@ -222,6 +304,7 @@ export function MigratePanel({ embedded = false }: { embedded?: boolean }) {
           totalTargetPages: targetPaths.length,
           missingPaths,
           existingPaths: validation.existingPaths ?? [],
+          allTargetPaths: targetPaths,
         });
         setBulkDialogOpen(true);
         return;
@@ -468,8 +551,20 @@ export function MigratePanel({ embedded = false }: { embedded?: boolean }) {
         open={singleMissingDialogOpen}
         targetPagePath={pendingMissingPath}
         isLoading={isPushing}
-        onCreatePage={() => void runPushToSitecore(true)}
-        onCancel={() => setSingleMissingDialogOpen(false)}
+        progressItems={pageProgressItems}
+        progressPhase={pageProgressPhase}
+        onCreatePage={() =>
+          void runPushToSitecore(true, {
+            allPaths: [pendingMissingPath],
+            existingPaths: [],
+          })
+        }
+        onCancel={() => {
+          if (!isPushing) {
+            setSingleMissingDialogOpen(false);
+            setPageProgressItems([]);
+          }
+        }}
       />
       <BulkPushTargetPageDialog
         open={bulkDialogOpen}
@@ -479,8 +574,20 @@ export function MigratePanel({ embedded = false }: { embedded?: boolean }) {
         missingPaths={bulkDialogMeta.missingPaths}
         existingPaths={bulkDialogMeta.existingPaths}
         isLoading={isPushing}
-        onContinue={() => void runPushToSitecore(true)}
-        onCancel={() => setBulkDialogOpen(false)}
+        progressItems={pageProgressItems}
+        progressPhase={pageProgressPhase}
+        onContinue={() =>
+          void runPushToSitecore(true, {
+            allPaths: bulkDialogMeta.allTargetPaths,
+            existingPaths: bulkDialogMeta.existingPaths,
+          })
+        }
+        onCancel={() => {
+          if (!isPushing) {
+            setBulkDialogOpen(false);
+            setPageProgressItems([]);
+          }
+        }}
       />
     </div>
   );
