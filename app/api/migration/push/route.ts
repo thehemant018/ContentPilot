@@ -6,6 +6,10 @@ import {
 } from "@/lib/sitecore/request-auth";
 import type { MigrationPushResult } from "@/types/migration-export";
 import type { MigrationQueueItem } from "@/types/migration-queue";
+import type {
+  PlaceholderDefinition,
+  RenderingPlaceholderProfile,
+} from "@/types/discovery";
 
 export const maxDuration = 300;
 
@@ -22,6 +26,8 @@ export async function POST(request: Request) {
       createMissingPages?: boolean;
       pageTemplatePath?: string;
       sxaPageDataTemplatePath?: string;
+      placeholders?: PlaceholderDefinition[];
+      renderingProfiles?: RenderingPlaceholderProfile[];
     };
 
     if (!body.queue?.length) {
@@ -43,6 +49,8 @@ export async function POST(request: Request) {
         createMissingPages: body.createMissingPages ?? false,
         pageTemplatePath: body.pageTemplatePath,
         sxaPageDataTemplatePath: body.sxaPageDataTemplatePath,
+        placeholders: body.placeholders,
+        renderingProfiles: body.renderingProfiles,
       },
     );
 

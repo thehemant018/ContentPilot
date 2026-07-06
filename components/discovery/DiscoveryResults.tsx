@@ -105,6 +105,15 @@ export function DiscoveryResults({ result }: DiscoveryResultsProps) {
             emptyMessage="No rendering items found under the provided path."
           />
 
+          <ItemList
+            title="Placeholder settings"
+            items={(result.placeholders ?? []).map((placeholder) => ({
+              name: `${placeholder.name} (${placeholder.key})`,
+              path: placeholder.path,
+            }))}
+            emptyMessage="No placeholder settings found under the provided path."
+          />
+
           <div className="flex max-h-[32rem] flex-col rounded-xl border border-zinc-200 bg-white p-4">
             <div className="flex shrink-0 items-center justify-between gap-2">
               <h4 className="text-sm font-semibold text-zinc-900">

@@ -14,11 +14,12 @@ export async function POST(request: Request) {
 
   try {
     const body = (await request.json()) as DiscoveryPathsInput;
-    const { siteName, renderingsPath, mediaPath, templatesPath } = body;
+    const { siteName, renderingsPath, placeholdersPath, mediaPath, templatesPath } = body;
 
     if (
       !siteName?.trim() ||
       !renderingsPath?.trim() ||
+      !placeholdersPath?.trim() ||
       !mediaPath?.trim() ||
       !templatesPath?.trim()
     ) {
@@ -26,7 +27,7 @@ export async function POST(request: Request) {
         {
           success: false,
           message:
-            "Site name and all three paths (renderings, media, templates) are required.",
+            "Site name and all four paths (renderings, placeholders, media, templates) are required.",
         },
         { status: 400 },
       );
@@ -35,6 +36,7 @@ export async function POST(request: Request) {
     const result = await runDiscovery(auth.instanceUrl, auth.accessToken, {
       siteName: siteName.trim(),
       renderingsPath: renderingsPath.trim(),
+      placeholdersPath: placeholdersPath.trim(),
       mediaPath: mediaPath.trim(),
       templatesPath: templatesPath.trim(),
     });

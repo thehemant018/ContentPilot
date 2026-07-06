@@ -1,7 +1,9 @@
+import { sortComponentsForPresentationTree } from "@/lib/sitecore/presentation-tree";
 import {
   buildComponentsFromQueue,
   prepareQueueForMigration,
 } from "@/lib/migration/queue-sync";
+import { logPresentationHierarchy } from "@/lib/migration/presentation-debug-log";
 import { resolveLinkFieldsForComponent } from "@/lib/migration/resolve-link-fields";
 import { resolveMediaFieldsForComponent } from "@/lib/migration/resolve-media-fields";
 import { normalizeSitecoreItemPath } from "@/lib/migration/sitecore-path";
@@ -20,13 +22,19 @@ import {
   normalizeMediaUploadPath,
   type UploadMediaResult,
 } from "@/lib/sitecore/media-upload";
-import { addRenderingToPage } from "@/lib/sitecore/presentation-client";
+import {
+  applyPresentationTreeToPage,
+} from "@/lib/sitecore/presentation-client";
 import type {
   MigrationComponentExport,
   MigrationPushComponentResult,
   MigrationPushResult,
 } from "@/types/migration-export";
 import type { MigrationQueueItem } from "@/types/migration-queue";
+import type {
+  PlaceholderDefinition,
+  RenderingPlaceholderProfile,
+} from "@/types/discovery";
 
 async function resolveDatasourceTemplateId(
   instanceUrl: string,
@@ -136,6 +144,8 @@ export interface PushQueueToSitecoreOptions {
   createMissingPages?: boolean;
   pageTemplatePath?: string;
   sxaPageDataTemplatePath?: string;
+  placeholders?: PlaceholderDefinition[];
+  renderingProfiles?: RenderingPlaceholderProfile[];
 }
 
 export async function pushQueueToSitecore(
@@ -143,7 +153,10 @@ export async function pushQueueToSitecore(
   accessToken: string,
   options: PushQueueToSitecoreOptions,
 ): Promise<MigrationPushResult> {
-  let preparedQueue = prepareQueueForMigration(options.queue);
+  let preparedQueue = prepareQueueForMigration(options.queue, {
+    placeholders: options.placeholders,
+    renderingProfiles: options.renderingProfiles,
+  });
 
   if (preparedQueue.length === 0) {
     return {
@@ -239,7 +252,22 @@ export async function pushQueueToSitecore(
   }
 
   const exportedAt = new Date().toISOString();
-  const components = buildComponentsFromQueue(preparedQueue, exportedAt);
+  const components = buildComponentsFromQueue(preparedQueue, exportedAt, {
+    placeholders: options.placeholders,
+    renderingProfiles: options.renderingProfiles,
+  });
+
+  logPresentationHierarchy("pushQueueToSitecore: built component exports", {
+    componentCount: components.length,
+    components: components.map((component) => ({
+      queueItemId: component.queueItemId,
+      renderingName: component.presentation.renderingName,
+      parentQueueItemId: component.presentation.parentQueueItemId,
+      childPlaceholderKey: component.presentation.childPlaceholderKey,
+      placeHolder: component.presentation.placeHolder,
+      presentationDepth: component.presentation.presentationDepth,
+    })),
+  });
 
   if (components.length === 0) {
     return {
@@ -258,7 +286,34 @@ export async function pushQueueToSitecore(
     Array<{ itemId: string; name: string; path: string }>
   >();
 
+  const componentsByPath = new Map<string, MigrationComponentExport[]>();
   for (const component of components) {
+    const pagePath = component.targetPagePath;
+    const group = componentsByPath.get(pagePath) ?? [];
+    group.push(component);
+    componentsByPath.set(pagePath, group);
+  }
+  for (const [pagePath, pageComponents] of componentsByPath) {
+    componentsByPath.set(
+      pagePath,
+      sortComponentsForPresentationTree(pageComponents),
+    );
+  }
+
+  const presentationResults = new Map<
+    string,
+    {
+      assigned: boolean;
+      warningsByQueueId: Map<string, string[]>;
+      assignedQueueIds: Set<string>;
+    }
+  >();
+
+  const componentResults = new Map<string, MigrationPushComponentResult>();
+
+  // Phase 1 — create/update all datasources (parents before children in tree order).
+  const datasourceOrder = sortComponentsForPresentationTree(components);
+  for (const component of datasourceOrder) {
     const result: MigrationPushComponentResult = {
       queueItemId: component.queueItemId,
       sourcePageUrl: component.sourcePageUrl,
@@ -313,35 +368,102 @@ export async function pushQueueToSitecore(
         result.warnings.push(
           "Rendering path missing — datasource saved; assign presentation manually.",
         );
-        results.push(result);
-        pushedCount += 1;
-        continue;
       }
 
-      try {
-        await addRenderingToPage(instanceUrl, accessToken, {
-          itemPath: component.presentation.itemPath,
-          renderingPath,
-          placeHolder: component.presentation.placeHolder,
-          dataSource: component.presentation.dataSource,
-          language: component.presentation.language,
-          finalLayout: component.presentation.finalLayout,
-          index: component.presentation.index,
-        });
-        result.presentationAssigned = true;
-      } catch (presentationError) {
-        result.warnings.push(
-          presentationError instanceof Error
-            ? presentationError.message
-            : "Presentation assignment failed.",
-        );
-      }
-
+      componentResults.set(component.queueItemId, result);
       pushedCount += 1;
     } catch (error) {
       result.error =
         error instanceof Error ? error.message : "Push failed for component.";
       failedCount += 1;
+      componentResults.set(component.queueItemId, result);
+    }
+  }
+
+  // Phase 2 — assign presentation per page after every datasource exists.
+  for (const [pagePath, pageComponents] of componentsByPath) {
+    if (presentationResults.has(pagePath)) {
+      continue;
+    }
+
+    const renderable = pageComponents.filter((component) =>
+      component.presentation.renderingPath?.trim(),
+    );
+    if (renderable.length === 0) {
+      presentationResults.set(pagePath, {
+        assigned: false,
+        warningsByQueueId: new Map(),
+        assignedQueueIds: new Set(),
+      });
+      continue;
+    }
+
+    const lead = renderable[0]!;
+    const warningsByQueueId = new Map<string, string[]>();
+    let assigned = false;
+    const assignedQueueIds = new Set<string>();
+
+    try {
+      const treeResult = await applyPresentationTreeToPage(
+        instanceUrl,
+        accessToken,
+        {
+          itemPath: lead.presentation.itemPath,
+          language: lead.presentation.language,
+          finalLayout: lead.presentation.finalLayout,
+          components: renderable,
+          renderingProfiles: options.renderingProfiles,
+        },
+      );
+      assigned = treeResult.assignedCount > 0;
+      for (const node of treeResult.assigned) {
+        assignedQueueIds.add(node.queueItemId);
+        warningsByQueueId.set(node.queueItemId, [
+          `Placed at placeholder "${node.placeholder}"`,
+        ]);
+      }
+      for (const skip of treeResult.skipped) {
+        warningsByQueueId.set(skip.queueItemId, [skip.reason]);
+      }
+    } catch (presentationError) {
+      const message =
+        presentationError instanceof Error
+          ? presentationError.message
+          : "Presentation assignment failed.";
+      for (const component of renderable) {
+        warningsByQueueId.set(component.queueItemId, [message]);
+      }
+    }
+
+    presentationResults.set(pagePath, {
+      assigned,
+      warningsByQueueId,
+      assignedQueueIds,
+    });
+  }
+
+  for (const component of components) {
+    const result =
+      componentResults.get(component.queueItemId) ??
+      ({
+        queueItemId: component.queueItemId,
+        sourcePageUrl: component.sourcePageUrl,
+        datasourcePath: component.datasource.path,
+        targetPagePath: component.targetPagePath,
+        datasourceCreated: false,
+        datasourceUpdated: false,
+        presentationAssigned: false,
+        warnings: [],
+      } satisfies MigrationPushComponentResult);
+
+    const presentation = presentationResults.get(component.targetPagePath);
+    if (presentation) {
+      result.presentationAssigned = presentation.assignedQueueIds.has(
+        component.queueItemId,
+      );
+      const presentationWarnings =
+        presentation.warningsByQueueId.get(component.queueItemId) ?? [];
+      result.warnings.push(...presentationWarnings);
     }
 
     results.push(result);

@@ -4,6 +4,10 @@ import {
   TEMPLATE_STRUCTURE_QUERY,
   VALIDATE_PATH_QUERY,
 } from "@/lib/sitecore/discovery/queries";
+import {
+  fetchPlaceholderDefinitions,
+  fetchRenderingPlaceholderProfiles,
+} from "@/lib/sitecore/discovery/placeholders";
 import { slimDiscoveryResult } from "@/lib/sitecore/discovery/slim-result";
 import { executeGraphQL } from "@/lib/sitecore/graphql-client";
 import type {
@@ -238,11 +242,13 @@ export async function runDiscovery(
   input: DiscoveryPathsInput,
 ): Promise<DiscoveryResult> {
   const renderingsPath = normalizePath(input.renderingsPath);
+  const placeholdersPath = normalizePath(input.placeholdersPath);
   const mediaPath = normalizePath(input.mediaPath);
   const templatesPath = normalizePath(input.templatesPath);
 
   const pathValidation = await Promise.all([
     validatePath(instanceUrl, accessToken, renderingsPath, "Renderings"),
+    validatePath(instanceUrl, accessToken, placeholdersPath, "Placeholders"),
     validatePath(instanceUrl, accessToken, mediaPath, "Media"),
     validatePath(instanceUrl, accessToken, templatesPath, "Templates"),
   ]);
@@ -262,8 +268,9 @@ export async function runDiscovery(
     });
   }
 
-  const [renderingItems, templates] = await Promise.all([
+  const [renderingItems, placeholders, templates] = await Promise.all([
     searchItemsUnderPath(instanceUrl, accessToken, renderingsPath),
+    fetchPlaceholderDefinitions(instanceUrl, accessToken, placeholdersPath),
     fetchTemplateDefinitions(instanceUrl, accessToken, templatesPath),
   ]);
 
@@ -273,11 +280,21 @@ export async function runDiscovery(
       RENDERING_TEMPLATE_NAMES.has(item.templateName),
   );
 
+  const renderingProfiles = await fetchRenderingPlaceholderProfiles(
+    instanceUrl,
+    accessToken,
+    renderings,
+    placeholders,
+  );
+
   return slimDiscoveryResult({
     success: true,
     message: `Discovery complete for site "${input.siteName}". All paths verified (read-only).`,
     mediaPath,
+    placeholdersPath,
     renderings,
+    placeholders,
+    renderingProfiles,
     templates,
   });
 }

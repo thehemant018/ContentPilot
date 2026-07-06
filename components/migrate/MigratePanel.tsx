@@ -71,7 +71,13 @@ export function MigratePanel({ embedded = false }: { embedded?: boolean }) {
   >("creating");
 
   const refreshQueue = useCallback(() => {
-    setQueue(prepareQueueForMigration(getMigrationQueue()));
+    const discovery = getDiscoveryResult();
+    setQueue(
+      prepareQueueForMigration(getMigrationQueue(), {
+        placeholders: discovery?.placeholders,
+        renderingProfiles: discovery?.renderingProfiles,
+      }),
+    );
   }, []);
 
   const showMigrateAnother = migrationComplete || feedback?.type === "success";
@@ -120,11 +126,15 @@ export function MigratePanel({ embedded = false }: { embedded?: boolean }) {
       existingPaths: string[];
     },
   ) {
-    const currentQueue = prepareQueueForMigration(getMigrationQueue());
-    const mediaLibraryPath = getDiscoveryResult()?.mediaPath?.trim();
-    const pageTemplatePath = getDiscoveryResult()?.pageTemplatePath?.trim();
+    const discovery = getDiscoveryResult();
+    const currentQueue = prepareQueueForMigration(getMigrationQueue(), {
+      placeholders: discovery?.placeholders,
+      renderingProfiles: discovery?.renderingProfiles,
+    });
+    const mediaLibraryPath = discovery?.mediaPath?.trim();
+    const pageTemplatePath = discovery?.pageTemplatePath?.trim();
     const sxaPageDataTemplatePath =
-      getDiscoveryResult()?.sxaPageDataTemplatePath?.trim();
+      discovery?.sxaPageDataTemplatePath?.trim();
 
     if (!mediaLibraryPath) {
       setFeedback({
@@ -188,6 +198,8 @@ export function MigratePanel({ embedded = false }: { embedded?: boolean }) {
           createMissingPages: shouldCreatePages,
           pageTemplatePath,
           sxaPageDataTemplatePath,
+          placeholders: discovery?.placeholders,
+          renderingProfiles: discovery?.renderingProfiles,
         }),
       });
 
@@ -243,7 +255,11 @@ export function MigratePanel({ embedded = false }: { embedded?: boolean }) {
   }
 
   async function handlePushToSitecore(): Promise<void> {
-    const currentQueue = prepareQueueForMigration(getMigrationQueue());
+    const discovery = getDiscoveryResult();
+    const currentQueue = prepareQueueForMigration(getMigrationQueue(), {
+      placeholders: discovery?.placeholders,
+      renderingProfiles: discovery?.renderingProfiles,
+    });
     refreshQueue();
 
     if (currentQueue.length === 0) {

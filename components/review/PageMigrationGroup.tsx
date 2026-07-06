@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { useMemo } from "react";
 import { QueueItemCard } from "@/components/review/QueueItemCard";
 import {
   reviewInputClass,
@@ -11,6 +12,8 @@ import {
   DEFAULT_MIGRATION_LANGUAGE,
   DEFAULT_PRESENTATION_PLACEHOLDER,
 } from "@/lib/migration/constants";
+import { listPageRootPlaceholderKeys } from "@/lib/migration/placeholder-registry";
+import { getDiscoveryResult } from "@/lib/storage/workflow-data";
 import type { MigrationQueueItem } from "@/types/migration-queue";
 
 interface PageMigrationGroupProps {
@@ -28,7 +31,7 @@ interface PageMigrationGroupProps {
   onUpdateItem: (
     id: string,
     updates: Partial<
-      Pick<MigrationQueueItem, "fields" | "datasourcePath">
+      Pick<MigrationQueueItem, "fields" | "datasourcePath" | "childPlaceholderKey">
     >,
   ) => void;
   onRemoveItem: (id: string) => void;
@@ -97,6 +100,7 @@ function PageGroupBody({
   placeholder,
   language,
   items,
+  pagePlaceholderKeys,
   onUpdatePageSettings,
   onUpdateItem,
   onRemoveItem,
@@ -107,10 +111,22 @@ function PageGroupBody({
   placeholder: string;
   language: string;
   items: MigrationQueueItem[];
+  pagePlaceholderKeys: string[];
   onUpdatePageSettings: PageMigrationGroupProps["onUpdatePageSettings"];
   onUpdateItem: PageMigrationGroupProps["onUpdateItem"];
   onRemoveItem: PageMigrationGroupProps["onRemoveItem"];
 }) {
+  const sortedItems = [...items].sort((left, right) => {
+    const leftDepth = left.presentationDepth ?? 0;
+    const rightDepth = right.presentationDepth ?? 0;
+    if (leftDepth !== rightDepth) {
+      return leftDepth - rightDepth;
+    }
+    const leftSibling = left.presentationSiblingIndex ?? 0;
+    const rightSibling = right.presentationSiblingIndex ?? 0;
+    return leftSibling - rightSibling;
+  });
+
   return (
     <>
       <div className={reviewSettingsPanelClass}>
@@ -145,29 +161,43 @@ function PageGroupBody({
               htmlFor={`placeholder-page-${lead.id}`}
               className={reviewLabelClass}
             >
-              Presentation placeholder
+              Page placeholder
             </label>
-            <input
-              id={`placeholder-page-${lead.id}`}
-              type="text"
-              value={placeholder}
-              onChange={(event) =>
-                onUpdatePageSettings(sourcePageUrl, {
-                  placeholder: event.target.value,
-                })
-              }
-              placeholder={DEFAULT_PRESENTATION_PLACEHOLDER}
-              className={reviewInputClass}
-            />
+            {pagePlaceholderKeys.length > 0 ? (
+              <select
+                id={`placeholder-page-${lead.id}`}
+                value={placeholder}
+                onChange={(event) =>
+                  onUpdatePageSettings(sourcePageUrl, {
+                    placeholder: event.target.value,
+                  })
+                }
+                className={reviewInputClass}
+              >
+                {pagePlaceholderKeys.map((key) => (
+                  <option key={key} value={key}>
+                    {key}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <input
+                id={`placeholder-page-${lead.id}`}
+                type="text"
+                value={placeholder}
+                onChange={(event) =>
+                  onUpdatePageSettings(sourcePageUrl, {
+                    placeholder: event.target.value,
+                  })
+                }
+                placeholder={DEFAULT_PRESENTATION_PLACEHOLDER}
+                className={reviewInputClass}
+              />
+            )}
             <p className="mt-1.5 text-xs text-zinc-600">
-              Enter the base placeholder key (for example{" "}
-              <span className="font-mono font-medium text-zinc-800">
-                headless-main
-              </span>
-              ). MigrateX resolves dynamic keys from the page layout at push
-              time, including partial-design{" "}
-              <span className="font-mono font-medium text-zinc-800">sig</span>{" "}
-              placeholders.
+              Root placeholder for page-level components (from Placeholder
+              Settings when Discovery includes a placeholders path). Nested
+              children use parent exposed placeholders automatically.
             </p>
           </div>
           <div>
@@ -194,14 +224,21 @@ function PageGroupBody({
       </div>
 
       <div className="mt-5 space-y-4">
-        {items.map((item) => (
-          <QueueItemCard
-            key={item.id}
-            item={item}
-            onUpdate={onUpdateItem}
-            onRemove={onRemoveItem}
-          />
-        ))}
+        {sortedItems.map((item) => (
+            <div
+              key={item.id}
+              style={{
+                marginLeft: `${Math.min(item.presentationDepth ?? 0, 4) * 1.25}rem`,
+              }}
+            >
+              <QueueItemCard
+                item={item}
+                pageItems={items}
+                onUpdate={onUpdateItem}
+                onRemove={onRemoveItem}
+              />
+            </div>
+          ))}
       </div>
     </>
   );
@@ -250,6 +287,14 @@ export function PageMigrationGroup({
   const renderingSummary = [
     ...new Set(items.map((item) => item.renderingName).filter(Boolean)),
   ];
+  const pagePlaceholderKeys = useMemo(() => {
+    const discovery = getDiscoveryResult();
+    const keys = listPageRootPlaceholderKeys(discovery?.placeholders);
+    if (keys.length > 0) {
+      return keys;
+    }
+    return [placeholder];
+  }, [placeholder]);
 
   return (
     <section className="rounded-2xl border border-zinc-200 bg-zinc-50 p-5">
@@ -270,6 +315,7 @@ export function PageMigrationGroup({
           placeholder={placeholder}
           language={language}
           items={items}
+          pagePlaceholderKeys={pagePlaceholderKeys}
           onUpdatePageSettings={onUpdatePageSettings}
           onUpdateItem={onUpdateItem}
           onRemoveItem={onRemoveItem}

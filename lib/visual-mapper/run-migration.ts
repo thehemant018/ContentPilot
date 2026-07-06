@@ -1,20 +1,52 @@
 import { queueItemFromMatch, queueItemKey } from "@/lib/migration-queue/from-match";
+import { prepareQueueForMigration } from "@/lib/migration/queue-sync";
 import { prepareVisualMapperMigration } from "@/lib/visual-mapper/migrate";
+import { inferVisualMapperParentBlockIds } from "@/lib/visual-mapper/queue-hierarchy";
+import { mappingEntryBlockId } from "@/lib/visual-mapper/template-key";
 import { getMigrationQueue, saveMigrationQueue } from "@/lib/storage/migration-queue";
+import { getDiscoveryResult } from "@/lib/storage/workflow-data";
 import type { BlockMatchResult } from "@/types/ai-match";
+import type { RenderingPlaceholderProfile } from "@/types/discovery";
 import type { MappingEntry } from "@/types/visual-mapper";
 import type { MigrationQueueItem } from "@/types/migration-queue";
+
+function prepareVisualMapperQueueItems(
+  items: MigrationQueueItem[],
+  renderingProfiles?: RenderingPlaceholderProfile[],
+): MigrationQueueItem[] {
+  const discovery = getDiscoveryResult();
+  return prepareQueueForMigration(items, {
+    placeholders: discovery?.placeholders,
+    renderingProfiles: renderingProfiles ?? discovery?.renderingProfiles,
+  });
+}
 
 export function mappingEntriesToQueueItems(
   entries: MappingEntry[],
   pageUrl: string,
   pageTitle: string,
   targetPagePath: string,
+  renderingProfiles?: RenderingPlaceholderProfile[],
 ): MigrationQueueItem[] {
   const { matches } = prepareVisualMapperMigration(entries, pageUrl, pageTitle);
+  const parentBlockIdByEntryId = inferVisualMapperParentBlockIds(entries);
+  const matchByBlockId = new Map(
+    matches.map((match) => [match.blockId, match]),
+  );
 
-  return matches.map((match) => {
-    const item = queueItemFromMatch(match);
+  const rawItems = entries.map((entry) => {
+    const blockId = mappingEntryBlockId(entry);
+    const match =
+      matchByBlockId.get(blockId) ??
+      matches.find((candidate) => candidate.blockId === entry.id);
+    if (!match) {
+      throw new Error(`Missing match for visual mapper entry ${entry.id}`);
+    }
+
+    const item = queueItemFromMatch(match, [], {
+      parentBlockId: parentBlockIdByEntryId.get(entry.id),
+    });
+
     return {
       ...item,
       targetPagePath: targetPagePath.trim(),
@@ -26,6 +58,8 @@ export function mappingEntriesToQueueItems(
       })),
     };
   });
+
+  return prepareVisualMapperQueueItems(rawItems, renderingProfiles);
 }
 
 export function appendVisualMapperToMigrationQueue(
@@ -49,11 +83,12 @@ export function appendVisualMapperToMigrationQueue(
       !existingKeys.has(queueItemKey(item.blockId, item.sourcePageUrl)),
   );
   const merged = [...existing, ...toAdd];
-  saveMigrationQueue(merged);
+  const prepared = prepareVisualMapperQueueItems(merged);
+  saveMigrationQueue(prepared);
   return {
     added: toAdd.length,
     skipped: newItems.length - toAdd.length,
-    items: merged,
+    items: prepared,
   };
 }
 
@@ -119,8 +154,9 @@ export function appendBulkApplyToMigrationQueue(
     items = [...items, ...toAdd];
   }
 
-  saveMigrationQueue(items);
-  return { added, skipped, items };
+  const prepared = prepareVisualMapperQueueItems(items);
+  saveMigrationQueue(prepared);
+  return { added, skipped, items: prepared };
 }
 
 export function enqueueVisualMapperMappings(

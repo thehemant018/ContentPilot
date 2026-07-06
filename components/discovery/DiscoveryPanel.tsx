@@ -17,6 +17,7 @@ import { DEFAULT_SXA_PAGE_DATA_TEMPLATE_PATH } from "@/lib/migration/sxa-page-st
 import { saveVisualMapperSiteId } from "@/lib/visual-mapper/session-storage";
 
 const DEFAULT_RENDERINGS_PATH = "/sitecore/layout/Renderings";
+const DEFAULT_PLACEHOLDERS_PATH = "/sitecore/layout/Placeholder Settings";
 const DEFAULT_MEDIA_PATH = "/sitecore/media";
 const DEFAULT_TEMPLATES_PATH = "/sitecore/templates";
 
@@ -25,6 +26,7 @@ export function DiscoveryPanel({ embedded = false }: { embedded?: boolean }) {
   const [sites, setSites] = useState<SitecoreSite[]>([]);
   const [selectedSite, setSelectedSite] = useState<SitecoreSite | null>(null);
   const [renderingsPath, setRenderingsPath] = useState(DEFAULT_RENDERINGS_PATH);
+  const [placeholdersPath, setPlaceholdersPath] = useState(DEFAULT_PLACEHOLDERS_PATH);
   const [mediaPath, setMediaPath] = useState(DEFAULT_MEDIA_PATH);
   const [templatesPath, setTemplatesPath] = useState(DEFAULT_TEMPLATES_PATH);
   const [pageTemplatePath, setPageTemplatePath] = useState("");
@@ -135,6 +137,7 @@ export function DiscoveryPanel({ embedded = false }: { embedded?: boolean }) {
         body: JSON.stringify({
           siteName: selectedSite.name,
           renderingsPath,
+          placeholdersPath,
           mediaPath,
           templatesPath,
         }),
@@ -225,7 +228,7 @@ export function DiscoveryPanel({ embedded = false }: { embedded?: boolean }) {
             Site &amp; template discovery
           </h2>
           <p className="mt-2 max-w-3xl text-sm leading-relaxed text-zinc-600">
-            Select a site, then provide the renderings, media, and templates
+            Select a site, then provide the renderings, placeholders, media, and templates
             paths for MigrateX to verify. When all paths exist, we load the
             target schema — read-only, nothing is modified in Sitecore.
           </p>
@@ -254,8 +257,8 @@ export function DiscoveryPanel({ embedded = false }: { embedded?: boolean }) {
           </h3>
           <p className="text-sm text-zinc-600">
             Enter the Sitecore item paths where your project keeps renderings,
-            media, and templates. We check each path exists before loading
-            related items.
+            placeholder settings, media, and templates. We check each path exists
+            before loading related items.
           </p>
 
           <div className="grid gap-4 md:grid-cols-1">
@@ -272,6 +275,23 @@ export function DiscoveryPanel({ embedded = false }: { embedded?: boolean }) {
                 onChange={(event) => setRenderingsPath(event.target.value)}
                 required
                 placeholder="/sitecore/layout/Renderings/Feature/YourProject"
+                className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 font-mono text-sm text-zinc-900 outline-none ring-teal-500 focus:border-teal-500 focus:ring-2"
+              />
+            </div>
+
+            <div>
+              <label
+                htmlFor="placeholdersPath"
+                className="block text-sm font-medium text-zinc-700"
+              >
+                Placeholder settings path
+              </label>
+              <input
+                id="placeholdersPath"
+                value={placeholdersPath}
+                onChange={(event) => setPlaceholdersPath(event.target.value)}
+                required
+                placeholder="/sitecore/layout/Placeholder Settings/Feature/YourProject"
                 className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 font-mono text-sm text-zinc-900 outline-none ring-teal-500 focus:border-teal-500 focus:ring-2"
               />
             </div>

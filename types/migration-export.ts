@@ -24,6 +24,11 @@ export interface MigrationPresentationExport {
   finalLayout: boolean;
   language: string;
   index: number;
+  parentQueueItemId?: string;
+  childPlaceholderKey?: string;
+  presentationDepth?: number;
+  presentationSiblingIndex?: number;
+  dynamicPlaceholderId?: number;
 }
 
 export interface MigrationComponentExport {

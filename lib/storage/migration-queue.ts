@@ -4,12 +4,17 @@ import {
 } from "@/lib/migration-queue/from-match";
 import { DEFAULT_PRESENTATION_PLACEHOLDER } from "@/lib/migration/constants";
 import {
+  linkQueueHierarchy,
+  applyDiscoveryPlaceholderDefaults,
+} from "@/lib/migration/queue-hierarchy";
+import { resolveChildPlaceholderKey } from "@/lib/migration/placeholder-registry";
+import {
   applyTargetPageChangeToQueueItem,
   normalizeQueueItemPaths,
 } from "@/lib/migration/queue-sync";
 import { normalizeSourcePageUrl } from "@/lib/migration/sitecore-path";
 import { STORAGE_KEYS } from "@/lib/sitecore/constants";
-import { getCrawlResult } from "@/lib/storage/workflow-data";
+import { getCrawlResult, getDiscoveryResult } from "@/lib/storage/workflow-data";
 import type { BlockMatchResult } from "@/types/ai-match";
 import type { CrawlImage } from "@/types/crawl";
 import type { MigrationQueueItem } from "@/types/migration-queue";
@@ -41,7 +46,20 @@ export function getMigrationQueue(): MigrationQueueItem[] {
 
   try {
     const parsed = JSON.parse(raw) as MigrationQueueItem[];
-    return Array.isArray(parsed) ? parsed.map(normalizeQueueItem) : [];
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+    const normalized = parsed.map(normalizeQueueItem);
+    const discovery = getDiscoveryResult();
+    const linked = linkQueueHierarchy(
+      applyDiscoveryPlaceholderDefaults(normalized, discovery?.placeholders),
+      discovery?.renderingProfiles,
+    );
+    const changed = JSON.stringify(linked) !== JSON.stringify(normalized);
+    if (changed) {
+      saveMigrationQueue(linked);
+    }
+    return linked;
   } catch {
     return [];
   }
@@ -97,10 +115,33 @@ export function addMatchToQueue(
   }
 
   const items = getMigrationQueue();
-  const newItem = normalizeQueueItemPaths(
-    queueItemFromMatch(match, findBlockImages(match)),
-  );
+  const discovery = getDiscoveryResult();
   const normalizedPageUrl = normalizeSourcePageUrl(match.pageUrl);
+
+  const existingParent = match.parentBlockId
+    ? items.find(
+        (item) =>
+          normalizeSourcePageUrl(item.sourcePageUrl) === normalizedPageUrl &&
+          item.blockId === match.parentBlockId,
+      )
+    : undefined;
+
+  const childPlaceholderKey =
+    existingParent && match.parentBlockId
+      ? resolveChildPlaceholderKey(
+          existingParent.renderingPath,
+          match.renderingPath,
+          discovery?.renderingProfiles,
+        ) ?? undefined
+      : undefined;
+
+  const newItem = normalizeQueueItemPaths(
+    queueItemFromMatch(match, findBlockImages(match), {
+      parentBlockId: match.parentBlockId,
+      parentQueueItemId: existingParent?.id,
+      childPlaceholderKey,
+    }),
+  );
   newItem.sourcePageUrl = normalizedPageUrl;
   const existingOnPage = items.find(
     (item) =>
@@ -112,7 +153,12 @@ export function addMatchToQueue(
     newItem.language = existingOnPage.language;
   }
   items.push(newItem);
-  saveMigrationQueue(items);
+
+  const linked = linkQueueHierarchy(
+    applyDiscoveryPlaceholderDefaults(items, discovery?.placeholders),
+    discovery?.renderingProfiles,
+  );
+  saveMigrationQueue(linked);
 
   return {
     success: true,
@@ -183,6 +229,8 @@ export function updateQueueItem(
       | "placeholder"
       | "datasourcePath"
       | "language"
+      | "childPlaceholderKey"
+      | "parentQueueItemId"
     >
   >,
 ): void {
