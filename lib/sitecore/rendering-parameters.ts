@@ -10,19 +10,6 @@ import {
 } from "@/lib/sitecore/nested-placeholder-format";
 import type { NestedPlaceholderFormat, RenderingPlaceholderProfile } from "@/types/discovery";
 
-const LOG_PREFIX = "[MigrateX:rendering-params]";
-
-function logRenderingParams(
-  message: string,
-  data?: Record<string, unknown>,
-): void {
-  if (data) {
-    console.log(LOG_PREFIX, message, data);
-  } else {
-    console.log(LOG_PREFIX, message);
-  }
-}
-
 export const DYNAMIC_PLACEHOLDER_ID_PARAM = "DynamicPlaceholderId";
 
 /** SXA / headless base template inherited by rendering parameter templates. */
@@ -65,12 +52,7 @@ export function buildSitecoreRenderingParametersString(
   if (parts.length === 0) {
     return "";
   }
-  const result = escapeLayoutParameterAttribute(`&${parts.join("&")}`);
-  logRenderingParams("buildSitecoreRenderingParametersString", {
-    input: parameters,
-    output: result,
-  });
-  return result;
+  return escapeLayoutParameterAttribute(`&${parts.join("&")}`);
 }
 
 export function mergeRenderingParameterStrings(
@@ -83,14 +65,7 @@ export function mergeRenderingParameterStrings(
       Object.entries(additions).map(([key, value]) => [key, String(value)]),
     ),
   };
-  const result = buildSitecoreRenderingParametersString(merged);
-  logRenderingParams("mergeRenderingParameterStrings", {
-    existing: existing ?? "",
-    additions,
-    merged,
-    output: result,
-  });
-  return result;
+  return buildSitecoreRenderingParametersString(merged);
 }
 
 export function fieldsIncludeDynamicPlaceholderConfiguration(
@@ -313,35 +288,10 @@ export function renderingRequiresDynamicPlaceholderId(
   hasQueuedChildren: boolean,
 ): boolean {
   if (hasQueuedChildren) {
-    logRenderingParams("renderingRequiresDynamicPlaceholderId", {
-      renderingPath: profile?.renderingPath,
-      renderingName: profile?.renderingName,
-      hasDynamicPlaceholders: profile?.hasDynamicPlaceholders,
-      defaultDynamicPlaceholderId: profile?.defaultDynamicPlaceholderId,
-      hasQueuedChildren,
-      required: true,
-      reason: "has queued children — parent needs DynamicPlaceholderId in s:par",
-    });
     return true;
   }
 
-  const required = renderingProfileHasDynamicPlaceholders(profile);
-
-  logRenderingParams("renderingRequiresDynamicPlaceholderId", {
-    renderingPath: profile?.renderingPath,
-    renderingName: profile?.renderingName,
-    hasDynamicPlaceholders: profile?.hasDynamicPlaceholders,
-    defaultDynamicPlaceholderId: profile?.defaultDynamicPlaceholderId,
-    hasQueuedChildren,
-    required,
-    reason: required
-      ? profile?.usesSxaDynamicPlaceholders
-        ? "SXA IsRenderingsWithDynamicPlaceholders + IDynamicPlaceholder parameter template"
-        : "parameters template defines DynamicPlaceholderId"
-      : "rendering missing SXA dynamic placeholder flag and/or IDynamicPlaceholder on parameter template",
-  });
-
-  return required;
+  return renderingProfileHasDynamicPlaceholders(profile);
 }
 
 /**
@@ -387,14 +337,6 @@ export function assignDynamicPlaceholderPresentation(input: {
     [DYNAMIC_PLACEHOLDER_ID_PARAM]: dynamicPlaceholderId,
   };
 
-  logRenderingParams("assignDynamicPlaceholderPresentation", {
-    renderingPath: input.profile?.renderingPath,
-    nestedPlaceholderKeyPattern: pattern,
-    parentResolvedPlaceholder: input.parentResolvedPlaceholder,
-    dynamicPlaceholderId,
-    parameters,
-  });
-
   return {
     apply: true,
     dynamicPlaceholderId,
@@ -429,14 +371,6 @@ export function resolveNestedDynamicPresentationPlaceholder(input: {
     parentRenderingUid: input.parentRenderingUid,
     childPlaceholderKey: input.childPlaceholderKey,
     dynamicPlaceholderId: input.parentDynamicPlaceholderId,
-  });
-
-  logRenderingParams("resolveNestedDynamicPresentationPlaceholder", {
-    parentRenderingName: input.parentRenderingName,
-    parentDynamicPlaceholderId: input.parentDynamicPlaceholderId,
-    childPlaceholderKey: input.childPlaceholderKey,
-    nestedPlaceholder,
-    format,
   });
 
   return nestedPlaceholder;
@@ -478,7 +412,6 @@ export function mergeLayoutRenderingParametersByUid(
 ): string {
   const uidToken = formatUidToken(uid);
   let updated = layoutXml;
-  let matched = false;
 
   for (const match of layoutXml.matchAll(RENDERING_TAG_REGEX)) {
     const fullElement = match[0]!;
@@ -488,7 +421,6 @@ export function mergeLayoutRenderingParametersByUid(
       continue;
     }
 
-    matched = true;
     const mergedPar = mergeRenderingParameterStrings(attrs["s:par"], parameters);
     const rebuilt = /s:par="/i.test(fullElement)
       ? fullElement.replace(/s:par="[^"]*"/i, `s:par="${mergedPar}"`)
@@ -496,23 +428,8 @@ export function mergeLayoutRenderingParametersByUid(
           /\s*\/>$/,
           ` s:par="${mergedPar}" s:ccb="Clear on publish" />`,
         );
-    logRenderingParams("mergeLayoutRenderingParametersByUid", {
-      uid: uidToken,
-      placeholder: attrs["s:ph"],
-      previousPar: attrs["s:par"] ?? "",
-      parameters,
-      mergedPar,
-      hadParAttribute: /s:par="/i.test(fullElement),
-    });
     updated = updated.replace(fullElement, rebuilt);
     break;
-  }
-
-  if (!matched) {
-    logRenderingParams("mergeLayoutRenderingParametersByUid: no match", {
-      uid: uidToken,
-      parameters,
-    });
   }
 
   return updated;

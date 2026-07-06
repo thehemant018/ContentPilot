@@ -130,19 +130,6 @@ interface TemplateInheritanceResult {
   }>;
 }
 
-const DISCOVERY_PARAMS_LOG_PREFIX = "[MigrateX:discovery-params]";
-
-function logDiscoveryParams(
-  message: string,
-  data?: Record<string, unknown>,
-): void {
-  if (data) {
-    console.log(DISCOVERY_PARAMS_LOG_PREFIX, message, data);
-  } else {
-    console.log(DISCOVERY_PARAMS_LOG_PREFIX, message);
-  }
-}
-
 function normalizePath(path: string): string {
   const trimmed = path.trim();
   if (!trimmed.startsWith("/")) {
@@ -309,11 +296,7 @@ async function resolveItemPathFromId(
       if (pathOnly.item?.path) {
         return pathOnly.item.path;
       }
-    } catch (error) {
-      logDiscoveryParams("resolveItemPathFromId: GraphQL itemId lookup failed", {
-        itemId,
-        error: error instanceof Error ? error.message : String(error),
-      });
+    } catch {
     }
   }
 
@@ -327,17 +310,9 @@ async function resolveItemPathFromId(
       );
       const path = searchResult.search?.results?.[0]?.innerItem?.path?.trim();
       if (path) {
-        logDiscoveryParams("resolveItemPathFromId: resolved via search index", {
-          searchId,
-          path,
-        });
         return path;
       }
-    } catch (error) {
-      logDiscoveryParams("resolveItemPathFromId: search lookup failed", {
-        searchId,
-        error: error instanceof Error ? error.message : String(error),
-      });
+    } catch {
     }
   }
 
@@ -391,11 +366,7 @@ async function fetchRenderingFieldsForDiscovery(
       { path },
     );
     inheritedFields = data.item?.fields?.nodes ?? [];
-  } catch (error) {
-    logDiscoveryParams("fetchRenderingFieldsForDiscovery: inherited fields failed", {
-      path,
-      error: error instanceof Error ? error.message : String(error),
-    });
+  } catch {
   }
 
   return mergeItemFieldSets(inheritedFields, ownFields);
@@ -477,17 +448,8 @@ async function resolveMultilistToKeysWithLookup(
       const key = readPlaceholderKey(fields);
       if (key) {
         keys.add(key);
-        logDiscoveryParams("resolveMultilistToKeysWithLookup: resolved key by item id", {
-          itemReference: trimmed,
-          path,
-          key,
-        });
       }
-    } catch (error) {
-      logDiscoveryParams("resolveMultilistToKeysWithLookup: lookup failed", {
-        itemReference: trimmed,
-        error: error instanceof Error ? error.message : String(error),
-      });
+    } catch {
     }
   }
 
@@ -566,11 +528,7 @@ async function fetchTemplateInheritance(
           resolvedTemplatePath: templatePath,
         };
       }
-    } catch (error) {
-      logDiscoveryParams("fetchTemplateInheritance: query failed", {
-        templatePath,
-        error: error instanceof Error ? error.message : String(error),
-      });
+    } catch {
     }
   }
 
@@ -633,20 +591,12 @@ async function fetchParameterTemplateFieldDefinitions(
   const parametersValue = rawParametersValue.split("|")[0]?.trim() ?? "";
 
   if (!parametersValue) {
-    logDiscoveryParams("parametersTemplate: field not found on rendering", {
-      checkedFieldNames: PARAMETERS_FIELD_NAMES,
-      availableFieldNames: renderingFields.map((field) => field.name),
-    });
     return {
       fields: [],
       baseTemplateNames: [],
       inheritsIDynamicPlaceholder: false,
     };
   }
-
-  logDiscoveryParams("parametersTemplate: resolved from rendering", {
-    parametersValue,
-  });
 
   let parametersTemplatePath: string | undefined;
 
@@ -656,28 +606,16 @@ async function fetchParameterTemplateFieldDefinitions(
       accessToken,
       parametersValue,
     );
-  } catch (error) {
-    logDiscoveryParams("parametersTemplate: path resolution failed", {
-      parametersValue,
-      error: error instanceof Error ? error.message : String(error),
-    });
+  } catch {
   }
 
   if (!parametersTemplatePath) {
-    logDiscoveryParams("parametersTemplate: could not resolve template path", {
-      parametersValue,
-    });
     return {
       fields: [],
       baseTemplateNames: [],
       inheritsIDynamicPlaceholder: false,
     };
   }
-
-  logDiscoveryParams("parametersTemplate: template path resolved", {
-    parametersValue,
-    parametersTemplatePath,
-  });
 
   const fields = new Map<string, { name: string; value?: string }>();
   let baseTemplateNames: string[] = [];
@@ -695,19 +633,7 @@ async function fetchParameterTemplateFieldDefinitions(
     for (const ownFieldName of inheritance.ownFieldNames) {
       fields.set(ownFieldName.toLowerCase(), { name: ownFieldName });
     }
-
-    logDiscoveryParams("fetchParameterTemplateInheritance", {
-      parametersTemplatePath,
-      resolvedTemplatePath: inheritance.resolvedTemplatePath,
-      baseTemplateNames,
-      inheritsIDynamicPlaceholder,
-      ownFieldNames: inheritance.ownFieldNames,
-    });
-  } catch (error) {
-    logDiscoveryParams("fetchParameterTemplateInheritance: failed", {
-      parametersTemplatePath,
-      error: error instanceof Error ? error.message : String(error),
-    });
+  } catch {
   }
 
   try {
@@ -721,14 +647,10 @@ async function fetchParameterTemplateFieldDefinitions(
     for (const field of extractFieldsFromParameterTemplateStructure(structure)) {
       fields.set(field.name.toLowerCase(), field);
     }
-  } catch (error) {
-    logDiscoveryParams("fetchParameterTemplateStructure: failed", {
-      parametersTemplatePath,
-      error: error instanceof Error ? error.message : String(error),
-    });
+  } catch {
   }
 
-  // Always read template item fields (__Base template lives here when templates() API is unavailable).
+  // Always read template item fields
   try {
     const templateItemFields = await fetchItemFields(
       instanceUrl,
@@ -748,17 +670,8 @@ async function fetchParameterTemplateFieldDefinitions(
       baseTemplateNames = [...new Set([...baseTemplateNames, ...resolvedBaseNames])];
       inheritsIDynamicPlaceholder =
         templateInheritsIDynamicPlaceholder(baseTemplateNames);
-      logDiscoveryParams("resolveBaseTemplateNamesFromFields", {
-        parametersTemplatePath,
-        baseTemplateNames,
-        inheritsIDynamicPlaceholder,
-      });
     }
-  } catch (error) {
-    logDiscoveryParams("fetchParameterTemplateItemFields: failed", {
-      parametersTemplatePath,
-      error: error instanceof Error ? error.message : String(error),
-    });
+  } catch {
   }
 
   const mergedFieldsFinal = Array.from(fields.values());
@@ -844,19 +757,6 @@ async function readRenderingParametersInfo(
     readDefaultDynamicPlaceholderId(renderingFields) ??
     readDefaultDynamicPlaceholderId(parameterFields) ??
     1;
-
-  logDiscoveryParams("readRenderingParametersInfo", {
-    renderingPath,
-    renderingName,
-    parametersTemplatePath: parametersTemplate.parametersTemplatePath,
-    parameterFieldNames: parameterFields.map((field) => field.name),
-    baseTemplateNames: parametersTemplate.baseTemplateNames,
-    usesSxaDynamicPlaceholders: support.usesSxaDynamicPlaceholders,
-    inheritsIDynamicPlaceholder: support.inheritsIDynamicPlaceholder,
-    parametersTemplateConfigured: support.parametersTemplateConfigured,
-    hasDynamicPlaceholders: support.hasDynamicPlaceholders,
-    defaultDynamicPlaceholderId,
-  });
 
   return {
     defaultDynamicPlaceholderId,
@@ -987,12 +887,7 @@ export async function fetchRenderingPlaceholderProfiles(
         rendering.path,
         rendering.name,
       );
-    } catch (error) {
-      logDiscoveryParams("readRenderingParametersInfo: failed", {
-        renderingPath: rendering.path,
-        renderingName: rendering.name,
-        error: error instanceof Error ? error.message : String(error),
-      });
+    } catch {
     }
 
     profiles.push({

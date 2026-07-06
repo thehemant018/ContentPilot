@@ -1,5 +1,4 @@
 import { buildDatasourcePath, buildComponentExport } from "@/lib/migration/build-export";
-import { logPresentationHierarchy } from "@/lib/migration/presentation-debug-log";
 import {
   applyDiscoveryPlaceholderDefaults,
   linkQueueHierarchy,
@@ -163,17 +162,6 @@ export function buildComponentsFromQueue(
   const queueItemsById = new Map(
     preparedQueue.map((queueItem) => [queueItem.id, queueItem]),
   );
-  logPresentationHierarchy("buildComponentsFromQueue: prepared queue", {
-    itemCount: preparedQueue.length,
-    items: preparedQueue.map((item) => ({
-      queueItemId: item.id,
-      renderingName: item.renderingName,
-      parentQueueItemId: item.parentQueueItemId,
-      childPlaceholderKey: item.childPlaceholderKey,
-      presentationDepth: item.presentationDepth,
-      placeholder: item.placeholder,
-    })),
-  });
   const components: MigrationComponentExport[] = [];
 
   for (let index = 0; index < preparedQueue.length; index += 1) {

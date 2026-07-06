@@ -3,7 +3,6 @@ import {
   buildComponentsFromQueue,
   prepareQueueForMigration,
 } from "@/lib/migration/queue-sync";
-import { logPresentationHierarchy } from "@/lib/migration/presentation-debug-log";
 import { resolveLinkFieldsForComponent } from "@/lib/migration/resolve-link-fields";
 import { resolveMediaFieldsForComponent } from "@/lib/migration/resolve-media-fields";
 import { normalizeSitecoreItemPath } from "@/lib/migration/sitecore-path";
@@ -255,18 +254,6 @@ export async function pushQueueToSitecore(
   const components = buildComponentsFromQueue(preparedQueue, exportedAt, {
     placeholders: options.placeholders,
     renderingProfiles: options.renderingProfiles,
-  });
-
-  logPresentationHierarchy("pushQueueToSitecore: built component exports", {
-    componentCount: components.length,
-    components: components.map((component) => ({
-      queueItemId: component.queueItemId,
-      renderingName: component.presentation.renderingName,
-      parentQueueItemId: component.presentation.parentQueueItemId,
-      childPlaceholderKey: component.presentation.childPlaceholderKey,
-      placeHolder: component.presentation.placeHolder,
-      presentationDepth: component.presentation.presentationDepth,
-    })),
   });
 
   if (components.length === 0) {

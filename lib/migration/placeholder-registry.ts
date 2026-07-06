@@ -3,7 +3,6 @@ import {
   nameSuggestsLeaf,
 } from "@/lib/ai-match/catalog-shape";
 import type { RenderingPlaceholderProfile } from "@/types/discovery";
-import { logPresentationHierarchy } from "@/lib/migration/presentation-debug-log";
 
 function normalizeRenderingPath(path: string): string {
   return path.trim().replace(/\/+$/, "");
@@ -144,13 +143,6 @@ export function resolveChildPlaceholderKey(
   const child = findRenderingProfile(profiles, childRenderingPath);
 
   if (!parent) {
-    logPresentationHierarchy("resolveChildPlaceholderKey: no parent profile", {
-      childRenderingName: debugContext?.childRenderingName,
-      parentRenderingName: debugContext?.parentRenderingName,
-      parentRenderingPath,
-      childRenderingPath,
-      profileCount: profiles?.length ?? 0,
-    });
     return null;
   }
 
@@ -158,12 +150,6 @@ export function resolveChildPlaceholderKey(
     if (parent.exposedChildPlaceholderKeys.length === 1) {
       return parent.exposedChildPlaceholderKeys[0]!;
     }
-    logPresentationHierarchy("resolveChildPlaceholderKey: no child profile", {
-      childRenderingName: debugContext?.childRenderingName,
-      parentRenderingName: parent.renderingName,
-      childRenderingPath,
-      parentExposedKeys: parent.exposedChildPlaceholderKeys,
-    });
     return null;
   }
 
@@ -220,12 +206,6 @@ export function resolveChildPlaceholderKey(
     return parent.exposedChildPlaceholderKeys[0]!;
   }
 
-  logPresentationHierarchy("resolveChildPlaceholderKey: no match", {
-    childRenderingName: child.renderingName,
-    parentRenderingName: parent.renderingName,
-    childAllowedParentKeys: child.allowedParentPlaceholderKeys,
-    parentExposedKeys: parent.exposedChildPlaceholderKeys,
-  });
   return null;
 }
 

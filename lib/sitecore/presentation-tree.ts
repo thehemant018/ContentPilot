@@ -23,7 +23,6 @@ import {
 import { resolveNestedPlaceholderFormatForPair } from "@/lib/sitecore/nested-placeholder-format";
 import type { RenderingPlaceholderProfile } from "@/types/discovery";
 import type { MigrationComponentExport } from "@/types/migration-export";
-import { logPresentationHierarchy } from "@/lib/migration/presentation-debug-log";
 import { pickNestedPlaceholderKeyPattern } from "@/lib/migration/placeholder-registry";
 
 export interface PresentationTreeNode {
@@ -369,18 +368,6 @@ export function applyPresentationTreeToLayoutXml(
 ): PresentationTreeResult {
   const ordered = sortComponentsForPresentationTree(components);
   const profileByPath = buildProfileMap(renderingProfiles);
-  logPresentationHierarchy("applyPresentationTreeToLayoutXml: start", {
-    componentCount: components.length,
-    orderedComponents: ordered.map((component) => ({
-      queueItemId: component.queueItemId,
-      renderingName: component.presentation.renderingName,
-      parentQueueItemId: component.presentation.parentQueueItemId,
-      childPlaceholderKey: component.presentation.childPlaceholderKey,
-      placeHolder: component.presentation.placeHolder,
-      presentationDepth: component.presentation.presentationDepth,
-    })),
-    renderingProfileCount: renderingProfiles?.length ?? 0,
-  });
   const componentByQueueId = new Map(
     components.map((component) => [component.queueItemId, component]),
   );
@@ -512,15 +499,6 @@ export function applyPresentationTreeToLayoutXml(
     const renderingParameters: Record<string, string | number | undefined> = {};
 
     if (component.presentation.parentQueueItemId) {
-      logPresentationHierarchy("presentation-tree: nested component", {
-        renderingName,
-        queueItemId: component.queueItemId,
-        parentQueueItemId: component.presentation.parentQueueItemId,
-        parentNodeFound: Boolean(parentNode),
-        childPlaceholderKey: component.presentation.childPlaceholderKey,
-        exportPlaceHolder: component.presentation.placeHolder,
-      });
-
       if (!parentNode) {
         skipped.push({
           queueItemId: component.queueItemId,
@@ -582,25 +560,7 @@ export function applyPresentationTreeToLayoutXml(
         parentDynamicPlaceholderId: parentDynamicId,
         childPlaceholderKey: nestedKeyPattern,
       });
-
-      logPresentationHierarchy("presentation-tree: nested placeholder resolved", {
-        renderingName,
-        queueItemId: component.queueItemId,
-        parentRenderingName: parentNode.component.presentation.renderingName,
-        parentResolvedPlaceholder: parentNode.resolvedPlaceholder,
-        parentDynamicPlaceholderId: parentDynamicId,
-        resolvedPlaceholder,
-        format,
-      });
     } else {
-      logPresentationHierarchy("presentation-tree: root component (no parentQueueItemId)", {
-        renderingName,
-        queueItemId: component.queueItemId,
-        exportPlaceHolder: component.presentation.placeHolder,
-        reason:
-          "No parentQueueItemId on export — will use page placeholder and assignDynamicPlaceholderPresentation if dynamic",
-      });
-
       resolvedPlaceholder = resolvePresentationPlaceholder(
         component.presentation.placeHolder,
         layoutXml,
