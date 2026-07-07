@@ -38,19 +38,23 @@ interface ItemServiceLanguageRow {
   RegionalIsoCode?: string;
 }
 
+type InstanceLanguageNode = NonNullable<
+  NonNullable<
+    NonNullable<InstanceLanguagesGraphQLResult["item"]>["children"]
+  >["nodes"]
+>[number];
+
 function fieldValue(
   fields: Array<{ name: string; value?: string }> | undefined,
   fieldName: string,
 ): string | undefined {
-  const value = fields?.find((field) => field.name === fieldName)?.value?.trim();
+  const value = fields
+    ?.find((field) => field.name === fieldName)
+    ?.value?.trim();
   return value || undefined;
 }
 
-function parseInstanceLanguageNode(
-  node: NonNullable<
-    NonNullable<InstanceLanguagesGraphQLResult["item"]>["children"]
-  >["nodes"][number],
-): SitecoreLanguage {
+function parseInstanceLanguageNode(node: InstanceLanguageNode): SitecoreLanguage {
   const fields = node.fields?.nodes ?? [];
   return {
     name: node.name,
@@ -90,9 +94,7 @@ async function fetchInstanceLanguagesViaItemService(
     | ItemServiceLanguageRow[]
     | { Languages?: ItemServiceLanguageRow[] };
 
-  const rows = Array.isArray(payload)
-    ? payload
-    : (payload.Languages ?? []);
+  const rows = Array.isArray(payload) ? payload : (payload.Languages ?? []);
 
   if (!Array.isArray(rows) || rows.length === 0) {
     return null;
@@ -160,7 +162,8 @@ export async function fetchSiteLanguages(
   accessToken: string,
   siteRootPath: string,
 ): Promise<SitecoreLanguage[]> {
-  const normalizedRoot = siteRootPath.trim().replace(/\/+$/, "") || siteRootPath;
+  const normalizedRoot =
+    siteRootPath.trim().replace(/\/+$/, "") || siteRootPath;
 
   const instanceLanguages = await fetchInstanceLanguages(
     instanceUrl,

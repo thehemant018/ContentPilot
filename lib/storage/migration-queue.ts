@@ -15,6 +15,7 @@ import {
   applyTargetPageChangeToQueueItem,
   normalizeQueueItemPaths,
 } from "@/lib/migration/queue-sync";
+import { DEFAULT_PRESENTATION_PLACEHOLDER } from "@/lib/migration/constants";
 import { normalizeSourcePageUrl } from "@/lib/migration/sitecore-path";
 import { STORAGE_KEYS } from "@/lib/sitecore/constants";
 import { getCrawlResult, getDiscoveryResult } from "@/lib/storage/workflow-data";
