@@ -4,7 +4,7 @@
 
 export const MEDIA_CLEANUP_SCRIPT = `
 (function() {
-  var EMBED_HOSTS = /youtube\\.com|youtu\\.be|vimeo\\.com|wistia\\.com|vidyard\\.com/i;
+  var EMBED_HOSTS = /youtube\\.com|youtu\\.be|vimeo\\.com|player\\.vimeo|wistia\\.com|vidyard\\.com|dailymotion\\.com/i;
 
   function stripAutoplayFromUrl(url) {
     try {

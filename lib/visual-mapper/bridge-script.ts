@@ -9,17 +9,23 @@ export function buildBridgeScript(pageSourceUrl: string): string {
   let activeOverlay = null;
   let pickingMode = false;
   let pickingFieldId = null;
+  let pickingPreferImage = false;
+  let layerPickIndex = 0;
+  let lastPickX = 0;
+  let lastPickY = 0;
 
   window.addEventListener('message', (e) => {
     if (!e.data || !e.data.type) return;
     if (e.data.type === 'ENABLE_PICK_MODE') {
       pickingMode = true;
       pickingFieldId = e.data.fieldId;
+      pickingPreferImage = !!e.data.preferImage;
       document.body.style.cursor = 'crosshair';
     }
     if (e.data.type === 'DISABLE_PICK_MODE') {
       pickingMode = false;
       pickingFieldId = null;
+      pickingPreferImage = false;
       document.body.style.cursor = '';
     }
     if (e.data.type === 'HIGHLIGHT_SELECTOR') {
@@ -33,9 +39,10 @@ export function buildBridgeScript(pageSourceUrl: string): string {
   document.addEventListener('mouseover', (e) => {
     if (pickingMode) return;
     if (activeOverlay) activeOverlay.style.outline = '';
-    e.target.style.outline = '2px solid #3B82F6';
-    e.target.style.outlineOffset = '2px';
-    activeOverlay = e.target;
+    const el = resolvePickTarget(e, false);
+    el.style.outline = '2px solid #3B82F6';
+    el.style.outlineOffset = '2px';
+    activeOverlay = el;
     e.stopPropagation();
   });
 
@@ -55,6 +62,100 @@ export function buildBridgeScript(pageSourceUrl: string): string {
     }
   }
 
+  function isPickableElement(el) {
+    if (!el || !el.tagName) return false;
+    const tag = el.tagName;
+    return tag !== 'HTML' && tag !== 'BODY' && tag !== 'SCRIPT' && tag !== 'STYLE';
+  }
+
+  function getPickStack(x, y) {
+    if (!document.elementsFromPoint) {
+      return [];
+    }
+    return document.elementsFromPoint(x, y).filter(function(el) {
+      return el instanceof Element && isPickableElement(el) && !isConsentTarget(el);
+    });
+  }
+
+  function hasBackgroundImage(el) {
+    try {
+      const bg = window.getComputedStyle(el).backgroundImage;
+      return Boolean(bg && bg !== 'none' && /url\\(/i.test(bg));
+    } catch (err) {
+      return false;
+    }
+  }
+
+  function isHeroLikeContainer(el) {
+    if (!el || !el.tagName) return false;
+    const tag = el.tagName;
+    if (tag === 'SECTION' || tag === 'HEADER' || tag === 'ARTICLE') {
+      return true;
+    }
+    if (!el.classList) return false;
+    return Array.from(el.classList).some(function(className) {
+      return /hero|banner|jumbotron|masthead|cover/i.test(className);
+    });
+  }
+
+  function findContainerInStack(stack, fromIndex) {
+    for (let i = fromIndex; i < stack.length; i += 1) {
+      const el = stack[i];
+      if (hasBackgroundImage(el) || isHeroLikeContainer(el)) {
+        return el;
+      }
+    }
+    return null;
+  }
+
+  function findImageTargetInStack(stack) {
+    for (let i = 0; i < stack.length; i += 1) {
+      const el = stack[i];
+      if (el.tagName === 'IMG' || hasBackgroundImage(el)) {
+        return el;
+      }
+    }
+    return null;
+  }
+
+  function resolvePickTarget(e, allowLayerCycle) {
+    const stack = getPickStack(e.clientX, e.clientY);
+    if (!stack.length) {
+      return e.target;
+    }
+
+    if (allowLayerCycle && e.altKey) {
+      const sameSpot =
+        Math.abs(e.clientX - lastPickX) < 4 && Math.abs(e.clientY - lastPickY) < 4;
+      if (!sameSpot) {
+        layerPickIndex = 0;
+        lastPickX = e.clientX;
+        lastPickY = e.clientY;
+      } else {
+        layerPickIndex = (layerPickIndex + 1) % stack.length;
+      }
+      return stack[layerPickIndex] || e.target;
+    }
+
+    const targetIndex = Math.max(0, stack.indexOf(e.target));
+
+    if (pickingMode && pickingPreferImage) {
+      const imageTarget = findImageTargetInStack(stack);
+      if (imageTarget) {
+        return imageTarget;
+      }
+    }
+
+    if (!pickingMode) {
+      const container = findContainerInStack(stack, targetIndex);
+      if (container) {
+        return container;
+      }
+    }
+
+    return e.target;
+  }
+
   document.addEventListener('click', (e) => {
     if (isConsentTarget(e.target)) {
       return;
@@ -62,7 +163,7 @@ export function buildBridgeScript(pageSourceUrl: string): string {
     e.preventDefault();
     e.stopPropagation();
 
-    const el = e.target;
+    const el = resolvePickTarget(e, true);
     const selector = getSelector(el);
     const extracted = extractFromElement(el);
 
@@ -186,23 +287,54 @@ export function buildBridgeScript(pageSourceUrl: string): string {
     return linkEl.getAttribute('target') || '';
   }
 
+  function extractBackgroundImageUrl(el) {
+    let node = el;
+    while (node && node !== document.documentElement) {
+      try {
+        const bg = window.getComputedStyle(node).backgroundImage;
+        const match = bg && bg.match(/url\\(["']?(.+?)["']?\\)/);
+        if (match && match[1]) {
+          return resolveNavigationHref(unwrapProxiedUrl(match[1]));
+        }
+      } catch (err) {}
+
+      const dataBg =
+        node.getAttribute('data-bg') ||
+        node.getAttribute('data-background') ||
+        node.getAttribute('data-background-image') ||
+        '';
+      if (dataBg.trim()) {
+        return resolveNavigationHref(unwrapProxiedUrl(dataBg.trim()));
+      }
+
+      node = node.parentElement;
+    }
+    return '';
+  }
+
   function extractSrc(el) {
     var img = el.tagName === 'IMG' ? el : (el.querySelector ? el.querySelector('img') : null);
     var target = img || el;
     var raw = target.getAttribute('src') || target.getAttribute('data-src') || target.src || target.currentSrc || '';
-    return resolveNavigationHref(unwrapProxiedUrl(raw));
+    if (raw) {
+      return resolveNavigationHref(unwrapProxiedUrl(raw));
+    }
+    return extractBackgroundImageUrl(el);
   }
 
   function extractFromElement(el) {
     var linkEl = findLinkElement(el);
+    var backgroundSrc = extractBackgroundImageUrl(el);
+    var src = extractSrc(el);
+    var hasImgChild = el.tagName === 'IMG' || (el.querySelector && el.querySelector('img') !== null);
     return {
       text: extractLinkText(el),
       html: (el.innerHTML && el.innerHTML.slice(0, 1000)) || '',
-      src: extractSrc(el),
+      src: src,
       href: extractHref(el),
       alt: el.alt || '',
       tagName: el.tagName,
-      isImage: el.tagName === 'IMG' || (el.querySelector && el.querySelector('img') !== null),
+      isImage: hasImgChild || Boolean(backgroundSrc),
       isLink: el.tagName === 'A' || !!linkEl,
       isHeading: /^H[1-6]$/.test(el.tagName),
       isRichText: el.tagName === 'P' || (el.tagName === 'DIV' && el.children.length > 1),

@@ -16,7 +16,7 @@ export type IframeToParentMessage =
     };
 
 export type ParentToIframeMessage =
-  | { type: "ENABLE_PICK_MODE"; fieldId: string }
+  | { type: "ENABLE_PICK_MODE"; fieldId: string; preferImage?: boolean }
   | { type: "DISABLE_PICK_MODE" }
   | { type: "HIGHLIGHT_SELECTOR"; selector: string }
   | { type: "CLEAR_HIGHLIGHTS" };

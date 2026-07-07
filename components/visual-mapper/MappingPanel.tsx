@@ -151,7 +151,12 @@ export function MappingPanel({
             <div className="mt-4 space-y-4">
               <p className="text-sm text-zinc-600">
                 Click a component on the page (e.g. the Hero section), then pick
-                the matching Sitecore rendering.
+                the matching Sitecore rendering. MigrateX prefers the section
+                behind text when you click headings or buttons.
+              </p>
+              <p className="text-xs text-zinc-500">
+                Hold <span className="font-semibold">Alt</span> and click to
+                cycle through layered elements (e.g. text → hero background).
               </p>
 
               {!selectedElement ? (
@@ -242,6 +247,11 @@ export function MappingPanel({
                   Map each Sitecore field by clicking{" "}
                   <span className="font-semibold">Pick from page</span>, then
                   click the matching element inside this component.
+                </p>
+                <p className="mt-1 text-xs text-zinc-500">
+                  Image fields automatically target CSS background images behind
+                  text. Hold <span className="font-semibold">Alt</span> and click
+                  to cycle through stacked elements.
                 </p>
                 <p className="mt-1 text-xs text-zinc-500">
                   {mappedFieldCount}/{draftFieldAssignments.length} fields mapped

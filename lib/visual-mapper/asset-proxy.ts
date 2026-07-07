@@ -286,6 +286,26 @@ export function buildAssetRuntimeScript(
     return PROXY_ORIGIN + "/api/proxy-asset?" + params;
   }
 
+  function toAbsolute(url) {
+    var normalized = normalizeUrl(url);
+    if (isSkippable(normalized)) return normalized;
+    try {
+      return new URL(normalized, PAGE_REFERER).href;
+    } catch (err) {
+      return normalized;
+    }
+  }
+
+  var IFRAME_URL_ATTRS = ["src", "data-src", "data-lazy-src", "data-iframe-src", "data-original"];
+
+  function isIframeUrlAttr(name) {
+    return IFRAME_URL_ATTRS.indexOf(String(name || "").toLowerCase()) !== -1;
+  }
+
+  function rewriteIframeAttrValue(name, value) {
+    return isIframeUrlAttr(name) ? toAbsolute(value) : value;
+  }
+
   function rewriteSrcset(value) {
     return String(value || "").split(",").map(function(part) {
       var trimmed = part.trim();
@@ -325,6 +345,15 @@ export function buildAssetRuntimeScript(
         } catch (err) {}
       }
     }
+    if (tag === "iframe") {
+      for (var k = 0; k < el.attributes.length; k++) {
+        var iframeAttr = el.attributes[k];
+        if (!iframeAttr || !isIframeUrlAttr(iframeAttr.name)) continue;
+        var iframeCurrent = iframeAttr.value;
+        var iframeNext = rewriteIframeAttrValue(iframeAttr.name, iframeCurrent);
+        if (iframeNext !== iframeCurrent) el.setAttribute(iframeAttr.name, iframeNext);
+      }
+    }
     if (isImagePreloadLink(el)) {
       var href = el.getAttribute("href");
       if (href) el.setAttribute("href", toProxy(href));
@@ -347,7 +376,12 @@ export function buildAssetRuntimeScript(
     var origSetAttribute = Element.prototype.setAttribute;
     Element.prototype.setAttribute = function(name, value) {
       var lower = String(name || "").toLowerCase();
+      var tag = this.tagName ? this.tagName.toLowerCase() : "";
       if (lower === "href" && !isImagePreloadLink(this)) {
+        return origSetAttribute.call(this, name, value);
+      }
+      if (tag === "iframe" && isIframeUrlAttr(name)) {
+        value = rewriteIframeAttrValue(name, value);
         return origSetAttribute.call(this, name, value);
       }
       if (isAssetAttr(name) || (lower === "href" && isImagePreloadLink(this))) {
@@ -396,6 +430,21 @@ export function buildAssetRuntimeScript(
         });
       }
     }
+
+    if (typeof HTMLIFrameElement !== "undefined") {
+      var iframeProto = HTMLIFrameElement.prototype;
+      var iframeSrcDesc = Object.getOwnPropertyDescriptor(iframeProto, "src");
+      if (iframeSrcDesc && iframeSrcDesc.set) {
+        Object.defineProperty(iframeProto, "src", {
+          configurable: true,
+          enumerable: iframeSrcDesc.enumerable,
+          get: iframeSrcDesc.get,
+          set: function(value) {
+            iframeSrcDesc.set.call(this, toAbsolute(value));
+          },
+        });
+      }
+    }
   }
 
   patchDomSetters();
@@ -404,7 +453,7 @@ export function buildAssetRuntimeScript(
     if (!root) return;
     if (root.nodeType === 1) rewriteElement(root);
     if (root.querySelectorAll) {
-      root.querySelectorAll("img,source,video,audio,picture,link[rel='preload'][as='image']").forEach(rewriteElement);
+      root.querySelectorAll("img,source,video,audio,picture,iframe,link[rel='preload'][as='image']").forEach(rewriteElement);
     }
   }
 
@@ -424,7 +473,7 @@ export function buildAssetRuntimeScript(
     childList: true,
     subtree: true,
     attributes: true,
-    attributeFilter: ["src", "srcset", "imagesrc", "imagesrcset", "data-src", "data-srcset", "poster"],
+    attributeFilter: ["src", "srcset", "imagesrc", "imagesrcset", "data-src", "data-srcset", "data-lazy-src", "data-iframe-src", "poster"],
   });
 
   document.addEventListener("DOMContentLoaded", function() { rewriteTree(document.documentElement); });
