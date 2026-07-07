@@ -26,7 +26,7 @@ import { ReturnToMappingSourceButton } from "@/components/workflow/ReturnToMappi
 import { isVisualMapperMode } from "@/lib/workflow/migration-mode";
 import { ReturnToReviewBanner } from "@/components/workflow/ReturnToReviewBanner";
 import { normalizeMediaUploadPath } from "@/lib/sitecore/media-upload";
-import { getDiscoveryResult } from "@/lib/storage/workflow-data";
+import { getDiscoveryResult, getCrawlResult } from "@/lib/storage/workflow-data";
 import { getMigrationQueue } from "@/lib/storage/migration-queue";
 import { prepareQueueForMigration } from "@/lib/migration/queue-sync";
 import {
@@ -200,6 +200,7 @@ export function MigratePanel({ embedded = false }: { embedded?: boolean }) {
           sxaPageDataTemplatePath,
           placeholders: discovery?.placeholders,
           renderingProfiles: discovery?.renderingProfiles,
+          sourcePages: getCrawlResult()?.pages,
         }),
       });
 
@@ -509,9 +510,14 @@ export function MigratePanel({ embedded = false }: { embedded?: boolean }) {
           <ul className="mt-3 space-y-3 text-sm">
             {pushResult.results.map((entry) => (
               <li
-                key={entry.queueItemId}
+                key={`${entry.queueItemId}::${entry.language ?? "en"}`}
                 className="rounded-lg border border-zinc-100 bg-zinc-50 p-3"
               >
+                {entry.language && (
+                  <p className="text-xs font-medium text-zinc-500">
+                    Language: {entry.language}
+                  </p>
+                )}
                 <p className="font-mono text-xs text-zinc-600">
                   {entry.datasourcePath}
                 </p>

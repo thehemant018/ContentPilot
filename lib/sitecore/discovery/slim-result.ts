@@ -4,6 +4,7 @@ import type {
   PathValidationResult,
   PlaceholderDefinition,
   RenderingPlaceholderProfile,
+  SitecoreLanguage,
   TemplateDefinition,
 } from "@/types/discovery";
 
@@ -61,6 +62,16 @@ function slimRenderingProfile(
   };
 }
 
+function slimLanguage(language: SitecoreLanguage): SitecoreLanguage {
+  return {
+    name: language.name,
+    path: language.path,
+    iso: language.iso,
+    nativeName: language.nativeName,
+    englishName: language.englishName,
+  };
+}
+
 /** Keeps only data required for AI match, export, and migrate push. */
 export function slimDiscoveryResult(result: DiscoveryResult): DiscoveryResult {
   if (!result.success) {
@@ -81,6 +92,10 @@ export function slimDiscoveryResult(result: DiscoveryResult): DiscoveryResult {
     renderings: (result.renderings ?? []).map(slimRendering),
     placeholders: (result.placeholders ?? []).map(slimPlaceholder),
     renderingProfiles: (result.renderingProfiles ?? []).map(slimRenderingProfile),
+    instanceLanguages: (result.instanceLanguages ?? []).map(slimLanguage),
+    siteLanguages: (result.siteLanguages ?? []).map(slimLanguage),
+    selectedSiteName: result.selectedSiteName,
+    selectedSiteRootPath: result.selectedSiteRootPath,
     templates: (result.templates ?? [])
       .filter(isDatasourceTemplate)
       .map((template) => ({

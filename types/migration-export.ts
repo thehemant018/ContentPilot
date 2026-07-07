@@ -47,6 +47,7 @@ export interface MigrationComponentExport {
 
 export interface MigrationPushComponentResult {
   queueItemId: string;
+  language?: string;
   sourcePageUrl?: string;
   datasourcePath: string;
   targetPagePath: string;

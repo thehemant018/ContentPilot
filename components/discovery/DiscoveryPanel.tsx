@@ -136,6 +136,7 @@ export function DiscoveryPanel({ embedded = false }: { embedded?: boolean }) {
         method: "POST",
         body: JSON.stringify({
           siteName: selectedSite.name,
+          siteRootPath: selectedSite.rootPath,
           renderingsPath,
           placeholdersPath,
           mediaPath,

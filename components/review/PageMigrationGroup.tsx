@@ -2,18 +2,17 @@
 
 import type { ReactNode } from "react";
 import { useMemo } from "react";
+import { LanguageMultiSelect } from "@/components/review/LanguageMultiSelect";
 import { QueueItemCard } from "@/components/review/QueueItemCard";
 import {
   reviewInputClass,
   reviewLabelClass,
   reviewSettingsPanelClass,
 } from "@/components/review/form-styles";
-import {
-  DEFAULT_MIGRATION_LANGUAGE,
-  DEFAULT_PRESENTATION_PLACEHOLDER,
-} from "@/lib/migration/constants";
+import { DEFAULT_PRESENTATION_PLACEHOLDER } from "@/lib/migration/constants";
+import { buildPageLanguagePicker } from "@/lib/migration/page-language-picker";
 import { listPageRootPlaceholderKeys } from "@/lib/migration/placeholder-registry";
-import { getDiscoveryResult } from "@/lib/storage/workflow-data";
+import { getCrawlResult, getDiscoveryResult } from "@/lib/storage/workflow-data";
 import type { MigrationQueueItem } from "@/types/migration-queue";
 
 interface PageMigrationGroupProps {
@@ -25,7 +24,10 @@ interface PageMigrationGroupProps {
   onUpdatePageSettings: (
     sourcePageUrl: string,
     updates: Partial<
-      Pick<MigrationQueueItem, "targetPagePath" | "placeholder" | "language">
+      Pick<
+        MigrationQueueItem,
+        "targetPagePath" | "placeholder" | "language" | "languages"
+      >
     >,
   ) => void;
   onUpdateItem: (
@@ -43,12 +45,14 @@ function PageGroupHeader({
   items,
   readyCount,
   renderingSummary,
+  selectedLanguages,
 }: {
   sourcePageUrl: string;
   pageTitle?: string;
   items: MigrationQueueItem[];
   readyCount: number;
   renderingSummary: string[];
+  selectedLanguages: string[];
 }) {
   return (
     <div className="flex flex-wrap items-start justify-between gap-3">
@@ -66,6 +70,11 @@ function PageGroupHeader({
           {items.length} component{items.length === 1 ? "" : "s"} — page settings
           apply to all components on this migration.
         </p>
+        {selectedLanguages.length > 0 && (
+          <p className="mt-1 text-xs text-zinc-600">
+            Versions: {selectedLanguages.join(", ")}
+          </p>
+        )}
         {renderingSummary.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-1.5">
             {renderingSummary.map((name) => (
@@ -98,7 +107,8 @@ function PageGroupBody({
   sourcePageUrl,
   targetPagePath,
   placeholder,
-  language,
+  selectedLanguages,
+  languageOptions,
   items,
   pagePlaceholderKeys,
   onUpdatePageSettings,
@@ -109,7 +119,8 @@ function PageGroupBody({
   sourcePageUrl: string;
   targetPagePath: string;
   placeholder: string;
-  language: string;
+  selectedLanguages: string[];
+  languageOptions: ReturnType<typeof buildPageLanguagePicker>["options"];
   items: MigrationQueueItem[];
   pagePlaceholderKeys: string[];
   onUpdatePageSettings: PageMigrationGroupProps["onUpdatePageSettings"];
@@ -200,45 +211,49 @@ function PageGroupBody({
               children use parent exposed placeholders automatically.
             </p>
           </div>
-          <div>
+          <div className="md:col-span-2">
             <label
               htmlFor={`language-page-${lead.id}`}
               className={reviewLabelClass}
             >
-              Language
+              Sitecore language versions
             </label>
-            <input
+            <LanguageMultiSelect
               id={`language-page-${lead.id}`}
-              type="text"
-              value={language}
-              onChange={(event) =>
+              options={languageOptions}
+              selected={selectedLanguages}
+              onChange={(languages) =>
                 onUpdatePageSettings(sourcePageUrl, {
-                  language: event.target.value,
+                  languages,
+                  language: languages[0],
                 })
               }
-              placeholder="en"
-              className={reviewInputClass}
             />
+            <p className="mt-1.5 text-xs text-zinc-600">
+              Select one or more matched languages. Unmatched Sitecore languages
+              are shown disabled. Missing page/datasource versions are created on
+              push.
+            </p>
           </div>
         </div>
       </div>
 
       <div className="mt-5 space-y-4">
         {sortedItems.map((item) => (
-            <div
-              key={item.id}
-              style={{
-                marginLeft: `${Math.min(item.presentationDepth ?? 0, 4) * 1.25}rem`,
-              }}
-            >
-              <QueueItemCard
-                item={item}
-                pageItems={items}
-                onUpdate={onUpdateItem}
-                onRemove={onRemoveItem}
-              />
-            </div>
-          ))}
+          <div
+            key={item.id}
+            style={{
+              marginLeft: `${Math.min(item.presentationDepth ?? 0, 4) * 1.25}rem`,
+            }}
+          >
+            <QueueItemCard
+              item={item}
+              pageItems={items}
+              onUpdate={onUpdateItem}
+              onRemove={onRemoveItem}
+            />
+          </div>
+        ))}
       </div>
     </>
   );
@@ -282,7 +297,6 @@ export function PageMigrationGroup({
   const lead = items[0]!;
   const targetPagePath = lead.targetPagePath;
   const placeholder = lead.placeholder ?? DEFAULT_PRESENTATION_PLACEHOLDER;
-  const language = lead.language ?? DEFAULT_MIGRATION_LANGUAGE;
   const readyCount = items.filter((item) => item.targetPagePath.trim()).length;
   const renderingSummary = [
     ...new Set(items.map((item) => item.renderingName).filter(Boolean)),
@@ -296,6 +310,19 @@ export function PageMigrationGroup({
     return [placeholder];
   }, [placeholder]);
 
+  const crawl = getCrawlResult();
+  const languagePicker = useMemo(
+    () =>
+      buildPageLanguagePicker(
+        sourcePageUrl,
+        getDiscoveryResult(),
+        lead.languages ?? (lead.language ? [lead.language] : []),
+        crawl?.pages,
+        crawl?.sourceLanguages,
+      ),
+    [sourcePageUrl, lead.languages, lead.language, crawl?.pages, crawl?.sourceLanguages],
+  );
+
   return (
     <section className="rounded-2xl border border-zinc-200 bg-zinc-50 p-5">
       {wrapCollapsible(
@@ -307,13 +334,15 @@ export function PageMigrationGroup({
           items={items}
           readyCount={readyCount}
           renderingSummary={renderingSummary}
+          selectedLanguages={languagePicker.selected}
         />,
         <PageGroupBody
           lead={lead}
           sourcePageUrl={sourcePageUrl}
           targetPagePath={targetPagePath}
           placeholder={placeholder}
-          language={language}
+          selectedLanguages={languagePicker.selected}
+          languageOptions={languagePicker.options}
           items={items}
           pagePlaceholderKeys={pagePlaceholderKeys}
           onUpdatePageSettings={onUpdatePageSettings}

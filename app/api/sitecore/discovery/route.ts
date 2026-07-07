@@ -14,7 +14,14 @@ export async function POST(request: Request) {
 
   try {
     const body = (await request.json()) as DiscoveryPathsInput;
-    const { siteName, renderingsPath, placeholdersPath, mediaPath, templatesPath } = body;
+    const {
+      siteName,
+      siteRootPath,
+      renderingsPath,
+      placeholdersPath,
+      mediaPath,
+      templatesPath,
+    } = body;
 
     if (
       !siteName?.trim() ||
@@ -35,6 +42,7 @@ export async function POST(request: Request) {
 
     const result = await runDiscovery(auth.instanceUrl, auth.accessToken, {
       siteName: siteName.trim(),
+      siteRootPath: siteRootPath?.trim(),
       renderingsPath: renderingsPath.trim(),
       placeholdersPath: placeholdersPath.trim(),
       mediaPath: mediaPath.trim(),

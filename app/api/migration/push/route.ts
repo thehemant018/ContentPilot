@@ -10,6 +10,7 @@ import type {
   PlaceholderDefinition,
   RenderingPlaceholderProfile,
 } from "@/types/discovery";
+import type { CrawledPage } from "@/types/crawl";
 
 export const maxDuration = 300;
 
@@ -28,6 +29,7 @@ export async function POST(request: Request) {
       sxaPageDataTemplatePath?: string;
       placeholders?: PlaceholderDefinition[];
       renderingProfiles?: RenderingPlaceholderProfile[];
+      sourcePages?: CrawledPage[];
     };
 
     if (!body.queue?.length) {
@@ -51,6 +53,7 @@ export async function POST(request: Request) {
         sxaPageDataTemplatePath: body.sxaPageDataTemplatePath,
         placeholders: body.placeholders,
         renderingProfiles: body.renderingProfiles,
+        sourcePages: body.sourcePages,
       },
     );
 

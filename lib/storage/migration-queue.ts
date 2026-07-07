@@ -2,7 +2,10 @@ import {
   queueItemFromMatch,
   queueItemKey,
 } from "@/lib/migration-queue/from-match";
-import { DEFAULT_PRESENTATION_PLACEHOLDER } from "@/lib/migration/constants";
+import {
+  resolveDefaultPageLanguages,
+  resolveMappedPageLanguage,
+} from "@/lib/migration/language-mapping";
 import {
   linkQueueHierarchy,
   applyDiscoveryPlaceholderDefaults,
@@ -116,6 +119,7 @@ export function addMatchToQueue(
 
   const items = getMigrationQueue();
   const discovery = getDiscoveryResult();
+  const crawl = getCrawlResult();
   const normalizedPageUrl = normalizeSourcePageUrl(match.pageUrl);
 
   const existingParent = match.parentBlockId
@@ -135,13 +139,41 @@ export function addMatchToQueue(
         ) ?? undefined
       : undefined;
 
+  const crawlPage = crawl?.pages?.find((entry) => entry.url === match.pageUrl);
+  const mappedLanguage = resolveMappedPageLanguage(
+    normalizedPageUrl,
+    crawlPage?.language,
+    {
+      instanceLanguages: discovery?.instanceLanguages,
+      siteLanguages: discovery?.siteLanguages,
+    },
+  );
+  const defaultLanguages = resolveDefaultPageLanguages(
+    normalizedPageUrl,
+    [
+      ...(crawlPage?.availableLanguages ?? []),
+      ...(crawl?.sourceLanguages ?? []),
+      ...(crawlPage?.language ? [crawlPage.language] : []),
+    ],
+    {
+      instanceLanguages: discovery?.instanceLanguages,
+      siteLanguages: discovery?.siteLanguages,
+      pageLanguage: crawlPage?.language,
+    },
+  );
+
   const newItem = normalizeQueueItemPaths(
     queueItemFromMatch(match, findBlockImages(match), {
       parentBlockId: match.parentBlockId,
       parentQueueItemId: existingParent?.id,
       childPlaceholderKey,
+      language: mappedLanguage,
     }),
   );
+  newItem.languages =
+    defaultLanguages.length > 0 ? defaultLanguages : [mappedLanguage];
+  newItem.primarySourceLanguage = mappedLanguage;
+  newItem.sourceAlternateUrls = crawlPage?.alternateUrls;
   newItem.sourcePageUrl = normalizedPageUrl;
   const existingOnPage = items.find(
     (item) =>
@@ -150,7 +182,11 @@ export function addMatchToQueue(
   if (existingOnPage) {
     newItem.targetPagePath = existingOnPage.targetPagePath;
     newItem.placeholder = existingOnPage.placeholder;
-    newItem.language = existingOnPage.language;
+    newItem.languages = existingOnPage.languages ?? (
+      existingOnPage.language ? [existingOnPage.language] : newItem.languages
+    );
+    newItem.language =
+      existingOnPage.language ?? newItem.languages?.[0] ?? newItem.language;
   }
   items.push(newItem);
 
@@ -193,7 +229,10 @@ export function removeMatchFromQueue(
 export function updateQueueItemsForSourcePage(
   sourcePageUrl: string,
   updates: Partial<
-    Pick<MigrationQueueItem, "targetPagePath" | "placeholder" | "language">
+    Pick<
+      MigrationQueueItem,
+      "targetPagePath" | "placeholder" | "language" | "languages"
+    >
   >,
 ): void {
   const normalizedSource = normalizeSourcePageUrl(sourcePageUrl);
@@ -210,11 +249,19 @@ export function updateQueueItemsForSourcePage(
       return {
         ...withTarget,
         placeholder: updates.placeholder ?? withTarget.placeholder,
-        language: updates.language ?? withTarget.language,
+        languages: updates.languages ?? withTarget.languages,
+        language:
+          updates.language ??
+          updates.languages?.[0] ??
+          withTarget.language,
       };
     }
 
-    return { ...item, ...updates };
+    const next = { ...item, ...updates };
+    if (updates.languages) {
+      next.language = updates.languages[0] ?? next.language;
+    }
+    return next;
   });
   saveMigrationQueue(items);
 }
@@ -229,6 +276,7 @@ export function updateQueueItem(
       | "placeholder"
       | "datasourcePath"
       | "language"
+      | "languages"
       | "childPlaceholderKey"
       | "parentQueueItemId"
     >

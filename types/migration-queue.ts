@@ -43,7 +43,13 @@ export interface MigrationQueueItem {
   dynamicPlaceholderId?: number;
   /** Override auto-generated datasource item path. */
   datasourcePath?: string;
-  /** Language for presentation/datasource (default en). */
+  /** Primary Sitecore language (legacy single-select; use languages when set). */
   language?: string;
+  /** Sitecore language versions to migrate this page into. */
+  languages?: string[];
+  /** Source language the queued field values were extracted from. */
+  primarySourceLanguage?: string;
+  /** hreflang code → URL for alternate source pages (same content, other languages). */
+  sourceAlternateUrls?: Record<string, string>;
   fields: EditableFieldValue[];
 }

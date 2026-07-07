@@ -1,6 +1,7 @@
 import { DEFAULT_MIGRATION_LANGUAGE } from "@/lib/migration/constants";
 import { normalizeSitecoreItemPath } from "@/lib/migration/sitecore-path";
 import { ensureSxaPageDataItem } from "@/lib/migration/sxa-page-structure";
+import { getSitecoreItemByPathInLanguage, requireItemLanguageVersionBeforeWrite } from "@/lib/sitecore/item-version";
 import { SEARCH_UNDER_PATH_QUERY } from "@/lib/sitecore/discovery/queries";
 import { executeGraphQL } from "@/lib/sitecore/graphql-client";
 import {
@@ -258,6 +259,8 @@ export interface EnsureTargetPageOptions {
   language?: string;
   pageTemplatePath?: string;
   sxaPageDataTemplatePath?: string;
+  sourceLanguage?: string;
+  sourceLanguages?: string[];
 }
 
 export async function ensureTargetPageExists(
@@ -274,9 +277,28 @@ export async function ensureTargetPageExists(
   );
 
   if (resolved.exists) {
+    const language = options?.language ?? DEFAULT_MIGRATION_LANGUAGE;
+    const versionOptions = {
+      sourceLanguage: options?.sourceLanguage,
+      sourceLanguages: options?.sourceLanguages,
+    };
+
+    const pageVersion = await requireItemLanguageVersionBeforeWrite(
+      instanceUrl,
+      accessToken,
+      resolved.path,
+      language,
+      versionOptions,
+    );
+    if (pageVersion.status === "item-not-found") {
+      throw new Error(`Target page not found at ${resolved.path}.`);
+    }
+
     await ensureSxaPageDataItem(instanceUrl, accessToken, resolved.path, {
-      language: options?.language,
+      language,
       sxaPageDataTemplatePath: options?.sxaPageDataTemplatePath,
+      sourceLanguages: options?.sourceLanguages,
+      sourceLanguage: options?.sourceLanguage,
     });
     return { created: false, path: resolved.path };
   }
@@ -310,18 +332,24 @@ export async function ensureTargetPageExists(
     { language: options?.language ?? DEFAULT_MIGRATION_LANGUAGE },
   );
 
-  const created = await getSitecoreItemByPath(
+  const language = options?.language ?? DEFAULT_MIGRATION_LANGUAGE;
+  const createdInLanguage = await getSitecoreItemByPathInLanguage(
     instanceUrl,
     accessToken,
     normalizedPath,
+    language,
   );
-  if (!created) {
-    throw new Error(`Failed to create target page at ${normalizedPath}.`);
+  if (!createdInLanguage) {
+    throw new Error(
+      `Failed to create target page at ${normalizedPath} in "${language}".`,
+    );
   }
 
   await ensureSxaPageDataItem(instanceUrl, accessToken, normalizedPath, {
-    language: options?.language,
+    language,
     sxaPageDataTemplatePath: options?.sxaPageDataTemplatePath,
+    sourceLanguages: options?.sourceLanguages,
+    sourceLanguage: options?.sourceLanguage,
   });
 
   return { created: true, path: normalizedPath };

@@ -1,3 +1,7 @@
+import {
+  resolveDefaultPageLanguages,
+  resolveMappedPageLanguage,
+} from "@/lib/migration/language-mapping";
 import { queueItemFromMatch, queueItemKey } from "@/lib/migration-queue/from-match";
 import { prepareQueueForMigration } from "@/lib/migration/queue-sync";
 import { prepareVisualMapperMigration } from "@/lib/visual-mapper/migrate";
@@ -28,6 +32,7 @@ export function mappingEntriesToQueueItems(
   targetPagePath: string,
   renderingProfiles?: RenderingPlaceholderProfile[],
 ): MigrationQueueItem[] {
+  const discovery = getDiscoveryResult();
   const { matches } = prepareVisualMapperMigration(entries, pageUrl, pageTitle);
   const parentBlockIdByEntryId = inferVisualMapperParentBlockIds(entries);
   const matchByBlockId = new Map(
@@ -45,10 +50,19 @@ export function mappingEntriesToQueueItems(
 
     const item = queueItemFromMatch(match, [], {
       parentBlockId: parentBlockIdByEntryId.get(entry.id),
+      language: resolveMappedPageLanguage(pageUrl, undefined, {
+        instanceLanguages: discovery?.instanceLanguages,
+        siteLanguages: discovery?.siteLanguages,
+      }),
+    });
+    const defaultLanguages = resolveDefaultPageLanguages(pageUrl, [], {
+      instanceLanguages: discovery?.instanceLanguages,
+      siteLanguages: discovery?.siteLanguages,
     });
 
     return {
       ...item,
+      languages: defaultLanguages,
       targetPagePath: targetPagePath.trim(),
       fields: item.fields.map((field, index) => ({
         ...field,

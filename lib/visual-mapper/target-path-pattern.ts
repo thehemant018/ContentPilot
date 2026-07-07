@@ -1,4 +1,5 @@
 import { sanitizePathSegment } from "@/lib/migration/build-export";
+import { extractLocaleFromUrl } from "@/lib/migration/locale-from-url";
 import { normalizeSitecoreItemPath } from "@/lib/migration/sitecore-path";
 
 const PLACEHOLDER_PATTERN = /\{(slug|locale|path)\}/i;
@@ -40,10 +41,7 @@ export function resolveTargetPagePath(
     const segments = url.pathname.split("/").filter(Boolean);
     const rawSlug = segments[segments.length - 1] ?? "";
     const slug = slugToPageItemName(rawSlug);
-    const localeMatch = url.pathname.match(
-      /^\/([a-z]{2}(?:-[a-zA-Z]{2})?)(?:\/|$)/i,
-    );
-    const locale = localeMatch?.[1] ?? "";
+    const locale = extractLocaleFromUrl(pageUrl) ?? "";
 
     let basePattern = trimmed;
     if (!PLACEHOLDER_PATTERN.test(trimmed)) {

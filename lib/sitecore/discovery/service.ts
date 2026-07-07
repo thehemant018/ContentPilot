@@ -10,6 +10,10 @@ import {
 } from "@/lib/sitecore/discovery/placeholders";
 import { slimDiscoveryResult } from "@/lib/sitecore/discovery/slim-result";
 import { executeGraphQL } from "@/lib/sitecore/graphql-client";
+import {
+  fetchInstanceLanguages,
+  fetchSiteLanguages,
+} from "@/lib/sitecore/languages";
 import type {
   DiscoveryItem,
   DiscoveryPathsInput,
@@ -268,11 +272,31 @@ export async function runDiscovery(
     });
   }
 
-  const [renderingItems, placeholders, templates] = await Promise.all([
+  const [renderingItems, placeholders, templates, instanceLanguages] =
+    await Promise.all([
     searchItemsUnderPath(instanceUrl, accessToken, renderingsPath),
     fetchPlaceholderDefinitions(instanceUrl, accessToken, placeholdersPath),
     fetchTemplateDefinitions(instanceUrl, accessToken, templatesPath),
+    fetchInstanceLanguages(instanceUrl, accessToken),
   ]);
+
+  const siteRootPath = input.siteRootPath?.trim();
+  let siteLanguages = instanceLanguages;
+
+  if (siteRootPath) {
+    try {
+      siteLanguages = await fetchSiteLanguages(
+        instanceUrl,
+        accessToken,
+        siteRootPath,
+      );
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Failed to fetch site languages.";
+      console.error("[MigrateX:discovery] Site language fetch failed:", message);
+      siteLanguages = instanceLanguages;
+    }
+  }
 
   const renderings = renderingItems.filter(
     (item) =>
@@ -296,5 +320,9 @@ export async function runDiscovery(
     placeholders,
     renderingProfiles,
     templates,
+    instanceLanguages,
+    siteLanguages,
+    selectedSiteName: input.siteName,
+    selectedSiteRootPath: siteRootPath,
   });
 }

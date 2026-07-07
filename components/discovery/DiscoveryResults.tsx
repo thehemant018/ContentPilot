@@ -1,4 +1,5 @@
 import type { DiscoveryResult } from "@/types/discovery";
+import { formatSitecoreLanguageLabel } from "@/lib/migration/language-mapping";
 
 interface DiscoveryResultsProps {
   result: DiscoveryResult;
@@ -96,6 +97,34 @@ export function DiscoveryResults({ result }: DiscoveryResultsProps) {
             <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-700">
               <span className="font-medium text-zinc-900">Media upload folder:</span>{" "}
               <span className="font-mono text-xs">{result.mediaPath}</span>
+            </div>
+          )}
+
+          {(result.siteLanguages?.length || result.instanceLanguages?.length) && (
+            <div className="rounded-xl border border-zinc-200 bg-white p-4">
+              <div className="flex items-center justify-between gap-2">
+                <h4 className="text-sm font-semibold text-zinc-900">Languages</h4>
+                <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-600">
+                  {(result.siteLanguages ?? result.instanceLanguages ?? []).length}
+                </span>
+              </div>
+              <p className="mt-2 text-xs text-zinc-600">
+                {result.siteLanguages?.length
+                  ? `Languages available on site "${result.selectedSiteName ?? "selected"}".`
+                  : "Languages configured on this Sitecore instance."}
+              </p>
+              <ul className="mt-3 flex flex-wrap gap-2">
+                {(result.siteLanguages ?? result.instanceLanguages ?? []).map(
+                  (language) => (
+                    <li
+                      key={language.name}
+                      className="rounded-full bg-teal-50 px-2.5 py-1 text-xs font-medium text-teal-900"
+                    >
+                      {formatSitecoreLanguageLabel(language)}
+                    </li>
+                  ),
+                )}
+              </ul>
             </div>
           )}
 

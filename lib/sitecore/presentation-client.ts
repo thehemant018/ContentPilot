@@ -1,4 +1,7 @@
-import { executeGraphQL } from "@/lib/sitecore/graphql-client";
+import { executeGraphQL, isMissingItemLanguageVersionError, SitecoreGraphQLError } from "@/lib/sitecore/graphql-client";
+import { formatSitecoreGraphQLItemId } from "@/lib/sitecore/item-service-client";
+import { requireItemLanguageVersionBeforeWrite } from "@/lib/sitecore/item-version";
+
 import { getSitecoreItemByPath } from "@/lib/sitecore/item-lookup";
 import { resolvePresentationPlaceholder } from "@/lib/sitecore/dynamic-placeholder";
 import {
@@ -56,22 +59,34 @@ async function getPageRenderingsFieldValue(
   language: string,
   fieldName: string,
 ): Promise<{ itemId: string; value: string }> {
-  const data = await executeGraphQL<PageRenderingsQueryResult>(
-    instanceUrl,
-    accessToken,
-    GET_PAGE_RENDERINGS_FIELD_QUERY,
-    { path: itemPath, language, fieldName },
-  );
+  try {
+    const data = await executeGraphQL<PageRenderingsQueryResult>(
+      instanceUrl,
+      accessToken,
+      GET_PAGE_RENDERINGS_FIELD_QUERY,
+      { path: itemPath, language, fieldName },
+    );
 
-  const item = data.item;
-  if (!item?.itemId) {
-    throw new Error(`Page item not found at ${itemPath}.`);
+    const item = data.item;
+    if (!item?.itemId) {
+      throw new Error(`Page item not found at ${itemPath}.`);
+    }
+
+    return {
+      itemId: item.itemId,
+      value: item.renderingsField?.value ?? "",
+    };
+  } catch (error) {
+    if (
+      error instanceof SitecoreGraphQLError &&
+      isMissingItemLanguageVersionError(error.message)
+    ) {
+      throw new Error(
+        `Page at ${itemPath} has no "${language}" language version. Create the language version before assigning presentation.`,
+      );
+    }
+    throw error;
   }
-
-  return {
-    itemId: item.itemId,
-    value: item.renderingsField?.value ?? "",
-  };
 }
 
 async function updatePageRenderingsFieldValue(
@@ -88,7 +103,7 @@ async function updatePageRenderingsFieldValue(
     UPDATE_ITEM_RENDERINGS_MUTATION,
     {
       input: {
-        itemId: itemId.replace(/[{}]/g, ""),
+        itemId: formatSitecoreGraphQLItemId(itemId),
         language,
         database: "master",
         fields: [{ name: fieldName, value: layoutXml, reset: false }],
@@ -222,6 +237,13 @@ export async function applyPresentationTreeToPage(
   if (components.length === 0) {
     return { assignedCount: 0, skippedCount: 0, skipped: [], assigned: [] };
   }
+
+  await requireItemLanguageVersionBeforeWrite(
+    instanceUrl,
+    accessToken,
+    pagePath,
+    language,
+  );
 
   const renderingPaths = [
     ...new Set(

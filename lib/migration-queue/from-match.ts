@@ -15,6 +15,7 @@ export interface QueueItemFromMatchOptions {
   parentBlockId?: string;
   parentQueueItemId?: string;
   childPlaceholderKey?: string;
+  language?: string;
 }
 
 export function queueItemFromMatch(
@@ -57,7 +58,7 @@ export function queueItemFromMatch(
     reasoning: match.reasoning,
     targetPagePath: "",
     placeholder: DEFAULT_PRESENTATION_PLACEHOLDER,
-    language: DEFAULT_MIGRATION_LANGUAGE,
+    language: options?.language?.trim() || DEFAULT_MIGRATION_LANGUAGE,
     parentBlockId: options?.parentBlockId ?? match.parentBlockId,
     parentQueueItemId: options?.parentQueueItemId,
     childPlaceholderKey: options?.childPlaceholderKey,

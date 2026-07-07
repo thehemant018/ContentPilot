@@ -1,3 +1,7 @@
+import type { SitecoreLanguage } from "@/types/language";
+
+export type { SitecoreLanguage };
+
 export interface SitecoreSite {
   name: string;
   rootPath: string;
@@ -5,7 +9,6 @@ export interface SitecoreSite {
   startPath?: string;
   rootItemId?: string;
 }
-
 export interface PathValidationResult {
   path: string;
   label: string;
@@ -70,6 +73,7 @@ export interface RenderingPlaceholderProfile {
 
 export interface DiscoveryPathsInput {
   siteName: string;
+  siteRootPath?: string;
   renderingsPath: string;
   placeholdersPath: string;
   mediaPath: string;
@@ -92,4 +96,9 @@ export interface DiscoveryResult {
   placeholders?: PlaceholderDefinition[];
   renderingProfiles?: RenderingPlaceholderProfile[];
   templates?: TemplateDefinition[];
+  /** Languages configured on the Sitecore instance. */
+  instanceLanguages?: SitecoreLanguage[];  /** Languages available for the selected site (from site root item versions). */
+  siteLanguages?: SitecoreLanguage[];
+  selectedSiteName?: string;
+  selectedSiteRootPath?: string;
 }

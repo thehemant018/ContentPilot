@@ -1,4 +1,6 @@
 import { buildDatasourcePath, buildComponentExport } from "@/lib/migration/build-export";
+import { expandQueueItemsForLanguages } from "@/lib/migration/expand-queue-languages";
+import { resolveQueueLanguages } from "@/lib/migration/language-mapping";
 import {
   applyDiscoveryPlaceholderDefaults,
   linkQueueHierarchy,
@@ -18,6 +20,7 @@ import type {
 export interface PrepareQueueOptions {
   placeholders?: PlaceholderDefinition[];
   renderingProfiles?: RenderingPlaceholderProfile[];
+  skipLanguageExpansion?: boolean;
 }
 
 function shouldClearDatasourceOverride(
@@ -111,7 +114,11 @@ export function prepareQueueForMigration(
     const lead = withTarget[0] ?? items[0]!;
     const targetPagePath = lead.targetPagePath;
     const placeholder = lead.placeholder;
-    const language = lead.language;
+    const languages = resolveQueueLanguages(lead);
+    const language = languages[0];
+    const primarySourceLanguage =
+      lead.primarySourceLanguage?.trim() || lead.language;
+    const sourceAlternateUrls = lead.sourceAlternateUrls;
 
     for (const item of items) {
       prepared.push(
@@ -119,7 +126,13 @@ export function prepareQueueForMigration(
           ...item,
           targetPagePath: targetPagePath || item.targetPagePath,
           placeholder: placeholder ?? item.placeholder,
+          languages,
           language: language ?? item.language,
+          primarySourceLanguage:
+            item.primarySourceLanguage?.trim() ||
+            primarySourceLanguage ||
+            item.language,
+          sourceAlternateUrls: item.sourceAlternateUrls ?? sourceAlternateUrls,
         }),
       );
     }
@@ -158,7 +171,9 @@ export function buildComponentsFromQueue(
   exportedAt: string,
   options?: PrepareQueueOptions,
 ): MigrationComponentExport[] {
-  const preparedQueue = prepareQueueForMigration(queue, options);
+  const preparedQueue = options?.skipLanguageExpansion
+    ? queue
+    : expandQueueItemsForLanguages(prepareQueueForMigration(queue, options));
   const queueItemsById = new Map(
     preparedQueue.map((queueItem) => [queueItem.id, queueItem]),
   );
