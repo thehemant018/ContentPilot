@@ -4,6 +4,7 @@ import {
   buildComponentExport,
   buildDatasourcePath,
 } from "@/lib/migration/build-export";
+import { getDiscoveryResult } from "@/lib/storage/workflow-data";
 import { isHttpImageFieldValue } from "@/lib/sitecore/media-upload";
 import { isSitecoreMediaPathValue } from "@/lib/sitecore/media-lookup";
 import { LinkFieldValueEditor } from "@/components/review/LinkFieldValueEditor";
@@ -41,20 +42,41 @@ function ConfidenceBadge({
 
 interface QueueItemCardProps {
   item: MigrationQueueItem;
+  pageItems?: MigrationQueueItem[];
   onUpdate: (
     id: string,
-    updates: Partial<Pick<MigrationQueueItem, "fields" | "datasourcePath">>,
+    updates: Partial<
+      Pick<MigrationQueueItem, "fields" | "datasourcePath" | "childPlaceholderKey">
+    >,
   ) => void;
   onRemove: (id: string) => void;
 }
 
-export function QueueItemCard({ item, onUpdate, onRemove }: QueueItemCardProps) {
+export function QueueItemCard({
+  item,
+  pageItems = [],
+  onUpdate,
+  onRemove,
+}: QueueItemCardProps) {
+  const queueItemsById = new Map(
+    (pageItems.length > 0 ? pageItems : [item]).map((queueItem) => [
+      queueItem.id,
+      queueItem,
+    ]),
+  );
   const previewExport = item.targetPagePath.trim()
-    ? buildComponentExport(item, 0, new Date().toISOString())
+    ? buildComponentExport(item, 0, new Date().toISOString(), {
+        queueItemsById,
+        renderingProfiles: getDiscoveryResult()?.renderingProfiles,
+      })
     : null;
   const suggestedDatasource = item.targetPagePath.trim()
     ? buildDatasourcePath({ ...item, datasourcePath: undefined })
     : "";
+  const parentItem = item.parentQueueItemId
+    ? queueItemsById.get(item.parentQueueItemId)
+    : undefined;
+  const parentRenderingName = parentItem?.renderingName;
 
   function updateField(fieldId: string, value: string): void {
     onUpdate(item.id, {
@@ -108,7 +130,20 @@ export function QueueItemCard({ item, onUpdate, onRemove }: QueueItemCardProps) 
             <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[11px] font-semibold uppercase text-rose-800">
               Queued
             </span>
+            {(item.presentationDepth ?? 0) > 0 && (
+              <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[11px] font-semibold uppercase text-violet-800">
+                Nested
+              </span>
+            )}
           </div>
+          {parentRenderingName && (
+            <p className="mt-1 text-xs text-violet-700">
+              Child of <span className="font-medium">{parentRenderingName}</span>
+              {item.childPlaceholderKey
+                ? ` → placeholder ${item.childPlaceholderKey}`
+                : ""}
+            </p>
+          )}
           <p className="mt-1 text-xs text-zinc-500">
             Source:{" "}
             <span className="break-all font-mono">{item.sourcePageUrl}</span>
@@ -209,7 +244,24 @@ export function QueueItemCard({ item, onUpdate, onRemove }: QueueItemCardProps) 
               <span className="font-mono">{previewExport.presentation.itemPath}</span>
             </li>
             <li>
-              Placeholder: {previewExport.presentation.placeHolder}
+              Placeholder:{" "}
+              <span className="font-mono">
+                {previewExport.presentation.placeHolder}
+              </span>
+              {previewExport.presentation.childPlaceholderKey &&
+                previewExport.presentation.childPlaceholderKey !==
+                  previewExport.presentation.placeHolder && (
+                  <>
+                    {" "}
+                    <span className="text-emerald-800">
+                      (child key:{" "}
+                      <span className="font-mono">
+                        {previewExport.presentation.childPlaceholderKey}
+                      </span>
+                      )
+                    </span>
+                  </>
+                )}
             </li>
             <li>
               New content item under Data:{" "}

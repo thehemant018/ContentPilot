@@ -39,7 +39,12 @@ export function validateMigrationQueue(
     };
   }
 
-  const pageCount = new Set(components.map((item) => item.targetPagePath)).size;
+  const pageCount = new Set(
+    components.map(
+      (item) =>
+        `${item.targetPagePath}::${item.presentation.language || "en"}`,
+    ),
+  ).size;
 
   return {
     success: true,

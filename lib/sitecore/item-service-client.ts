@@ -71,6 +71,38 @@ async function parseItemServiceResponse(
   }
 }
 
+type ItemServiceReadStatus = "found" | "not-found" | "unavailable";
+
+async function readItemServiceGet(
+  url: string,
+  accessToken: string,
+  context: string,
+): Promise<{ status: ItemServiceReadStatus; item?: ItemServiceItem }> {
+  const response = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      Accept: "application/json",
+    },
+    cache: "no-store",
+  });
+
+  if (response.status === 404) {
+    return { status: "not-found" };
+  }
+
+  if (!response.ok) {
+    await response.text();
+    return { status: "unavailable" };
+  }
+
+  const item = await parseItemServiceResponse(response);
+  if (!item.ItemID) {
+    return { status: "not-found" };
+  }
+
+  return { status: "found", item };
+}
+
 /** Sitecore expects field names at the JSON root, not under a Fields property. */
 export function buildItemServiceFieldPayload(
   fields: Record<string, string>,
@@ -99,7 +131,115 @@ function toGraphQLFieldInputs(
 }
 
 function normalizeItemId(itemId: string): string {
-  return itemId.replace(/[{}]/g, "");
+  return itemId.replace(/[{}]/g, "").toLowerCase();
+}
+
+/** Plain UUID for GraphQL Guid/ID fields (createItem, updateItem). */
+export function formatSitecoreGraphQLItemId(itemId: string): string {
+  return normalizeItemId(itemId);
+}
+
+function buildItemServiceUrlById(
+  instanceUrl: string,
+  itemId: string,
+  options?: ItemServiceOptions,
+): string {
+  const base = `${normalizeInstanceUrl(instanceUrl)}${ITEM_SERVICE_PATH}/${normalizeItemId(itemId)}`;
+  const params = new URLSearchParams();
+  params.set("database", options?.database ?? DEFAULT_ITEM_DATABASE);
+  if (options?.language) {
+    params.set("language", options.language);
+  }
+  if (options?.version) {
+    params.set("version", options.version);
+  }
+  const query = params.toString();
+  return query ? `${base}?${query}` : base;
+}
+
+export async function getItemById(
+  instanceUrl: string,
+  accessToken: string,
+  itemId: string,
+  options?: ItemServiceOptions,
+): Promise<ItemServiceItem | null> {
+  const url = buildItemServiceUrlById(instanceUrl, itemId, options);
+  const read = await readItemServiceGet(
+    url,
+    accessToken,
+    `item ${itemId} (${options?.language ?? "default"})`,
+  );
+  if (read.status === "found") {
+    return read.item ?? null;
+  }
+  return null;
+}
+
+export async function probeItemByIdInLanguage(
+  instanceUrl: string,
+  accessToken: string,
+  itemId: string,
+  language: string,
+  options?: ItemServiceOptions,
+): Promise<ItemServiceReadStatus> {
+  const url = buildItemServiceUrlById(instanceUrl, itemId, {
+    ...options,
+    language,
+  });
+  const read = await readItemServiceGet(
+    url,
+    accessToken,
+    `item ${itemId} (${language})`,
+  );
+  return read.status;
+}
+
+/**
+ * Creates a language version by PATCHing the item in the target language.
+ * Copies the item name from a source language version when available.
+ */
+export async function createItemLanguageVersionViaItemService(
+  instanceUrl: string,
+  accessToken: string,
+  itemId: string,
+  targetLanguage: string,
+  sourceLanguage?: string,
+  options?: ItemServiceOptions,
+): Promise<boolean> {
+  const database = options?.database ?? DEFAULT_ITEM_DATABASE;
+  let itemName: string | undefined;
+
+  if (sourceLanguage?.trim()) {
+    const sourceItem = await getItemById(instanceUrl, accessToken, itemId, {
+      database,
+      language: sourceLanguage.trim(),
+    });
+    itemName =
+      (typeof sourceItem?.ItemName === "string" && sourceItem.ItemName.trim()) ||
+      undefined;
+  }
+
+  const url = buildItemServiceUrlById(instanceUrl, itemId, {
+    database,
+    language: targetLanguage,
+  });
+  const response = await fetch(url, {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(itemName ? { ItemName: itemName } : {}),
+    cache: "no-store",
+  });
+
+  if (response.ok) {
+    return true;
+  }
+
+  await response.text();
+  return false;
 }
 
 export async function getItemByPath(
@@ -109,26 +249,15 @@ export async function getItemByPath(
   options?: ItemServiceOptions,
 ): Promise<ItemServiceItem | null> {
   const url = buildItemServiceUrl(instanceUrl, itemPath, options);
-  const response = await fetch(url, {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      Accept: "application/json",
-    },
-    cache: "no-store",
-  });
-
-  if (response.status === 404) {
-    return null;
+  const read = await readItemServiceGet(
+    url,
+    accessToken,
+    `${itemPath} (${options?.language ?? "default"})`,
+  );
+  if (read.status === "found") {
+    return read.item ?? null;
   }
-
-  if (!response.ok) {
-    const body = await response.text();
-    throw new Error(
-      `Item Service GET failed (${response.status}) for ${itemPath}: ${body.slice(0, 200)}`,
-    );
-  }
-
-  return parseItemServiceResponse(response);
+  return null;
 }
 
 export async function createItem(
@@ -140,6 +269,7 @@ export async function createItem(
   fields: Record<string, string>,
   options?: ItemServiceOptions,
 ): Promise<ItemServiceItem> {
+  const language = options?.language ?? "en";
   const parent = await getSitecoreItemByPath(
     instanceUrl,
     accessToken,
@@ -161,9 +291,9 @@ export async function createItem(
   }>(instanceUrl, accessToken, CREATE_ITEM_MUTATION, {
     input: {
       name: itemName,
-      parent: normalizeItemId(parent.itemId),
-      templateId: normalizeItemId(templateId),
-      language: options?.language ?? "en",
+      parent: formatSitecoreGraphQLItemId(parent.itemId),
+      templateId: formatSitecoreGraphQLItemId(templateId),
+      language,
       fields: graphqlFields,
     },
   });
@@ -204,7 +334,7 @@ export async function editItemById(
     } | null;
   }>(instanceUrl, accessToken, UPDATE_ITEM_MUTATION, {
     input: {
-      itemId: normalizeItemId(itemId),
+      itemId: formatSitecoreGraphQLItemId(itemId),
       database: options?.database ?? DEFAULT_ITEM_DATABASE,
       language: options?.language ?? "en",
       fields: graphqlFields,

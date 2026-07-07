@@ -1,3 +1,4 @@
+import { ensureItemLanguageVersion, getSitecoreItemByPathInLanguage } from "@/lib/sitecore/item-version";
 import { DEFAULT_MIGRATION_LANGUAGE } from "@/lib/migration/constants";
 import { normalizeSitecoreItemPath } from "@/lib/migration/sitecore-path";
 import { SEARCH_UNDER_PATH_QUERY } from "@/lib/sitecore/discovery/queries";
@@ -21,6 +22,8 @@ export const SXA_PAGE_DATA_ITEM_NAME = "Data";
 export interface EnsureSxaPageDataOptions {
   language?: string;
   sxaPageDataTemplatePath?: string;
+  sourceLanguage?: string;
+  sourceLanguages?: string[];
 }
 
 interface SearchUnderPathResult {
@@ -169,24 +172,98 @@ export async function ensureSxaPageDataItem(
   const normalizedPagePath = normalizeSitecoreItemPath(pagePath);
   const dataPath = buildSxaDatasourceParentPath(normalizedPagePath);
   const language = options?.language ?? DEFAULT_MIGRATION_LANGUAGE;
+  const versionOptions = {
+    sourceLanguage: options?.sourceLanguage,
+    sourceLanguages: options?.sourceLanguages,
+  };
 
-  const existing = await getSitecoreItemByPath(
+  const pageInLanguage = await getSitecoreItemByPathInLanguage(
+    instanceUrl,
+    accessToken,
+    normalizedPagePath,
+    language,
+  );
+  if (!pageInLanguage) {
+    const pageItem = await getSitecoreItemByPath(
+      instanceUrl,
+      accessToken,
+      normalizedPagePath,
+    );
+    if (!pageItem) {
+      throw new Error(
+        `Target page not found at ${normalizedPagePath}. Create the page before adding SXA Data.`,
+      );
+    }
+
+    await ensureItemLanguageVersion(
+      instanceUrl,
+      accessToken,
+      normalizedPagePath,
+      language,
+      versionOptions,
+    );
+
+    const pageVerified = await getSitecoreItemByPathInLanguage(
+      instanceUrl,
+      accessToken,
+      normalizedPagePath,
+      language,
+    );
+    if (!pageVerified) {
+      throw new Error(
+        `Could not create "${language}" version for page at ${normalizedPagePath} before creating SXA Data.`,
+      );
+    }
+  }
+
+  const dataInLanguage = await getSitecoreItemByPathInLanguage(
+    instanceUrl,
+    accessToken,
+    dataPath,
+    language,
+  );
+  if (dataInLanguage) {
+    return { created: false, path: dataPath };
+  }
+
+  const dataInAnyLanguage = await getSitecoreItemByPath(
     instanceUrl,
     accessToken,
     dataPath,
   );
-  if (existing) {
+  if (dataInAnyLanguage) {
+    await ensureItemLanguageVersion(
+      instanceUrl,
+      accessToken,
+      dataPath,
+      language,
+      versionOptions,
+    );
+
+    const dataVerified = await getSitecoreItemByPathInLanguage(
+      instanceUrl,
+      accessToken,
+      dataPath,
+      language,
+    );
+    if (!dataVerified) {
+      throw new Error(
+        `Could not create "${language}" version for SXA Data at ${dataPath} before writing content.`,
+      );
+    }
+
     return { created: false, path: dataPath };
   }
 
-  const pageItem = await getSitecoreItemByPath(
+  const pageItem = await getSitecoreItemByPathInLanguage(
     instanceUrl,
     accessToken,
     normalizedPagePath,
+    language,
   );
   if (!pageItem) {
     throw new Error(
-      `Target page not found at ${normalizedPagePath}. Create the page before adding SXA Data.`,
+      `Target page not found at ${normalizedPagePath} in "${language}".`,
     );
   }
 
@@ -207,14 +284,15 @@ export async function ensureSxaPageDataItem(
     { language },
   );
 
-  const created = await getSitecoreItemByPath(
+  const created = await getSitecoreItemByPathInLanguage(
     instanceUrl,
     accessToken,
     dataPath,
+    language,
   );
   if (!created) {
     throw new Error(
-      `Failed to create SXA Data item at ${dataPath} (Page Data template).`,
+      `Failed to create SXA Data item at ${dataPath} in "${language}" (Page Data template).`,
     );
   }
 

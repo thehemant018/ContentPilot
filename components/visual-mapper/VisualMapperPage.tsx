@@ -163,10 +163,11 @@ export function VisualMapperPage() {
 
   async function runMigratePush(createMissingPages: boolean) {
     const targetPagePath = useVisualMapperStore.getState().targetPagePath;
-    const mediaLibraryPath = getDiscoveryResult()?.mediaPath?.trim();
-    const pageTemplatePath = getDiscoveryResult()?.pageTemplatePath?.trim();
+    const discovery = getDiscoveryResult();
+    const mediaLibraryPath = discovery?.mediaPath?.trim();
+    const pageTemplatePath = discovery?.pageTemplatePath?.trim();
     const sxaPageDataTemplatePath =
-      getDiscoveryResult()?.sxaPageDataTemplatePath?.trim();
+      discovery?.sxaPageDataTemplatePath?.trim();
 
     if (!mediaLibraryPath) {
       setFeedback({
@@ -242,6 +243,8 @@ export function VisualMapperPage() {
           createMissingPages: shouldCreatePages,
           pageTemplatePath,
           sxaPageDataTemplatePath,
+          placeholders: discovery?.placeholders,
+          renderingProfiles: discovery?.renderingProfiles,
         }),
       });
 

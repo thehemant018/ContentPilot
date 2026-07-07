@@ -13,6 +13,11 @@ export class SitecoreGraphQLError extends Error {
   }
 }
 
+/** True when Sitecore reports an item exists but has no version in the requested language. */
+export function isMissingItemLanguageVersionError(message: string): boolean {
+  return /does not contain version/i.test(message);
+}
+
 export async function executeGraphQL<T>(
   instanceUrl: string,
   accessToken: string,
@@ -41,9 +46,8 @@ export async function executeGraphQL<T>(
   }
 
   if (payload.errors?.length) {
-    throw new SitecoreGraphQLError(
-      payload.errors.map((error) => error.message).join("; "),
-    );
+    const message = payload.errors.map((error) => error.message).join("; ");
+    throw new SitecoreGraphQLError(message);
   }
 
   if (!payload.data) {

@@ -11,9 +11,17 @@ import type {
   MigrationQueueItem,
 } from "@/types/migration-queue";
 
+export interface QueueItemFromMatchOptions {
+  parentBlockId?: string;
+  parentQueueItemId?: string;
+  childPlaceholderKey?: string;
+  language?: string;
+}
+
 export function queueItemFromMatch(
   match: BlockMatchResult,
   blockImages: CrawlImage[] = [],
+  options?: QueueItemFromMatchOptions,
 ): MigrationQueueItem {
   const fields: EditableFieldValue[] = enrichImageFieldAlts(
     match.fieldMappings.map((mapping, index) => ({
@@ -50,7 +58,10 @@ export function queueItemFromMatch(
     reasoning: match.reasoning,
     targetPagePath: "",
     placeholder: DEFAULT_PRESENTATION_PLACEHOLDER,
-    language: DEFAULT_MIGRATION_LANGUAGE,
+    language: options?.language?.trim() || DEFAULT_MIGRATION_LANGUAGE,
+    parentBlockId: options?.parentBlockId ?? match.parentBlockId,
+    parentQueueItemId: options?.parentQueueItemId,
+    childPlaceholderKey: options?.childPlaceholderKey,
     fields,
   };
 }

@@ -29,9 +29,27 @@ export interface MigrationQueueItem {
   targetPagePath: string;
   /** Base presentation placeholder key (e.g. headless-main). Resolved to dynamic keys at push. */
   placeholder?: string;
+  /** Parent queue item for nested presentation (e.g. Card Item under Card List). */
+  parentQueueItemId?: string;
+  /** Crawl parent block id — used to link hierarchy before parent is queued. */
+  parentBlockId?: string;
+  /** Static child placeholder key from Placeholder Settings (e.g. card-list-items). */
+  childPlaceholderKey?: string;
+  /** Depth in presentation tree (0 = page root). */
+  presentationDepth?: number;
+  /** Order among siblings under the same parent placeholder. */
+  presentationSiblingIndex?: number;
+  /** Dynamic placeholder id suffix from rendering parameters (default 1). */
+  dynamicPlaceholderId?: number;
   /** Override auto-generated datasource item path. */
   datasourcePath?: string;
-  /** Language for presentation/datasource (default en). */
+  /** Primary Sitecore language (legacy single-select; use languages when set). */
   language?: string;
+  /** Sitecore language versions to migrate this page into. */
+  languages?: string[];
+  /** Source language the queued field values were extracted from. */
+  primarySourceLanguage?: string;
+  /** hreflang code → URL for alternate source pages (same content, other languages). */
+  sourceAlternateUrls?: Record<string, string>;
   fields: EditableFieldValue[];
 }

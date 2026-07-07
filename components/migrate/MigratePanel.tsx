@@ -26,7 +26,7 @@ import { ReturnToMappingSourceButton } from "@/components/workflow/ReturnToMappi
 import { isVisualMapperMode } from "@/lib/workflow/migration-mode";
 import { ReturnToReviewBanner } from "@/components/workflow/ReturnToReviewBanner";
 import { normalizeMediaUploadPath } from "@/lib/sitecore/media-upload";
-import { getDiscoveryResult } from "@/lib/storage/workflow-data";
+import { getDiscoveryResult, getCrawlResult } from "@/lib/storage/workflow-data";
 import { getMigrationQueue } from "@/lib/storage/migration-queue";
 import { prepareQueueForMigration } from "@/lib/migration/queue-sync";
 import {
@@ -71,7 +71,13 @@ export function MigratePanel({ embedded = false }: { embedded?: boolean }) {
   >("creating");
 
   const refreshQueue = useCallback(() => {
-    setQueue(prepareQueueForMigration(getMigrationQueue()));
+    const discovery = getDiscoveryResult();
+    setQueue(
+      prepareQueueForMigration(getMigrationQueue(), {
+        placeholders: discovery?.placeholders,
+        renderingProfiles: discovery?.renderingProfiles,
+      }),
+    );
   }, []);
 
   const showMigrateAnother = migrationComplete || feedback?.type === "success";
@@ -120,11 +126,15 @@ export function MigratePanel({ embedded = false }: { embedded?: boolean }) {
       existingPaths: string[];
     },
   ) {
-    const currentQueue = prepareQueueForMigration(getMigrationQueue());
-    const mediaLibraryPath = getDiscoveryResult()?.mediaPath?.trim();
-    const pageTemplatePath = getDiscoveryResult()?.pageTemplatePath?.trim();
+    const discovery = getDiscoveryResult();
+    const currentQueue = prepareQueueForMigration(getMigrationQueue(), {
+      placeholders: discovery?.placeholders,
+      renderingProfiles: discovery?.renderingProfiles,
+    });
+    const mediaLibraryPath = discovery?.mediaPath?.trim();
+    const pageTemplatePath = discovery?.pageTemplatePath?.trim();
     const sxaPageDataTemplatePath =
-      getDiscoveryResult()?.sxaPageDataTemplatePath?.trim();
+      discovery?.sxaPageDataTemplatePath?.trim();
 
     if (!mediaLibraryPath) {
       setFeedback({
@@ -188,6 +198,9 @@ export function MigratePanel({ embedded = false }: { embedded?: boolean }) {
           createMissingPages: shouldCreatePages,
           pageTemplatePath,
           sxaPageDataTemplatePath,
+          placeholders: discovery?.placeholders,
+          renderingProfiles: discovery?.renderingProfiles,
+          sourcePages: getCrawlResult()?.pages,
         }),
       });
 
@@ -243,7 +256,11 @@ export function MigratePanel({ embedded = false }: { embedded?: boolean }) {
   }
 
   async function handlePushToSitecore(): Promise<void> {
-    const currentQueue = prepareQueueForMigration(getMigrationQueue());
+    const discovery = getDiscoveryResult();
+    const currentQueue = prepareQueueForMigration(getMigrationQueue(), {
+      placeholders: discovery?.placeholders,
+      renderingProfiles: discovery?.renderingProfiles,
+    });
     refreshQueue();
 
     if (currentQueue.length === 0) {
@@ -493,9 +510,14 @@ export function MigratePanel({ embedded = false }: { embedded?: boolean }) {
           <ul className="mt-3 space-y-3 text-sm">
             {pushResult.results.map((entry) => (
               <li
-                key={entry.queueItemId}
+                key={`${entry.queueItemId}::${entry.language ?? "en"}`}
                 className="rounded-lg border border-zinc-100 bg-zinc-50 p-3"
               >
+                {entry.language && (
+                  <p className="text-xs font-medium text-zinc-500">
+                    Language: {entry.language}
+                  </p>
+                )}
                 <p className="font-mono text-xs text-zinc-600">
                   {entry.datasourcePath}
                 </p>
