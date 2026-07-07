@@ -1,4 +1,4 @@
-import { clearContentMigrationData } from "@/lib/storage/workflow-data";
+import { clearContentMigrationData, clearDownstreamOfCrawlData } from "@/lib/storage/workflow-data";
 import { clearMigrationMode, getMigrationMode } from "@/lib/workflow/migration-mode";
 import { SESSION_CHANGED_EVENT, STORAGE_KEYS } from "@/lib/sitecore/constants";
 import {
@@ -32,7 +32,11 @@ export function getFurthestPhaseIndex(): number {
 export function setFurthestPhaseIndex(index: number): void {
   const current = getFurthestPhaseIndex();
   const next = Math.max(current, index);
-  localStorage.setItem(STORAGE_KEYS.workflowFurthestPhase, String(next));
+  setWorkflowPhaseIndex(next);
+}
+
+export function setWorkflowPhaseIndex(index: number): void {
+  localStorage.setItem(STORAGE_KEYS.workflowFurthestPhase, String(index));
   window.dispatchEvent(new Event(WORKFLOW_PROGRESS_EVENT));
 }
 
@@ -127,6 +131,13 @@ export function clearMigratePhaseComplete(): void {
 
 export function clearAiMatchPhaseComplete(): void {
   localStorage.removeItem(STORAGE_KEYS.aiMatchComplete);
+}
+
+export function clearDownstreamMigrationProgress(): void {
+  clearAiMatchPhaseComplete();
+  clearReviewPhaseComplete();
+  clearMigratePhaseComplete();
+  clearDownstreamOfCrawlData();
 }
 
 export function clearCrawlPhaseComplete(): void {
@@ -227,12 +238,47 @@ export function canReturnToReviewForEditing(): boolean {
   return isReviewPhaseComplete() && !isMigratePhaseComplete();
 }
 
+export function canReturnToCrawlPhase(): boolean {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  if (getMigrationMode() === "visual-mapper") {
+    return false;
+  }
+
+  const crawlIndex = getPhaseIndex("crawl");
+  if (crawlIndex < 0) {
+    return false;
+  }
+
+  return isMapModePhaseComplete() && getFurthestPhaseIndex() >= crawlIndex;
+}
+
 export function returnToReviewPhase(): void {
   if (!canReturnToReviewForEditing()) {
     return;
   }
 
   window.location.hash = "review";
+  document.getElementById("workflow")?.scrollIntoView({
+    behavior: "smooth",
+    block: "start",
+  });
+}
+
+export function returnToCrawlPhase(): void {
+  if (!canReturnToCrawlPhase()) {
+    return;
+  }
+
+  clearDownstreamMigrationProgress();
+  setWorkflowPhaseIndex(getPhaseIndex("crawl"));
+  window.location.hash = "crawl";
+  document.getElementById("workflow")?.scrollIntoView({
+    behavior: "smooth",
+    block: "start",
+  });
 }
 
 export function canNavigateToPhase(
@@ -248,6 +294,9 @@ export function canNavigateToPhase(
 
   if (index < furthestIndex) {
     if (phaseId === "review" && canReturnToReviewForEditing()) {
+      return true;
+    }
+    if (phaseId === "crawl" && canReturnToCrawlPhase()) {
       return true;
     }
     if (phaseId === "auth" && !isAuthPhaseComplete()) {
@@ -310,7 +359,7 @@ export function advanceToWorkflowPhase(phaseId: WorkflowPhaseId): void {
     return;
   }
 
-  setFurthestPhaseIndex(index);
+  setWorkflowPhaseIndex(index);
   window.location.hash = phaseId;
 }
 

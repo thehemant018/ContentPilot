@@ -6,6 +6,7 @@ import { NextPhaseButton } from "@/components/workflow/NextPhaseButton";
 import {
   isDiscoveryPhaseComplete,
   isMapModePhaseComplete,
+  clearDownstreamMigrationProgress,
   markCrawlPhaseComplete,
   subscribeWorkflowProgress,
 } from "@/lib/workflow/progress";
@@ -68,6 +69,7 @@ export function CrawlPanel({ embedded = false }: { embedded?: boolean }) {
       }
 
       setResult(payload);
+      clearDownstreamMigrationProgress();
       markCrawlPhaseComplete();
       saveCrawlResult(payload);
       setFeedback({
