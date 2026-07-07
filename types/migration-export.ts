@@ -24,6 +24,11 @@ export interface MigrationPresentationExport {
   finalLayout: boolean;
   language: string;
   index: number;
+  parentQueueItemId?: string;
+  childPlaceholderKey?: string;
+  presentationDepth?: number;
+  presentationSiblingIndex?: number;
+  dynamicPlaceholderId?: number;
 }
 
 export interface MigrationComponentExport {
@@ -42,6 +47,7 @@ export interface MigrationComponentExport {
 
 export interface MigrationPushComponentResult {
   queueItemId: string;
+  language?: string;
   sourcePageUrl?: string;
   datasourcePath: string;
   targetPagePath: string;

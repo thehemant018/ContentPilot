@@ -47,6 +47,12 @@ export interface CrawledPage {
   url: string;
   title: string;
   blocks: ContentBlock[];
+  /** Detected source language for this page (URL, html lang, hreflang). */
+  language?: string;
+  /** Languages advertised on this page. */
+  availableLanguages?: string[];
+  /** hreflang code → absolute URL for alternate language pages. */
+  alternateUrls?: Record<string, string>;
 }
 
 export interface CrawlInput {
@@ -65,4 +71,6 @@ export interface CrawlResult {
   startUrl?: string;
   pages?: CrawledPage[];
   pageCount?: number;
+  /** Union of languages detected across crawled pages. */
+  sourceLanguages?: string[];
 }

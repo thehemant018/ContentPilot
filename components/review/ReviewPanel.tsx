@@ -80,7 +80,10 @@ export function ReviewPanel({ embedded = false }: { embedded?: boolean }) {
   function handleUpdatePageSettings(
     sourcePageUrl: string,
     updates: Partial<
-      Pick<MigrationQueueItem, "targetPagePath" | "placeholder" | "language">
+      Pick<
+        MigrationQueueItem,
+        "targetPagePath" | "placeholder" | "language" | "languages"
+      >
     >,
   ): void {
     updateQueueItemsForSourcePage(sourcePageUrl, updates);
@@ -196,9 +199,17 @@ export function ReviewPanel({ embedded = false }: { embedded?: boolean }) {
         <p className="mt-1 text-sm text-zinc-600">
           Set target page paths and SXA placeholders once per source page.
           Each component keeps its own datasource path and field content.
+          Language is mapped from the crawled page to the matching Sitecore
+          language discovered in Phase 2.
           When you push in Migrate, the queue is sent directly to Sitecore — nothing
           is written to disk.
         </p>
+        {getCrawlResult()?.sourceLanguages?.length ? (
+          <p className="mt-2 text-xs text-zinc-500">
+            Source website languages detected:{" "}
+            {getCrawlResult()?.sourceLanguages?.join(", ")}
+          </p>
+        ) : null}
         {getDiscoveryResult()?.mediaPath && (
           <p className="mt-2 text-xs text-zinc-500">
             Media upload folder:{" "}

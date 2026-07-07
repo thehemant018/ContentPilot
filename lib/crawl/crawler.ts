@@ -3,6 +3,7 @@ import {
   extractInternalLinks,
   extractPageTitle,
 } from "@/lib/crawl/extract-blocks";
+import { extractPageLanguages, aggregateSourceLanguages } from "@/lib/crawl/extract-languages";
 import { buildCrawlSuccessMessage } from "@/lib/crawl/crawl-messages";
 import { fetchPageHtml } from "@/lib/crawl/fetch-html";
 import {
@@ -34,12 +35,17 @@ async function parsePage(
   );
   const title = extractPageTitle(html) || url;
   const blocks = extractBlocksFromHtml(html);
+  const { detectedLanguage, availableLanguages, alternateUrls } =
+    extractPageLanguages(html, url);
 
   return {
     page: {
       url,
       title,
       blocks,
+      language: detectedLanguage,
+      availableLanguages,
+      alternateUrls,
     },
     effectiveFetchMode,
   };
@@ -73,11 +79,16 @@ async function crawlSite(
 
       const title = extractPageTitle(html) || currentUrl;
       const blocks = extractBlocksFromHtml(html);
+      const { detectedLanguage, availableLanguages, alternateUrls } =
+        extractPageLanguages(html, currentUrl);
 
       pages.push({
         url: currentUrl,
         title,
         blocks,
+        language: detectedLanguage,
+        availableLanguages,
+        alternateUrls,
       });
 
       if (pages.length < maxPages) {
@@ -144,6 +155,7 @@ export async function runCrawl(input: CrawlInput): Promise<CrawlResult> {
         fetchMode: effectiveFetchMode,
         pages,
         pageCount: pages.length,
+        sourceLanguages: aggregateSourceLanguages(pages),
       };
     }
 
@@ -163,6 +175,7 @@ export async function runCrawl(input: CrawlInput): Promise<CrawlResult> {
       fetchMode: effectiveFetchMode,
       pages: [page],
       pageCount: 1,
+      sourceLanguages: aggregateSourceLanguages([page]),
     };
   } catch (error) {
     const message =

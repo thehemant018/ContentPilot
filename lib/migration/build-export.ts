@@ -2,8 +2,14 @@ import {
   DEFAULT_MIGRATION_LANGUAGE,
   DEFAULT_PRESENTATION_PLACEHOLDER,
 } from "@/lib/migration/constants";
+import {
+  findRenderingProfile,
+  pickNestedPlaceholderKeyPattern,
+} from "@/lib/migration/placeholder-registry";
 import { normalizeSitecoreItemPath } from "@/lib/migration/sitecore-path";
 import { buildSxaDatasourceParentPath } from "@/lib/sitecore/item-lookup";
+import { resolveNestedDynamicPresentationPlaceholder } from "@/lib/sitecore/rendering-parameters";
+import type { RenderingPlaceholderProfile } from "@/types/discovery";
 import type {
   MigrationComponentExport,
 } from "@/types/migration-export";
@@ -46,10 +52,83 @@ export function buildDatasourceName(item: MigrationQueueItem): string {
   return item.renderingName || item.templateName || item.blockType;
 }
 
+export interface BuildComponentExportOptions {
+  queueItemsById?: Map<string, MigrationQueueItem>;
+  renderingProfiles?: RenderingPlaceholderProfile[];
+}
+
+/**
+ * Resolves the layout placeholder key written at push time.
+ * Root components use the page placeholder (e.g. headless-main).
+ * Nested children use Sitecore dynamic placeholder paths
+ * (e.g. headless-main/CardList-1).
+ */
+export function resolveExportPresentationPlaceholder(
+  item: MigrationQueueItem,
+  queueItemsById: Map<string, MigrationQueueItem>,
+  renderingProfiles?: RenderingPlaceholderProfile[],
+  visiting: Set<string> = new Set(),
+): string {
+  if (!item.parentQueueItemId) {
+    return item.placeholder?.trim() || DEFAULT_PLACEHOLDER;
+  }
+
+  if (visiting.has(item.id)) {
+    return item.childPlaceholderKey?.trim() || item.placeholder?.trim() || DEFAULT_PLACEHOLDER;
+  }
+
+  const parent = queueItemsById.get(item.parentQueueItemId);
+  if (!parent) {
+    return item.childPlaceholderKey?.trim() || item.placeholder?.trim() || DEFAULT_PLACEHOLDER;
+  }
+
+  visiting.add(item.id);
+  const parentResolvedPlaceholder = resolveExportPresentationPlaceholder(
+    parent,
+    queueItemsById,
+    renderingProfiles,
+    visiting,
+  );
+  visiting.delete(item.id);
+
+  const parentProfile = findRenderingProfile(
+    renderingProfiles,
+    parent.renderingPath,
+  );
+  const childProfile = findRenderingProfile(
+    renderingProfiles,
+    item.renderingPath,
+  );
+  const childPlaceholderKey = pickNestedPlaceholderKeyPattern({
+    childPlaceholderKey: item.childPlaceholderKey,
+    parentProfile,
+    childProfile,
+  });
+  if (!childPlaceholderKey) {
+    return item.placeholder?.trim() || DEFAULT_PLACEHOLDER;
+  }
+  const parentDynamicPlaceholderId =
+    parent.dynamicPlaceholderId ??
+    parentProfile?.defaultDynamicPlaceholderId ??
+    1;
+
+  return resolveNestedDynamicPresentationPlaceholder({
+    parentProfile,
+    childProfile,
+    parentResolvedPlaceholder,
+    parentRenderingName:
+      parent.renderingName || parentProfile?.renderingName || "",
+    parentRenderingUid: "",
+    parentDynamicPlaceholderId,
+    childPlaceholderKey,
+  });
+}
+
 export function buildComponentExport(
   item: MigrationQueueItem,
   index: number,
   exportedAt: string,
+  options?: BuildComponentExportOptions,
 ): MigrationComponentExport | null {
   const targetPagePath = normalizeSitecoreItemPath(item.targetPagePath);
   if (!targetPagePath) {
@@ -75,6 +154,14 @@ export function buildComponentExport(
     });
   }
 
+  const queueItemsById =
+    options?.queueItemsById ?? new Map([[item.id, item]]);
+  const resolvedPlaceholder = resolveExportPresentationPlaceholder(
+    item,
+    queueItemsById,
+    options?.renderingProfiles,
+  );
+
   return {
     queueItemId: item.id,
     blockId: item.blockId,
@@ -97,11 +184,16 @@ export function buildComponentExport(
       itemPath: targetPagePath,
       renderingName: item.renderingName,
       renderingPath: item.renderingPath,
-      placeHolder: item.placeholder?.trim() || DEFAULT_PLACEHOLDER,
+      placeHolder: resolvedPlaceholder,
       dataSource: dataSourcePath,
       finalLayout: false,
       language: item.language?.trim() || DEFAULT_LANGUAGE,
       index,
+      parentQueueItemId: item.parentQueueItemId,
+      childPlaceholderKey: item.childPlaceholderKey,
+      presentationDepth: item.presentationDepth,
+      presentationSiblingIndex: item.presentationSiblingIndex,
+      dynamicPlaceholderId: item.dynamicPlaceholderId,
     },
   };
 }

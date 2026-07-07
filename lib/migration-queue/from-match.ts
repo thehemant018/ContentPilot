@@ -1,3 +1,4 @@
+import { ensureLinkFieldStoredValue, isLinkField } from "@/lib/migration/link-field";
 import { enrichImageFieldAlts } from "@/lib/migration/image-metadata";
 import {
   DEFAULT_MIGRATION_LANGUAGE,
@@ -10,9 +11,17 @@ import type {
   MigrationQueueItem,
 } from "@/types/migration-queue";
 
+export interface QueueItemFromMatchOptions {
+  parentBlockId?: string;
+  parentQueueItemId?: string;
+  childPlaceholderKey?: string;
+  language?: string;
+}
+
 export function queueItemFromMatch(
   match: BlockMatchResult,
   blockImages: CrawlImage[] = [],
+  options?: QueueItemFromMatchOptions,
 ): MigrationQueueItem {
   const fields: EditableFieldValue[] = enrichImageFieldAlts(
     match.fieldMappings.map((mapping, index) => ({
@@ -21,7 +30,12 @@ export function queueItemFromMatch(
       sitecoreField: mapping.sitecoreField,
       fieldType: mapping.fieldType,
       section: mapping.section,
-      value: mapping.sourcePreview,
+      value: ensureLinkFieldStoredValue(
+        mapping.sourcePreview,
+        mapping.sitecoreField,
+        mapping.fieldType,
+        match.pageUrl,
+      ),
       imageAlt: mapping.imageAlt,
     })),
     blockImages,
@@ -44,7 +58,10 @@ export function queueItemFromMatch(
     reasoning: match.reasoning,
     targetPagePath: "",
     placeholder: DEFAULT_PRESENTATION_PLACEHOLDER,
-    language: DEFAULT_MIGRATION_LANGUAGE,
+    language: options?.language?.trim() || DEFAULT_MIGRATION_LANGUAGE,
+    parentBlockId: options?.parentBlockId ?? match.parentBlockId,
+    parentQueueItemId: options?.parentQueueItemId,
+    childPlaceholderKey: options?.childPlaceholderKey,
     fields,
   };
 }

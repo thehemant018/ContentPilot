@@ -8,14 +8,17 @@ import {
   isSessionExpired,
 } from "@/lib/storage/sitecore-session";
 import type { DiscoveryResult, SitecoreSite } from "@/types/discovery";
+import { DiscoveryProgress } from "@/components/discovery/DiscoveryProgress";
 import { DiscoveryResults } from "@/components/discovery/DiscoveryResults";
 import { SiteSelector } from "@/components/discovery/SiteSelector";
 import { NextPhaseButton } from "@/components/workflow/NextPhaseButton";
 import { markDiscoveryPhaseComplete } from "@/lib/workflow/progress";
-import { saveDiscoveryResult } from "@/lib/storage/workflow-data";
+import { saveDiscoveryResult, getDiscoveryResult } from "@/lib/storage/workflow-data";
+import { DEFAULT_SXA_PAGE_DATA_TEMPLATE_PATH } from "@/lib/migration/sxa-page-structure";
 import { saveVisualMapperSiteId } from "@/lib/visual-mapper/session-storage";
 
 const DEFAULT_RENDERINGS_PATH = "/sitecore/layout/Renderings";
+const DEFAULT_PLACEHOLDERS_PATH = "/sitecore/layout/Placeholder Settings";
 const DEFAULT_MEDIA_PATH = "/sitecore/media";
 const DEFAULT_TEMPLATES_PATH = "/sitecore/templates";
 
@@ -24,8 +27,13 @@ export function DiscoveryPanel({ embedded = false }: { embedded?: boolean }) {
   const [sites, setSites] = useState<SitecoreSite[]>([]);
   const [selectedSite, setSelectedSite] = useState<SitecoreSite | null>(null);
   const [renderingsPath, setRenderingsPath] = useState(DEFAULT_RENDERINGS_PATH);
+  const [placeholdersPath, setPlaceholdersPath] = useState(DEFAULT_PLACEHOLDERS_PATH);
   const [mediaPath, setMediaPath] = useState(DEFAULT_MEDIA_PATH);
   const [templatesPath, setTemplatesPath] = useState(DEFAULT_TEMPLATES_PATH);
+  const [pageTemplatePath, setPageTemplatePath] = useState("");
+  const [sxaPageDataTemplatePath, setSxaPageDataTemplatePath] = useState(
+    DEFAULT_SXA_PAGE_DATA_TEMPLATE_PATH,
+  );
   const [isLoadingSites, setIsLoadingSites] = useState(false);
   const [isDiscovering, setIsDiscovering] = useState(false);
   const [feedback, setFeedback] = useState<{
@@ -79,6 +87,13 @@ export function DiscoveryPanel({ embedded = false }: { embedded?: boolean }) {
   useEffect(() => {
     queueMicrotask(() => {
       refreshConnectionState();
+      const saved = getDiscoveryResult();
+      if (saved?.pageTemplatePath) {
+        setPageTemplatePath(saved.pageTemplatePath);
+      }
+      if (saved?.sxaPageDataTemplatePath) {
+        setSxaPageDataTemplatePath(saved.sxaPageDataTemplatePath);
+      }
     });
 
     function handleSessionChange() {
@@ -122,7 +137,9 @@ export function DiscoveryPanel({ embedded = false }: { embedded?: boolean }) {
         method: "POST",
         body: JSON.stringify({
           siteName: selectedSite.name,
+          siteRootPath: selectedSite.rootPath,
           renderingsPath,
+          placeholdersPath,
           mediaPath,
           templatesPath,
         }),
@@ -138,7 +155,11 @@ export function DiscoveryPanel({ embedded = false }: { embedded?: boolean }) {
 
       if (payload.success) {
         markDiscoveryPhaseComplete();
-        saveDiscoveryResult(payload);
+        saveDiscoveryResult({
+          ...payload,
+          pageTemplatePath: pageTemplatePath.trim() || undefined,
+          sxaPageDataTemplatePath: sxaPageDataTemplatePath.trim() || undefined,
+        });
         if (selectedSite) {
           saveVisualMapperSiteId(selectedSite.name);
         }
@@ -209,7 +230,7 @@ export function DiscoveryPanel({ embedded = false }: { embedded?: boolean }) {
             Site &amp; template discovery
           </h2>
           <p className="mt-2 max-w-3xl text-sm leading-relaxed text-zinc-600">
-            Select a site, then provide the renderings, media, and templates
+            Select a site, then provide the renderings, placeholders, media, and templates
             paths for MigrateX to verify. When all paths exist, we load the
             target schema — read-only, nothing is modified in Sitecore.
           </p>
@@ -238,8 +259,8 @@ export function DiscoveryPanel({ embedded = false }: { embedded?: boolean }) {
           </h3>
           <p className="text-sm text-zinc-600">
             Enter the Sitecore item paths where your project keeps renderings,
-            media, and templates. We check each path exists before loading
-            related items.
+            placeholder settings, media, and templates. We check each path exists
+            before loading related items.
           </p>
 
           <div className="grid gap-4 md:grid-cols-1">
@@ -254,9 +275,28 @@ export function DiscoveryPanel({ embedded = false }: { embedded?: boolean }) {
                 id="renderingsPath"
                 value={renderingsPath}
                 onChange={(event) => setRenderingsPath(event.target.value)}
+                disabled={isDiscovering}
                 required
                 placeholder="/sitecore/layout/Renderings/Feature/YourProject"
-                className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 font-mono text-sm text-zinc-900 outline-none ring-teal-500 focus:border-teal-500 focus:ring-2"
+                className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 font-mono text-sm text-zinc-900 outline-none ring-teal-500 focus:border-teal-500 focus:ring-2 disabled:cursor-not-allowed disabled:bg-zinc-50 disabled:opacity-70"
+              />
+            </div>
+
+            <div>
+              <label
+                htmlFor="placeholdersPath"
+                className="block text-sm font-medium text-zinc-700"
+              >
+                Placeholder settings path
+              </label>
+              <input
+                id="placeholdersPath"
+                value={placeholdersPath}
+                onChange={(event) => setPlaceholdersPath(event.target.value)}
+                disabled={isDiscovering}
+                required
+                placeholder="/sitecore/layout/Placeholder Settings/Feature/YourProject"
+                className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 font-mono text-sm text-zinc-900 outline-none ring-teal-500 focus:border-teal-500 focus:ring-2 disabled:cursor-not-allowed disabled:bg-zinc-50 disabled:opacity-70"
               />
             </div>
 
@@ -271,9 +311,10 @@ export function DiscoveryPanel({ embedded = false }: { embedded?: boolean }) {
                 id="mediaPath"
                 value={mediaPath}
                 onChange={(event) => setMediaPath(event.target.value)}
+                disabled={isDiscovering}
                 required
                 placeholder="/sitecore/media/Project/YourProject"
-                className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 font-mono text-sm text-zinc-900 outline-none ring-teal-500 focus:border-teal-500 focus:ring-2"
+                className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 font-mono text-sm text-zinc-900 outline-none ring-teal-500 focus:border-teal-500 focus:ring-2 disabled:cursor-not-allowed disabled:bg-zinc-50 disabled:opacity-70"
               />
             </div>
 
@@ -288,14 +329,59 @@ export function DiscoveryPanel({ embedded = false }: { embedded?: boolean }) {
                 id="templatesPath"
                 value={templatesPath}
                 onChange={(event) => setTemplatesPath(event.target.value)}
+                disabled={isDiscovering}
                 required
                 placeholder="/sitecore/templates/Feature/YourProject"
-                className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 font-mono text-sm text-zinc-900 outline-none ring-teal-500 focus:border-teal-500 focus:ring-2"
+                className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 font-mono text-sm text-zinc-900 outline-none ring-teal-500 focus:border-teal-500 focus:ring-2 disabled:cursor-not-allowed disabled:bg-zinc-50 disabled:opacity-70"
               />
+            </div>
+
+            <div>
+              <label
+                htmlFor="pageTemplatePath"
+                className="block text-sm font-medium text-zinc-700"
+              >
+                Page template path (optional)
+              </label>
+              <input
+                id="pageTemplatePath"
+                value={pageTemplatePath}
+                onChange={(event) => setPageTemplatePath(event.target.value)}
+                disabled={isDiscovering}
+                placeholder="/sitecore/templates/Project/Page"
+                className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 font-mono text-sm text-zinc-900 outline-none ring-teal-500 focus:border-teal-500 focus:ring-2 disabled:cursor-not-allowed disabled:bg-zinc-50 disabled:opacity-70"
+              />
+              <p className="mt-1 text-xs text-zinc-500">
+                Used when creating missing target pages during migrate push. If
+                empty, MigrateX infers the template from a sibling page.
+              </p>
+            </div>
+
+            <div>
+              <label
+                htmlFor="sxaPageDataTemplatePath"
+                className="block text-sm font-medium text-zinc-700"
+              >
+                SXA Page Data template path (optional)
+              </label>
+              <input
+                id="sxaPageDataTemplatePath"
+                value={sxaPageDataTemplatePath}
+                onChange={(event) =>
+                  setSxaPageDataTemplatePath(event.target.value)
+                }
+                disabled={isDiscovering}
+                placeholder={DEFAULT_SXA_PAGE_DATA_TEMPLATE_PATH}
+                className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 font-mono text-sm text-zinc-900 outline-none ring-teal-500 focus:border-teal-500 focus:ring-2 disabled:cursor-not-allowed disabled:bg-zinc-50 disabled:opacity-70"
+              />
+              <p className="mt-1 text-xs text-zinc-500">
+                Template for the page-level <span className="font-mono">Data</span>{" "}
+                item created under new SXA pages during migrate push.
+              </p>
             </div>
           </div>
 
-          {feedback && (
+          {feedback && !isDiscovering && (
             <div
               role="status"
               className={`rounded-lg px-4 py-3 text-sm ${
@@ -308,12 +394,20 @@ export function DiscoveryPanel({ embedded = false }: { embedded?: boolean }) {
             </div>
           )}
 
+          <DiscoveryProgress isActive={isDiscovering} />
+
           <button
             type="submit"
             disabled={isDiscovering || !selectedSite}
-            className="inline-flex items-center justify-center rounded-lg bg-teal-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex items-center justify-center gap-2 rounded-lg bg-teal-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {isDiscovering ? "Validating paths…" : "Validate paths & discover"}
+            {isDiscovering && (
+              <span
+                className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"
+                aria-hidden="true"
+              />
+            )}
+            {isDiscovering ? "Discovering…" : "Validate paths & discover"}
           </button>
         </form>
 

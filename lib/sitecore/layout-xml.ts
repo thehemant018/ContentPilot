@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import { DEFAULT_PRESENTATION_PLACEHOLDER } from "@/lib/migration/constants";
+import { buildSitecoreRenderingParametersString } from "@/lib/sitecore/rendering-parameters";
 
 /** Default layout device used by most Sitecore / SXA pages. */
 export const DEFAULT_LAYOUT_DEVICE_ID = "FE5D7FDF-89C0-4D99-9AA3-B5FBD009C9F3";
@@ -19,19 +20,27 @@ export function formatSitecoreGuid(id: string): string {
   return `{${dashed}}`;
 }
 
+export function buildRenderingParametersString(
+  parameters: Record<string, string | number | undefined> | undefined,
+): string {
+  return buildSitecoreRenderingParametersString(parameters ?? {});
+}
+
 export function buildRenderingElement(input: {
   renderingId: string;
   placeholder: string;
   datasourceId: string;
   uid?: string;
+  parameters?: Record<string, string | number | undefined>;
 }): string {
   const uid = formatSitecoreGuid(input.uid ?? randomUUID());
   const renderingId = formatSitecoreGuid(input.renderingId);
   const datasourceId = formatSitecoreGuid(input.datasourceId);
   const placeholder =
     input.placeholder.trim() || DEFAULT_PRESENTATION_PLACEHOLDER;
+  const parameters = buildRenderingParametersString(input.parameters);
 
-  return `<r uid="${uid}" s:id="${renderingId}" s:ph="${placeholder}" s:ds="${datasourceId}" s:par="" s:ccb="Clear on publish" />`;
+  return `<r uid="${uid}" s:id="${renderingId}" s:ph="${placeholder}" s:ds="${datasourceId}" s:par="${parameters}" s:ccb="Clear on publish" />`;
 }
 
 export function buildInitialLayoutXml(

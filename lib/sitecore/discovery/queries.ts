@@ -61,6 +61,90 @@ export const SEARCH_UNDER_PATH_QUERY = `
   }
 `;
 
+export const ITEM_FIELDS_QUERY = `
+  query MigrateXItemFields($path: String!) {
+    item(where: { path: $path }) {
+      itemId
+      name
+      path
+      fields(ownFields: true, excludeStandardFields: false) {
+        nodes {
+          name
+          value
+        }
+      }
+    }
+  }
+`;
+
+export const ITEM_INHERITED_FIELDS_QUERY = `
+  query MigrateXItemInheritedFields($path: String!) {
+    item(where: { path: $path }) {
+      itemId
+      name
+      path
+      fields(ownFields: false, excludeStandardFields: false) {
+        nodes {
+          name
+          value
+        }
+      }
+    }
+  }
+`;
+
+export const ITEM_PATH_BY_ID_QUERY = `
+  query MigrateXItemPathById($itemId: ID!) {
+    item(where: { itemId: $itemId }) {
+      itemId
+      path
+    }
+  }
+`;
+
+export const ITEM_FIELDS_BY_ID_QUERY = `
+  query MigrateXItemFieldsById($itemId: ID!) {
+    item(where: { itemId: $itemId }) {
+      itemId
+      name
+      path
+      fields(ownFields: true, excludeStandardFields: false) {
+        nodes {
+          name
+          value
+        }
+      }
+    }
+  }
+`;
+
+export const SEARCH_ITEM_BY_ID_QUERY = `
+  query MigrateXSearchItemById($itemId: String!, $pageSize: Int!) {
+    search(
+      query: {
+        index: "sitecore_master_index"
+        searchStatement: {
+          criteria: [
+            {
+              criteriaType: EQUALS
+              field: "_id"
+              value: $itemId
+            }
+          ]
+        }
+        paging: { pageSize: $pageSize, pageIndex: 0 }
+      }
+    ) {
+      results {
+        innerItem {
+          itemId
+          path
+        }
+      }
+    }
+  }
+`;
+
 export const TEMPLATE_STRUCTURE_QUERY = `
   query MigrateXTemplateStructure($path: String!) {
     item(where: { path: $path }) {
@@ -88,6 +172,30 @@ export const TEMPLATE_STRUCTURE_QUERY = `
             }
           }
         }
+      }
+    }
+  }
+`;
+
+/** Resolves parameter template base templates (e.g. IDynamicPlaceholder inheritance). */
+export const TEMPLATE_INHERITANCE_QUERY = `
+  query MigrateXTemplateInheritance($path: String!) {
+    templates(path: $path) {
+      name
+      baseTemplates {
+        name
+        baseTemplates {
+          name
+          baseTemplates {
+            name
+            baseTemplates {
+              name
+            }
+          }
+        }
+      }
+      ownFields {
+        name
       }
     }
   }

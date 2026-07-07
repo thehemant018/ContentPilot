@@ -2,6 +2,9 @@ import type {
   DiscoveryItem,
   DiscoveryResult,
   PathValidationResult,
+  PlaceholderDefinition,
+  RenderingPlaceholderProfile,
+  SitecoreLanguage,
   TemplateDefinition,
 } from "@/types/discovery";
 
@@ -33,6 +36,42 @@ function slimPathValidation(item: PathValidationResult): PathValidationResult {
   };
 }
 
+function slimPlaceholder(item: PlaceholderDefinition): PlaceholderDefinition {
+  return {
+    itemId: item.itemId,
+    name: item.name,
+    path: item.path,
+    key: item.key,
+  };
+}
+
+function slimRenderingProfile(
+  profile: RenderingPlaceholderProfile,
+): RenderingPlaceholderProfile {
+  return {
+    renderingPath: profile.renderingPath,
+    renderingId: profile.renderingId,
+    renderingName: profile.renderingName,
+    allowedParentPlaceholderKeys: profile.allowedParentPlaceholderKeys,
+    exposedChildPlaceholderKeys: profile.exposedChildPlaceholderKeys,
+    defaultDynamicPlaceholderId: profile.defaultDynamicPlaceholderId,
+    hasDynamicPlaceholders: profile.hasDynamicPlaceholders,
+    usesSxaDynamicPlaceholders: profile.usesSxaDynamicPlaceholders,
+    inheritsIDynamicPlaceholder: profile.inheritsIDynamicPlaceholder,
+    nestedPlaceholderFormat: profile.nestedPlaceholderFormat,
+  };
+}
+
+function slimLanguage(language: SitecoreLanguage): SitecoreLanguage {
+  return {
+    name: language.name,
+    path: language.path,
+    iso: language.iso,
+    nativeName: language.nativeName,
+    englishName: language.englishName,
+  };
+}
+
 /** Keeps only data required for AI match, export, and migrate push. */
 export function slimDiscoveryResult(result: DiscoveryResult): DiscoveryResult {
   if (!result.success) {
@@ -47,7 +86,16 @@ export function slimDiscoveryResult(result: DiscoveryResult): DiscoveryResult {
     success: true,
     message: result.message,
     mediaPath: result.mediaPath,
+    pageTemplatePath: result.pageTemplatePath,
+    sxaPageDataTemplatePath: result.sxaPageDataTemplatePath,
+    placeholdersPath: result.placeholdersPath,
     renderings: (result.renderings ?? []).map(slimRendering),
+    placeholders: (result.placeholders ?? []).map(slimPlaceholder),
+    renderingProfiles: (result.renderingProfiles ?? []).map(slimRenderingProfile),
+    instanceLanguages: (result.instanceLanguages ?? []).map(slimLanguage),
+    siteLanguages: (result.siteLanguages ?? []).map(slimLanguage),
+    selectedSiteName: result.selectedSiteName,
+    selectedSiteRootPath: result.selectedSiteRootPath,
     templates: (result.templates ?? [])
       .filter(isDatasourceTemplate)
       .map((template) => ({

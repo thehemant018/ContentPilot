@@ -1,16 +1,18 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { useMemo } from "react";
+import { LanguageMultiSelect } from "@/components/review/LanguageMultiSelect";
 import { QueueItemCard } from "@/components/review/QueueItemCard";
 import {
   reviewInputClass,
   reviewLabelClass,
   reviewSettingsPanelClass,
 } from "@/components/review/form-styles";
-import {
-  DEFAULT_MIGRATION_LANGUAGE,
-  DEFAULT_PRESENTATION_PLACEHOLDER,
-} from "@/lib/migration/constants";
+import { DEFAULT_PRESENTATION_PLACEHOLDER } from "@/lib/migration/constants";
+import { buildPageLanguagePicker } from "@/lib/migration/page-language-picker";
+import { listPageRootPlaceholderKeys } from "@/lib/migration/placeholder-registry";
+import { getCrawlResult, getDiscoveryResult } from "@/lib/storage/workflow-data";
 import type { MigrationQueueItem } from "@/types/migration-queue";
 
 interface PageMigrationGroupProps {
@@ -22,13 +24,16 @@ interface PageMigrationGroupProps {
   onUpdatePageSettings: (
     sourcePageUrl: string,
     updates: Partial<
-      Pick<MigrationQueueItem, "targetPagePath" | "placeholder" | "language">
+      Pick<
+        MigrationQueueItem,
+        "targetPagePath" | "placeholder" | "language" | "languages"
+      >
     >,
   ) => void;
   onUpdateItem: (
     id: string,
     updates: Partial<
-      Pick<MigrationQueueItem, "fields" | "datasourcePath">
+      Pick<MigrationQueueItem, "fields" | "datasourcePath" | "childPlaceholderKey">
     >,
   ) => void;
   onRemoveItem: (id: string) => void;
@@ -40,12 +45,14 @@ function PageGroupHeader({
   items,
   readyCount,
   renderingSummary,
+  selectedLanguages,
 }: {
   sourcePageUrl: string;
   pageTitle?: string;
   items: MigrationQueueItem[];
   readyCount: number;
   renderingSummary: string[];
+  selectedLanguages: string[];
 }) {
   return (
     <div className="flex flex-wrap items-start justify-between gap-3">
@@ -63,6 +70,11 @@ function PageGroupHeader({
           {items.length} component{items.length === 1 ? "" : "s"} — page settings
           apply to all components on this migration.
         </p>
+        {selectedLanguages.length > 0 && (
+          <p className="mt-1 text-xs text-zinc-600">
+            Versions: {selectedLanguages.join(", ")}
+          </p>
+        )}
         {renderingSummary.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-1.5">
             {renderingSummary.map((name) => (
@@ -95,8 +107,10 @@ function PageGroupBody({
   sourcePageUrl,
   targetPagePath,
   placeholder,
-  language,
+  selectedLanguages,
+  languageOptions,
   items,
+  pagePlaceholderKeys,
   onUpdatePageSettings,
   onUpdateItem,
   onRemoveItem,
@@ -105,12 +119,25 @@ function PageGroupBody({
   sourcePageUrl: string;
   targetPagePath: string;
   placeholder: string;
-  language: string;
+  selectedLanguages: string[];
+  languageOptions: ReturnType<typeof buildPageLanguagePicker>["options"];
   items: MigrationQueueItem[];
+  pagePlaceholderKeys: string[];
   onUpdatePageSettings: PageMigrationGroupProps["onUpdatePageSettings"];
   onUpdateItem: PageMigrationGroupProps["onUpdateItem"];
   onRemoveItem: PageMigrationGroupProps["onRemoveItem"];
 }) {
+  const sortedItems = [...items].sort((left, right) => {
+    const leftDepth = left.presentationDepth ?? 0;
+    const rightDepth = right.presentationDepth ?? 0;
+    if (leftDepth !== rightDepth) {
+      return leftDepth - rightDepth;
+    }
+    const leftSibling = left.presentationSiblingIndex ?? 0;
+    const rightSibling = right.presentationSiblingIndex ?? 0;
+    return leftSibling - rightSibling;
+  });
+
   return (
     <>
       <div className={reviewSettingsPanelClass}>
@@ -145,62 +172,87 @@ function PageGroupBody({
               htmlFor={`placeholder-page-${lead.id}`}
               className={reviewLabelClass}
             >
-              Presentation placeholder
+              Page placeholder
             </label>
-            <input
-              id={`placeholder-page-${lead.id}`}
-              type="text"
-              value={placeholder}
-              onChange={(event) =>
-                onUpdatePageSettings(sourcePageUrl, {
-                  placeholder: event.target.value,
-                })
-              }
-              placeholder={DEFAULT_PRESENTATION_PLACEHOLDER}
-              className={reviewInputClass}
-            />
+            {pagePlaceholderKeys.length > 0 ? (
+              <select
+                id={`placeholder-page-${lead.id}`}
+                value={placeholder}
+                onChange={(event) =>
+                  onUpdatePageSettings(sourcePageUrl, {
+                    placeholder: event.target.value,
+                  })
+                }
+                className={reviewInputClass}
+              >
+                {pagePlaceholderKeys.map((key) => (
+                  <option key={key} value={key}>
+                    {key}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <input
+                id={`placeholder-page-${lead.id}`}
+                type="text"
+                value={placeholder}
+                onChange={(event) =>
+                  onUpdatePageSettings(sourcePageUrl, {
+                    placeholder: event.target.value,
+                  })
+                }
+                placeholder={DEFAULT_PRESENTATION_PLACEHOLDER}
+                className={reviewInputClass}
+              />
+            )}
             <p className="mt-1.5 text-xs text-zinc-600">
-              Enter the base placeholder key (for example{" "}
-              <span className="font-mono font-medium text-zinc-800">
-                headless-main
-              </span>
-              ). MigrateX resolves dynamic keys from the page layout at push
-              time, including partial-design{" "}
-              <span className="font-mono font-medium text-zinc-800">sig</span>{" "}
-              placeholders.
+              Root placeholder for page-level components (from Placeholder
+              Settings when Discovery includes a placeholders path). Nested
+              children use parent exposed placeholders automatically.
             </p>
           </div>
-          <div>
+          <div className="md:col-span-2">
             <label
               htmlFor={`language-page-${lead.id}`}
               className={reviewLabelClass}
             >
-              Language
+              Sitecore language versions
             </label>
-            <input
+            <LanguageMultiSelect
               id={`language-page-${lead.id}`}
-              type="text"
-              value={language}
-              onChange={(event) =>
+              options={languageOptions}
+              selected={selectedLanguages}
+              onChange={(languages) =>
                 onUpdatePageSettings(sourcePageUrl, {
-                  language: event.target.value,
+                  languages,
+                  language: languages[0],
                 })
               }
-              placeholder="en"
-              className={reviewInputClass}
             />
+            <p className="mt-1.5 text-xs text-zinc-600">
+              Select one or more matched languages. Unmatched Sitecore languages
+              are shown disabled. Missing page/datasource versions are created on
+              push.
+            </p>
           </div>
         </div>
       </div>
 
       <div className="mt-5 space-y-4">
-        {items.map((item) => (
-          <QueueItemCard
+        {sortedItems.map((item) => (
+          <div
             key={item.id}
-            item={item}
-            onUpdate={onUpdateItem}
-            onRemove={onRemoveItem}
-          />
+            style={{
+              marginLeft: `${Math.min(item.presentationDepth ?? 0, 4) * 1.25}rem`,
+            }}
+          >
+            <QueueItemCard
+              item={item}
+              pageItems={items}
+              onUpdate={onUpdateItem}
+              onRemove={onRemoveItem}
+            />
+          </div>
         ))}
       </div>
     </>
@@ -245,11 +297,31 @@ export function PageMigrationGroup({
   const lead = items[0]!;
   const targetPagePath = lead.targetPagePath;
   const placeholder = lead.placeholder ?? DEFAULT_PRESENTATION_PLACEHOLDER;
-  const language = lead.language ?? DEFAULT_MIGRATION_LANGUAGE;
   const readyCount = items.filter((item) => item.targetPagePath.trim()).length;
   const renderingSummary = [
     ...new Set(items.map((item) => item.renderingName).filter(Boolean)),
   ];
+  const pagePlaceholderKeys = useMemo(() => {
+    const discovery = getDiscoveryResult();
+    const keys = listPageRootPlaceholderKeys(discovery?.placeholders);
+    if (keys.length > 0) {
+      return keys;
+    }
+    return [placeholder];
+  }, [placeholder]);
+
+  const crawl = getCrawlResult();
+  const languagePicker = useMemo(
+    () =>
+      buildPageLanguagePicker(
+        sourcePageUrl,
+        getDiscoveryResult(),
+        lead.languages ?? (lead.language ? [lead.language] : []),
+        crawl?.pages,
+        crawl?.sourceLanguages,
+      ),
+    [sourcePageUrl, lead.languages, lead.language, crawl?.pages, crawl?.sourceLanguages],
+  );
 
   return (
     <section className="rounded-2xl border border-zinc-200 bg-zinc-50 p-5">
@@ -262,14 +334,17 @@ export function PageMigrationGroup({
           items={items}
           readyCount={readyCount}
           renderingSummary={renderingSummary}
+          selectedLanguages={languagePicker.selected}
         />,
         <PageGroupBody
           lead={lead}
           sourcePageUrl={sourcePageUrl}
           targetPagePath={targetPagePath}
           placeholder={placeholder}
-          language={language}
+          selectedLanguages={languagePicker.selected}
+          languageOptions={languagePicker.options}
           items={items}
+          pagePlaceholderKeys={pagePlaceholderKeys}
           onUpdatePageSettings={onUpdatePageSettings}
           onUpdateItem={onUpdateItem}
           onRemoveItem={onRemoveItem}

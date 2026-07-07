@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
 import { requestAccessToken, normalizeInstanceUrl } from "@/lib/sitecore/auth";
+import {
+  connectErrorMessage,
+  connectErrorStatusCode,
+} from "@/lib/sitecore/connect-errors";
 import { verifyContentApiAccess } from "@/lib/sitecore/validate";
 import type {
   SitecoreConnectionInput,
@@ -8,7 +12,19 @@ import type {
 
 export async function POST(request: Request) {
   try {
-    const body = (await request.json()) as SitecoreConnectionInput;
+    let body: SitecoreConnectionInput;
+    try {
+      body = (await request.json()) as SitecoreConnectionInput;
+    } catch {
+      return NextResponse.json<SitecoreConnectionResult>(
+        {
+          success: false,
+          message: "Invalid request body. Refresh the page and try again.",
+        },
+        { status: 400 },
+      );
+    }
+
     const { instanceUrl, clientId, clientSecret } = body;
 
     if (!instanceUrl?.trim() || !clientId?.trim() || !clientSecret?.trim()) {
@@ -50,14 +66,14 @@ export async function POST(request: Request) {
       contentApiVerified: true,
     });
   } catch (error) {
-    const message =
-      error instanceof Error
-        ? error.message
-        : "Unable to connect to Sitecore XM Cloud.";
+    const message = connectErrorMessage(error);
+    const status = connectErrorStatusCode(error);
+
+    console.error("[sitecore/connect]", message);
 
     return NextResponse.json<SitecoreConnectionResult>(
       { success: false, message },
-      { status: 502 },
+      { status },
     );
   }
 }

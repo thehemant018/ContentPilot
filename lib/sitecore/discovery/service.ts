@@ -4,8 +4,16 @@ import {
   TEMPLATE_STRUCTURE_QUERY,
   VALIDATE_PATH_QUERY,
 } from "@/lib/sitecore/discovery/queries";
+import {
+  fetchPlaceholderDefinitions,
+  fetchRenderingPlaceholderProfiles,
+} from "@/lib/sitecore/discovery/placeholders";
 import { slimDiscoveryResult } from "@/lib/sitecore/discovery/slim-result";
 import { executeGraphQL } from "@/lib/sitecore/graphql-client";
+import {
+  fetchInstanceLanguages,
+  fetchSiteLanguages,
+} from "@/lib/sitecore/languages";
 import type {
   DiscoveryItem,
   DiscoveryPathsInput,
@@ -238,11 +246,13 @@ export async function runDiscovery(
   input: DiscoveryPathsInput,
 ): Promise<DiscoveryResult> {
   const renderingsPath = normalizePath(input.renderingsPath);
+  const placeholdersPath = normalizePath(input.placeholdersPath);
   const mediaPath = normalizePath(input.mediaPath);
   const templatesPath = normalizePath(input.templatesPath);
 
   const pathValidation = await Promise.all([
     validatePath(instanceUrl, accessToken, renderingsPath, "Renderings"),
+    validatePath(instanceUrl, accessToken, placeholdersPath, "Placeholders"),
     validatePath(instanceUrl, accessToken, mediaPath, "Media"),
     validatePath(instanceUrl, accessToken, templatesPath, "Templates"),
   ]);
@@ -262,10 +272,31 @@ export async function runDiscovery(
     });
   }
 
-  const [renderingItems, templates] = await Promise.all([
+  const [renderingItems, placeholders, templates, instanceLanguages] =
+    await Promise.all([
     searchItemsUnderPath(instanceUrl, accessToken, renderingsPath),
+    fetchPlaceholderDefinitions(instanceUrl, accessToken, placeholdersPath),
     fetchTemplateDefinitions(instanceUrl, accessToken, templatesPath),
+    fetchInstanceLanguages(instanceUrl, accessToken),
   ]);
+
+  const siteRootPath = input.siteRootPath?.trim();
+  let siteLanguages = instanceLanguages;
+
+  if (siteRootPath) {
+    try {
+      siteLanguages = await fetchSiteLanguages(
+        instanceUrl,
+        accessToken,
+        siteRootPath,
+      );
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Failed to fetch site languages.";
+      console.error("[MigrateX:discovery] Site language fetch failed:", message);
+      siteLanguages = instanceLanguages;
+    }
+  }
 
   const renderings = renderingItems.filter(
     (item) =>
@@ -273,11 +304,25 @@ export async function runDiscovery(
       RENDERING_TEMPLATE_NAMES.has(item.templateName),
   );
 
+  const renderingProfiles = await fetchRenderingPlaceholderProfiles(
+    instanceUrl,
+    accessToken,
+    renderings,
+    placeholders,
+  );
+
   return slimDiscoveryResult({
     success: true,
     message: `Discovery complete for site "${input.siteName}". All paths verified (read-only).`,
     mediaPath,
+    placeholdersPath,
     renderings,
+    placeholders,
+    renderingProfiles,
     templates,
+    instanceLanguages,
+    siteLanguages,
+    selectedSiteName: input.siteName,
+    selectedSiteRootPath: siteRootPath,
   });
 }

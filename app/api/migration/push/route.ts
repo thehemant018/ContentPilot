@@ -6,6 +6,11 @@ import {
 } from "@/lib/sitecore/request-auth";
 import type { MigrationPushResult } from "@/types/migration-export";
 import type { MigrationQueueItem } from "@/types/migration-queue";
+import type {
+  PlaceholderDefinition,
+  RenderingPlaceholderProfile,
+} from "@/types/discovery";
+import type { CrawledPage } from "@/types/crawl";
 
 export const maxDuration = 300;
 
@@ -19,6 +24,12 @@ export async function POST(request: Request) {
     const body = (await request.json()) as {
       mediaLibraryPath?: string;
       queue?: MigrationQueueItem[];
+      createMissingPages?: boolean;
+      pageTemplatePath?: string;
+      sxaPageDataTemplatePath?: string;
+      placeholders?: PlaceholderDefinition[];
+      renderingProfiles?: RenderingPlaceholderProfile[];
+      sourcePages?: CrawledPage[];
     };
 
     if (!body.queue?.length) {
@@ -37,6 +48,12 @@ export async function POST(request: Request) {
       {
         mediaLibraryPath: body.mediaLibraryPath ?? "",
         queue: body.queue,
+        createMissingPages: body.createMissingPages ?? false,
+        pageTemplatePath: body.pageTemplatePath,
+        sxaPageDataTemplatePath: body.sxaPageDataTemplatePath,
+        placeholders: body.placeholders,
+        renderingProfiles: body.renderingProfiles,
+        sourcePages: body.sourcePages,
       },
     );
 
