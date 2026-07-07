@@ -8,6 +8,7 @@ import {
   isSessionExpired,
 } from "@/lib/storage/sitecore-session";
 import type { DiscoveryResult, SitecoreSite } from "@/types/discovery";
+import { DiscoveryProgress } from "@/components/discovery/DiscoveryProgress";
 import { DiscoveryResults } from "@/components/discovery/DiscoveryResults";
 import { SiteSelector } from "@/components/discovery/SiteSelector";
 import { NextPhaseButton } from "@/components/workflow/NextPhaseButton";
@@ -274,9 +275,10 @@ export function DiscoveryPanel({ embedded = false }: { embedded?: boolean }) {
                 id="renderingsPath"
                 value={renderingsPath}
                 onChange={(event) => setRenderingsPath(event.target.value)}
+                disabled={isDiscovering}
                 required
                 placeholder="/sitecore/layout/Renderings/Feature/YourProject"
-                className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 font-mono text-sm text-zinc-900 outline-none ring-teal-500 focus:border-teal-500 focus:ring-2"
+                className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 font-mono text-sm text-zinc-900 outline-none ring-teal-500 focus:border-teal-500 focus:ring-2 disabled:cursor-not-allowed disabled:bg-zinc-50 disabled:opacity-70"
               />
             </div>
 
@@ -291,9 +293,10 @@ export function DiscoveryPanel({ embedded = false }: { embedded?: boolean }) {
                 id="placeholdersPath"
                 value={placeholdersPath}
                 onChange={(event) => setPlaceholdersPath(event.target.value)}
+                disabled={isDiscovering}
                 required
                 placeholder="/sitecore/layout/Placeholder Settings/Feature/YourProject"
-                className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 font-mono text-sm text-zinc-900 outline-none ring-teal-500 focus:border-teal-500 focus:ring-2"
+                className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 font-mono text-sm text-zinc-900 outline-none ring-teal-500 focus:border-teal-500 focus:ring-2 disabled:cursor-not-allowed disabled:bg-zinc-50 disabled:opacity-70"
               />
             </div>
 
@@ -308,9 +311,10 @@ export function DiscoveryPanel({ embedded = false }: { embedded?: boolean }) {
                 id="mediaPath"
                 value={mediaPath}
                 onChange={(event) => setMediaPath(event.target.value)}
+                disabled={isDiscovering}
                 required
                 placeholder="/sitecore/media/Project/YourProject"
-                className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 font-mono text-sm text-zinc-900 outline-none ring-teal-500 focus:border-teal-500 focus:ring-2"
+                className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 font-mono text-sm text-zinc-900 outline-none ring-teal-500 focus:border-teal-500 focus:ring-2 disabled:cursor-not-allowed disabled:bg-zinc-50 disabled:opacity-70"
               />
             </div>
 
@@ -325,9 +329,10 @@ export function DiscoveryPanel({ embedded = false }: { embedded?: boolean }) {
                 id="templatesPath"
                 value={templatesPath}
                 onChange={(event) => setTemplatesPath(event.target.value)}
+                disabled={isDiscovering}
                 required
                 placeholder="/sitecore/templates/Feature/YourProject"
-                className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 font-mono text-sm text-zinc-900 outline-none ring-teal-500 focus:border-teal-500 focus:ring-2"
+                className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 font-mono text-sm text-zinc-900 outline-none ring-teal-500 focus:border-teal-500 focus:ring-2 disabled:cursor-not-allowed disabled:bg-zinc-50 disabled:opacity-70"
               />
             </div>
 
@@ -342,8 +347,9 @@ export function DiscoveryPanel({ embedded = false }: { embedded?: boolean }) {
                 id="pageTemplatePath"
                 value={pageTemplatePath}
                 onChange={(event) => setPageTemplatePath(event.target.value)}
+                disabled={isDiscovering}
                 placeholder="/sitecore/templates/Project/Page"
-                className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 font-mono text-sm text-zinc-900 outline-none ring-teal-500 focus:border-teal-500 focus:ring-2"
+                className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 font-mono text-sm text-zinc-900 outline-none ring-teal-500 focus:border-teal-500 focus:ring-2 disabled:cursor-not-allowed disabled:bg-zinc-50 disabled:opacity-70"
               />
               <p className="mt-1 text-xs text-zinc-500">
                 Used when creating missing target pages during migrate push. If
@@ -364,8 +370,9 @@ export function DiscoveryPanel({ embedded = false }: { embedded?: boolean }) {
                 onChange={(event) =>
                   setSxaPageDataTemplatePath(event.target.value)
                 }
+                disabled={isDiscovering}
                 placeholder={DEFAULT_SXA_PAGE_DATA_TEMPLATE_PATH}
-                className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 font-mono text-sm text-zinc-900 outline-none ring-teal-500 focus:border-teal-500 focus:ring-2"
+                className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 font-mono text-sm text-zinc-900 outline-none ring-teal-500 focus:border-teal-500 focus:ring-2 disabled:cursor-not-allowed disabled:bg-zinc-50 disabled:opacity-70"
               />
               <p className="mt-1 text-xs text-zinc-500">
                 Template for the page-level <span className="font-mono">Data</span>{" "}
@@ -374,7 +381,7 @@ export function DiscoveryPanel({ embedded = false }: { embedded?: boolean }) {
             </div>
           </div>
 
-          {feedback && (
+          {feedback && !isDiscovering && (
             <div
               role="status"
               className={`rounded-lg px-4 py-3 text-sm ${
@@ -387,12 +394,20 @@ export function DiscoveryPanel({ embedded = false }: { embedded?: boolean }) {
             </div>
           )}
 
+          <DiscoveryProgress isActive={isDiscovering} />
+
           <button
             type="submit"
             disabled={isDiscovering || !selectedSite}
-            className="inline-flex items-center justify-center rounded-lg bg-teal-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex items-center justify-center gap-2 rounded-lg bg-teal-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {isDiscovering ? "Validating paths…" : "Validate paths & discover"}
+            {isDiscovering && (
+              <span
+                className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"
+                aria-hidden="true"
+              />
+            )}
+            {isDiscovering ? "Discovering…" : "Validate paths & discover"}
           </button>
         </form>
 
