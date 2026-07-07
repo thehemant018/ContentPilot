@@ -48,6 +48,43 @@ function extractLinkTarget($: CheerioAPI, el: CheerioElement): string {
   return linkEl?.attr("target") || "";
 }
 
+function extractBackgroundImageFromStyle(
+  style: string,
+  pageUrl: string,
+): string {
+  const match = style.match(/background-image:\s*url\(["']?([^"')]+)["']?\)/i);
+  return match?.[1] ? resolveNavigationHref(match[1], pageUrl) : "";
+}
+
+function extractBackgroundImageUrl(
+  $: CheerioAPI,
+  el: CheerioElement,
+  pageUrl: string,
+): string {
+  let current: CheerioElement | null = el;
+
+  while (current && current.length > 0 && !current.is("html")) {
+    const inline = current.attr("style") || "";
+    const fromInline = extractBackgroundImageFromStyle(inline, pageUrl);
+    if (fromInline) {
+      return fromInline;
+    }
+
+    const dataBg =
+      current.attr("data-bg") ||
+      current.attr("data-background") ||
+      current.attr("data-background-image") ||
+      "";
+    if (dataBg.trim()) {
+      return resolveNavigationHref(dataBg.trim(), pageUrl);
+    }
+
+    current = current.parent();
+  }
+
+  return "";
+}
+
 function extractSrc($: CheerioAPI, el: CheerioElement, pageUrl: string): string {
   const img = el.is("img") ? el : el.find("img").first();
   const target = img.length > 0 ? img : el;
@@ -55,7 +92,11 @@ function extractSrc($: CheerioAPI, el: CheerioElement, pageUrl: string): string 
     target.attr("src") ||
     target.attr("data-src") ||
     "";
-  return raw ? resolveNavigationHref(raw, pageUrl) : "";
+  if (raw) {
+    return resolveNavigationHref(raw, pageUrl);
+  }
+
+  return extractBackgroundImageUrl($, el, pageUrl);
 }
 
 export function extractContentFromElement(
@@ -67,15 +108,18 @@ export function extractContentFromElement(
   const linkEl = findLinkElement($, el);
   const html = el.html() || "";
   const childCount = el.children().length;
+  const backgroundSrc = extractBackgroundImageUrl($, el, pageUrl);
+  const src = extractSrc($, el, pageUrl);
+  const hasImgChild = tagName === "IMG" || el.find("img").length > 0;
 
   return {
     text: extractLinkText($, el),
     html: html.slice(0, 1000),
-    src: extractSrc($, el, pageUrl),
+    src,
     href: extractHref($, el, pageUrl),
     alt: el.attr("alt") || el.find("img").first().attr("alt") || "",
     tagName,
-    isImage: tagName === "IMG" || el.find("img").length > 0,
+    isImage: hasImgChild || Boolean(backgroundSrc),
     isLink: tagName === "A" || Boolean(linkEl),
     isHeading: /^H[1-6]$/.test(tagName),
     isRichText: tagName === "P" || (tagName === "DIV" && childCount > 1),

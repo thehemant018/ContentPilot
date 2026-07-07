@@ -33,6 +33,12 @@ export function unwrapNextImageUrl(absoluteUrl: string, baseUrl: URL): string {
   return extractNextImageInnerUrl(absoluteUrl, baseUrl) ?? absoluteUrl;
 }
 
+const EMBED_HOST_PATTERN =
+  /youtube\.com|youtu\.be|vimeo\.com|player\.vimeo|wistia\.com|vidyard\.com|dailymotion\.com|facebook\.com\/plugins\/video/i;
+
+const DEFAULT_EMBED_ALLOW =
+  "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share";
+
 function rewriteGenericUrl(url: string, baseUrl: URL): string {
   return resolveUrl(url, baseUrl);
 }
@@ -56,6 +62,21 @@ function rewriteTagAttributes(
     );
   }
   return result;
+}
+
+export function ensureIframeEmbedCapabilities(html: string): string {
+  return html.replace(/<iframe\b([^>]*)>/gi, (match, attrs: string) => {
+    const srcMatch = attrs.match(
+      /\s(?:src|data-src|data-lazy-src|data-iframe-src)\s*=\s*["']([^"']+)["']/i,
+    );
+    if (!srcMatch || !EMBED_HOST_PATTERN.test(srcMatch[1])) {
+      return match;
+    }
+    if (/\ballow\s*=/i.test(attrs)) {
+      return match;
+    }
+    return `<iframe${attrs} allow="${DEFAULT_EMBED_ALLOW}">`;
+  });
 }
 
 export function rewriteRelativeUrls(
@@ -117,6 +138,18 @@ export function rewriteRelativeUrls(
   result = rewriteTagAttributes(result, "form", ["action"], (url) =>
     rewriteGenericUrl(url, baseUrl),
   );
+
+  const iframeAttrs = [
+    "src",
+    "data-src",
+    "data-lazy-src",
+    "data-iframe-src",
+    "data-original",
+  ];
+  result = rewriteTagAttributes(result, "iframe", iframeAttrs, (url) =>
+    rewriteGenericUrl(url, baseUrl),
+  );
+  result = ensureIframeEmbedCapabilities(result);
 
   result = result.replace(
     /url\s*\(\s*(["']?)([^"')]+)\1\s*\)/gi,

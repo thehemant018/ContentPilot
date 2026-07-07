@@ -96,6 +96,16 @@ export function getAiMatchResult(): AiMatchResult | null {
   }
 }
 
+export function clearDownstreamOfCrawlData(): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  localStorage.removeItem(STORAGE_KEYS.aiMatchResult);
+  clearMigrationQueue();
+  window.dispatchEvent(new Event(WORKFLOW_DATA_CHANGED_EVENT));
+}
+
 export function clearWorkflowData(): void {
   localStorage.removeItem(STORAGE_KEYS.discoveryResult);
   localStorage.removeItem(STORAGE_KEYS.crawlResult);

@@ -1,3 +1,4 @@
+import { returnToCrawlPhase } from "@/lib/workflow/progress";
 import { STORAGE_KEYS } from "@/lib/sitecore/constants";
 
 export type MigrationMode = "ai" | "visual-mapper";
@@ -53,7 +54,7 @@ export function getMappingSourceBackTarget(): MappingSourceBackTarget {
     description:
       "Changed your mind about this page? Go back to Crawl and pick a different source URL.",
     navigate: () => {
-      window.location.href = "/#crawl";
+      returnToCrawlPhase();
     },
   };
 }

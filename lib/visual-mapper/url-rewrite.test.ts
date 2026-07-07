@@ -100,4 +100,24 @@ describe("url-rewrite", () => {
     );
     expect(toProxiedAssetUrl(proxied, PROXY_ORIGIN)).toBe(proxied);
   });
+
+  it("rewrites iframe embed src to absolute URLs without asset proxy", () => {
+    const html = rewriteRelativeUrls(
+      '<iframe src="/embed/video/123"></iframe><iframe src="https://www.youtube.com/embed/abc"></iframe>',
+      base,
+      { proxyOrigin: PROXY_ORIGIN },
+    );
+    expect(html).toContain('src="https://www.dpworld.com/embed/video/123"');
+    expect(html).toContain('src="https://www.youtube.com/embed/abc"');
+    expect(html).not.toContain("proxy-asset?url=https%3A%2F%2Fwww.youtube.com");
+  });
+
+  it("adds allow permissions for known video embed hosts", () => {
+    const html = rewriteRelativeUrls(
+      '<iframe src="https://player.vimeo.com/video/123"></iframe>',
+      base,
+      { proxyOrigin: PROXY_ORIGIN },
+    );
+    expect(html).toContain('allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"');
+  });
 });

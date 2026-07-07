@@ -24,4 +24,15 @@ describe("extract-from-dom", () => {
     const $ = cheerio.load("<html><head><title>My Blog</title></head></html>");
     expect(extractPageTitle($)).toBe("My Blog");
   });
+
+  it("extracts CSS background image URLs from inline styles", () => {
+    const $ = cheerio.load(
+      '<section style="background-image: url(\'/images/hero.jpg\')"><h1>Title</h1></section>',
+    );
+    const el = querySelectorElement($, "h1");
+    expect(el).not.toBeNull();
+    const content = extractContentFromElement($, el!, "https://example.com");
+    expect(content.src).toBe("https://example.com/images/hero.jpg");
+    expect(content.isImage).toBe(true);
+  });
 });

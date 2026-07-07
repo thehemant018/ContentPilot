@@ -6,6 +6,19 @@ import {
   type ParentToIframeMessage,
 } from "@/lib/visual-mapper/post-message";
 import { useVisualMapperStore } from "@/lib/visual-mapper/store";
+import type { FieldAssignment } from "@/types/visual-mapper";
+
+const IMAGE_FIELD_PATTERN = /\b(image|photo|media|thumbnail|picture|banner)\b/i;
+
+function fieldPrefersImagePick(field: FieldAssignment | undefined): boolean {
+  if (!field) {
+    return false;
+  }
+  return (
+    field.fieldType.toLowerCase().includes("image") ||
+    IMAGE_FIELD_PATTERN.test(field.sitecoreField)
+  );
+}
 
 interface IframeViewerProps {
   sourceUrl: string;
@@ -28,7 +41,12 @@ export function IframeViewer({ sourceUrl, highlightSelector }: IframeViewerProps
   const pageLoaded = useVisualMapperStore((s) => s.pageLoaded);
   const pageLoadFailed = useVisualMapperStore((s) => s.pageLoadFailed);
   const activeFieldId = useVisualMapperStore((s) => s.activeFieldId);
+  const draftFieldAssignments = useVisualMapperStore((s) => s.draftFieldAssignments);
   const sessionStatus = useVisualMapperStore((s) => s.session.status);
+
+  const activeField = draftFieldAssignments.find(
+    (field) => field.sitecoreField === activeFieldId,
+  );
 
   const postToIframe = useCallback((message: ParentToIframeMessage) => {
     iframeRef.current?.contentWindow?.postMessage(message, "*");
@@ -123,11 +141,15 @@ export function IframeViewer({ sourceUrl, highlightSelector }: IframeViewerProps
 
   useEffect(() => {
     if (activeFieldId) {
-      postToIframe({ type: "ENABLE_PICK_MODE", fieldId: activeFieldId });
+      postToIframe({
+        type: "ENABLE_PICK_MODE",
+        fieldId: activeFieldId,
+        preferImage: fieldPrefersImagePick(activeField),
+      });
     } else {
       postToIframe({ type: "DISABLE_PICK_MODE" });
     }
-  }, [activeFieldId, postToIframe]);
+  }, [activeField, activeFieldId, postToIframe]);
 
   useEffect(() => {
     if (highlightSelector) {
@@ -184,7 +206,7 @@ export function IframeViewer({ sourceUrl, highlightSelector }: IframeViewerProps
           ref={iframeRef}
           src={proxySrc}
           title="Visual Mapper page preview"
-          sandbox="allow-scripts allow-same-origin allow-forms"
+          sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-presentation"
           className="h-full w-full border-0 bg-white"
           onLoad={handleIframeLoad}
           onError={handleIframeError}
