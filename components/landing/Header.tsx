@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { HeaderConnectionStatus } from "@/components/landing/HeaderConnectionStatus";
 import { HeaderDisconnectButton } from "@/components/landing/HeaderDisconnectButton";
+import { HeaderDiscoveryButton } from "@/components/landing/HeaderDiscoveryButton";
 import { SESSION_CHANGED_EVENT } from "@/lib/sitecore/constants";
 import {
   getStoredSession,
@@ -106,6 +107,7 @@ export function Header() {
 
         <div className="hidden items-center gap-3 md:flex">
           <HeaderConnectionStatus />
+          <HeaderDiscoveryButton />
           <HeaderDisconnectButton />
           {!isConnected && (
             <a
@@ -136,6 +138,10 @@ export function Header() {
         >
           <div className="flex flex-col gap-3">
             <HeaderConnectionStatus mobile />
+            <HeaderDiscoveryButton
+              mobile
+              onNavigate={() => setMenuOpen(false)}
+            />
             <HeaderDisconnectButton
               mobile
               onDisconnect={() => setMenuOpen(false)}

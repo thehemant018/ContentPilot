@@ -1,4 +1,8 @@
-import { clearContentMigrationData, clearDownstreamOfCrawlData } from "@/lib/storage/workflow-data";
+import {
+  clearContentMigrationData,
+  clearPostDiscoveryWorkflowData,
+  clearDownstreamOfCrawlData,
+} from "@/lib/storage/workflow-data";
 import { clearMigrationMode, getMigrationMode } from "@/lib/workflow/migration-mode";
 import { SESSION_CHANGED_EVENT, STORAGE_KEYS } from "@/lib/sitecore/constants";
 import {
@@ -14,6 +18,7 @@ import {
 export const WORKFLOW_PROGRESS_EVENT = "migratex-workflow-progress-changed";
 export const CONTENT_MIGRATION_RESET_EVENT =
   "migratex-content-migration-reset";
+export const REOPEN_DISCOVERY_SESSION_FLAG = "migratex_reopen_discovery";
 
 function getPhaseIndex(phaseId: WorkflowPhaseId): number {
   return WORKFLOW_PHASES.findIndex((phase) => phase.id === phaseId);
@@ -255,6 +260,81 @@ export function canReturnToCrawlPhase(): boolean {
   return isMapModePhaseComplete() && getFurthestPhaseIndex() >= crawlIndex;
 }
 
+export function canReturnToDiscoveryPhase(): boolean {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  return isAuthPhaseComplete() && isDiscoveryPhaseComplete();
+}
+
+/** Clears map → migrate progress while keeping discovery results and completion. */
+export function clearDownstreamOfDiscovery(): void {
+  clearMapModePhaseComplete();
+  clearMigrationMode();
+  clearCrawlPhaseComplete();
+  clearAiMatchPhaseComplete();
+  clearReviewPhaseComplete();
+  clearMigratePhaseComplete();
+  clearPostDiscoveryWorkflowData();
+
+  localStorage.setItem(
+    STORAGE_KEYS.migrationCycleId,
+    String(getMigrationCycleId() + 1),
+  );
+  window.dispatchEvent(new Event(WORKFLOW_PROGRESS_EVENT));
+}
+
+export function requestReopenDiscoveryPhase(): void {
+  if (!canReturnToDiscoveryPhase()) {
+    return;
+  }
+
+  sessionStorage.setItem(REOPEN_DISCOVERY_SESSION_FLAG, "1");
+}
+
+export function applyReopenDiscoveryIfRequested(): boolean {
+  if (sessionStorage.getItem(REOPEN_DISCOVERY_SESSION_FLAG) !== "1") {
+    return false;
+  }
+
+  sessionStorage.removeItem(REOPEN_DISCOVERY_SESSION_FLAG);
+
+  if (!canReturnToDiscoveryPhase()) {
+    return false;
+  }
+
+  clearDownstreamOfDiscovery();
+
+  const discoveryIndex = getPhaseIndex("discovery");
+  if (discoveryIndex >= 0) {
+    setWorkflowPhaseIndex(discoveryIndex);
+  }
+
+  document.getElementById("workflow")?.scrollIntoView({
+    behavior: "smooth",
+    block: "start",
+  });
+
+  return true;
+}
+
+export function returnToDiscoveryPhase(): void {
+  if (!canReturnToDiscoveryPhase()) {
+    return;
+  }
+
+  requestReopenDiscoveryPhase();
+
+  if (window.location.pathname !== "/") {
+    window.location.href = "/#discovery";
+    return;
+  }
+
+  window.location.hash = "discovery";
+  applyReopenDiscoveryIfRequested();
+}
+
 export function returnToReviewPhase(): void {
   if (!canReturnToReviewForEditing()) {
     return;
@@ -294,6 +374,9 @@ export function canNavigateToPhase(
 
   if (index < furthestIndex) {
     if (phaseId === "review" && canReturnToReviewForEditing()) {
+      return true;
+    }
+    if (phaseId === "discovery" && canReturnToDiscoveryPhase()) {
       return true;
     }
     if (phaseId === "crawl" && canReturnToCrawlPhase()) {
