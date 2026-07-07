@@ -96,6 +96,18 @@ export function getAiMatchResult(): AiMatchResult | null {
   }
 }
 
+/** Clears map → migrate workflow data while keeping auth and discovery. */
+export function clearPostDiscoveryWorkflowData(): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  localStorage.removeItem(STORAGE_KEYS.crawlResult);
+  localStorage.removeItem(STORAGE_KEYS.aiMatchResult);
+  clearMigrationQueue();
+  window.dispatchEvent(new Event(WORKFLOW_DATA_CHANGED_EVENT));
+}
+
 export function clearDownstreamOfCrawlData(): void {
   if (typeof window === "undefined") {
     return;

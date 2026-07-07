@@ -18,6 +18,7 @@ import {
 import {
   canNavigateToPhase,
   canReturnToReviewForEditing,
+  applyReopenDiscoveryIfRequested,
   CONTENT_MIGRATION_RESET_EVENT,
   getDefaultPhaseFromHash,
   getFurthestPhaseIndex,
@@ -77,6 +78,17 @@ export function WorkflowTabs() {
   useEffect(() => {
     queueMicrotask(() => {
       setHydrated(true);
+
+      if (applyReopenDiscoveryIfRequested()) {
+        refreshProgress();
+        setActiveTab("discovery");
+        setMigrationCycleId(getMigrationCycleId());
+        if (window.location.hash.replace("#", "") !== "discovery") {
+          window.history.replaceState(null, "", "#discovery");
+        }
+        return;
+      }
+
       refreshProgress();
       const defaultTab = getDefaultPhaseFromHash();
       setActiveTab(defaultTab);
@@ -86,6 +98,13 @@ export function WorkflowTabs() {
     });
 
     function handleHashChange() {
+      if (applyReopenDiscoveryIfRequested()) {
+        refreshProgress();
+        setActiveTab("discovery");
+        setMigrationCycleId(getMigrationCycleId());
+        return;
+      }
+
       const tab = getDefaultPhaseFromHash();
       setActiveTab(tab);
       setFurthestIndex(getFurthestPhaseIndex());
