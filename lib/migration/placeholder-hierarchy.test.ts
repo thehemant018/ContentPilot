@@ -505,4 +505,73 @@ describe("linkQueueHierarchy", () => {
     expect(linkedChild?.childPlaceholderKey).toBe("CardList-Demo-{*}");
     expect(linkedChild?.presentationDepth).toBe(1);
   });
+
+  it("links each Card Item to the correct Card List when a page has two lists", () => {
+    const listA: MigrationQueueItem = {
+      id: "list-a",
+      addedAt: "2026-01-01T00:00:00.000Z",
+      blockId: "grid-a",
+      sourcePageUrl: "https://example.com/page",
+      blockType: "card-grid",
+      renderingName: "Card List",
+      renderingPath: profiles[0]!.renderingPath,
+      templateName: "Card List",
+      matchScore: 90,
+      confidence: "high",
+      reasoning: "test",
+      targetPagePath: "/sitecore/content/site/home",
+      placeholder: "headless-main",
+      fields: [],
+    };
+
+    const listB: MigrationQueueItem = {
+      ...listA,
+      id: "list-b",
+      addedAt: "2026-01-01T00:00:01.000Z",
+      blockId: "grid-b",
+    };
+
+    const itemA: MigrationQueueItem = {
+      id: "item-a",
+      addedAt: "2026-01-01T00:00:02.000Z",
+      blockId: "grid-a-sub-1",
+      parentBlockId: "grid-a",
+      sourcePageUrl: "https://example.com/page",
+      blockType: "card-grid",
+      renderingName: "Card Item",
+      renderingPath: profiles[1]!.renderingPath,
+      templateName: "Card Item",
+      matchScore: 88,
+      confidence: "high",
+      reasoning: "test",
+      targetPagePath: "/sitecore/content/site/home",
+      fields: [],
+    };
+
+    const itemB: MigrationQueueItem = {
+      ...itemA,
+      id: "item-b",
+      addedAt: "2026-01-01T00:00:03.000Z",
+      blockId: "grid-b-sub-1",
+      parentBlockId: "grid-b",
+    };
+
+    const linked = linkQueueHierarchy(
+      [listA, itemB, listB, itemA],
+      profiles,
+    );
+
+    expect(linked.find((item) => item.id === "item-a")?.parentQueueItemId).toBe(
+      "list-a",
+    );
+    expect(linked.find((item) => item.id === "item-b")?.parentQueueItemId).toBe(
+      "list-b",
+    );
+    expect(linked.find((item) => item.id === "list-a")?.dynamicPlaceholderId).toBe(
+      2,
+    );
+    expect(linked.find((item) => item.id === "list-b")?.dynamicPlaceholderId).toBe(
+      3,
+    );
+  });
 });

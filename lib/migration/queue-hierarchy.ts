@@ -34,17 +34,49 @@ function inferParentFromRenderingProfiles(
   byId: Map<string, MigrationQueueItem>,
   renderingProfiles?: RenderingPlaceholderProfile[],
 ): { parentQueueItemId: string; childPlaceholderKey: string } | undefined {
+  if (item.parentBlockId) {
+    const parentByBlock = pageItems.find(
+      (candidate) =>
+        candidate.id !== item.id && candidate.blockId === item.parentBlockId,
+    );
+    if (parentByBlock) {
+      const childPlaceholderKey = resolveChildPlaceholderKeyForNesting(
+        parentByBlock.renderingPath,
+        item.renderingPath,
+        renderingProfiles,
+        {
+          childRenderingName: item.renderingName,
+          parentRenderingName: parentByBlock.renderingName,
+        },
+      );
+      if (childPlaceholderKey) {
+        return {
+          parentQueueItemId: parentByBlock.id,
+          childPlaceholderKey,
+        };
+      }
+    }
+  }
+
   const matches: Array<{
     parentQueueItemId: string;
     childPlaceholderKey: string;
     score: number;
+    order: number;
   }> = [];
 
-  for (const candidate of pageItems) {
+  for (const [order, candidate] of pageItems.entries()) {
     if (candidate.id === item.id) {
       continue;
     }
     if (isAncestor(item.id, candidate.id, byId)) {
+      continue;
+    }
+    if (
+      candidate.renderingPath &&
+      item.renderingPath &&
+      candidate.renderingPath.trim() === item.renderingPath.trim()
+    ) {
       continue;
     }
 
@@ -75,11 +107,19 @@ function inferParentFromRenderingProfiles(
     if (parentProfile?.usesSxaDynamicPlaceholders) {
       score += 2;
     }
+    if (
+      item.blockId &&
+      candidate.blockId &&
+      item.blockId.startsWith(`${candidate.blockId}-sub-`)
+    ) {
+      score += 10;
+    }
 
     matches.push({
       parentQueueItemId: candidate.id,
       childPlaceholderKey,
       score,
+      order,
     });
   }
 
@@ -87,7 +127,12 @@ function inferParentFromRenderingProfiles(
     return undefined;
   }
 
-  matches.sort((left, right) => right.score - left.score);
+  matches.sort((left, right) => {
+    if (right.score !== left.score) {
+      return right.score - left.score;
+    }
+    return right.order - left.order;
+  });
   const best = matches[0]!;
   return {
     parentQueueItemId: best.parentQueueItemId,
@@ -131,11 +176,11 @@ export function linkQueueHierarchy(
   const withParents = queue.map((item) => {
     let next: MigrationQueueItem = { ...item };
 
-    if (!next.parentQueueItemId && next.parentBlockId) {
+    if (next.parentBlockId) {
       const parent = byBlockOnPage.get(
         `${next.sourcePageUrl}::${next.parentBlockId}`,
       );
-      if (parent) {
+      if (parent && parent.id !== next.id) {
         next = { ...next, parentQueueItemId: parent.id };
       }
     }
@@ -165,6 +210,18 @@ export function linkQueueHierarchy(
   }
 
   const withInferredParents = withParents.map((item) => {
+    if (item.parentBlockId) {
+      const parentInQueue = byBlockOnPage.get(
+        `${item.sourcePageUrl}::${item.parentBlockId}`,
+      );
+      if (!parentInQueue) {
+        return item;
+      }
+      if (item.parentQueueItemId) {
+        return item;
+      }
+    }
+
     if (item.parentQueueItemId) {
       return item;
     }
@@ -188,6 +245,7 @@ export function linkQueueHierarchy(
 
   const linkedById = new Map(withInferredParents.map((item) => [item.id, item]));
   const siblingCounts = new Map<string, number>();
+  const rootDynamicIdCounts = new Map<string, number>();
 
   return withInferredParents.map((item) => {
     const depth = computeDepth(item, linkedById);
@@ -203,11 +261,13 @@ export function linkQueueHierarchy(
       const hasChildren = withInferredParents.some(
         (candidate) => candidate.parentQueueItemId === item.id,
       );
-      if (hasChildren && dynamicPlaceholderId === undefined) {
+      if (hasChildren) {
         const profile = findRenderingProfile(renderingProfiles, item.renderingPath);
-        if (profile?.defaultDynamicPlaceholderId !== undefined) {
-          dynamicPlaceholderId = profile.defaultDynamicPlaceholderId;
-        }
+        const rootKey = `${item.sourcePageUrl}::${item.renderingPath?.trim() ?? ""}`;
+        const rootIndex = rootDynamicIdCounts.get(rootKey) ?? 0;
+        rootDynamicIdCounts.set(rootKey, rootIndex + 1);
+        const baseId = profile?.defaultDynamicPlaceholderId ?? 1;
+        dynamicPlaceholderId = baseId + rootIndex;
       }
     }
 
