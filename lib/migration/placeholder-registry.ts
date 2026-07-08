@@ -74,6 +74,41 @@ export function findRenderingProfile(
   );
 }
 
+function childProfileAllowsParentPlaceholder(
+  childProfile: RenderingPlaceholderProfile,
+  parentProfile: RenderingPlaceholderProfile,
+  exposedKey: string,
+): boolean {
+  return childProfile.allowedParentPlaceholderKeys.some((allowed) =>
+    placeholderKeysReferToSameNestedSlot(
+      exposedKey,
+      allowed,
+      parentProfile.allowedParentPlaceholderKeys,
+    ),
+  );
+}
+
+/** True when a rendering is expected to live in a parent's nested placeholder. */
+export function childAllowsNestedPresentation(
+  childRenderingPath: string | undefined,
+  childRenderingName: string | undefined,
+  profiles?: RenderingPlaceholderProfile[],
+): boolean {
+  const name = childRenderingName?.trim() ?? "";
+  if (nameSuggestsLeaf(name)) {
+    return true;
+  }
+
+  const childProfile = findRenderingProfile(profiles, childRenderingPath);
+  if (!childProfile?.allowedParentPlaceholderKeys.length) {
+    return false;
+  }
+
+  return childProfile.allowedParentPlaceholderKeys.some(
+    (key) => key.includes("{*}") || /\{id\}/i.test(key),
+  );
+}
+
 /**
  * Picks the Sitecore placeholder key pattern for nested presentation
  * (e.g. CardList-Demo-{*}) from Discovery profiles — never from rendering names.
@@ -95,7 +130,21 @@ export function pickNestedPlaceholderKeyPattern(input: {
 
   const exposed = parent.exposedChildPlaceholderKeys.filter(Boolean);
   if (exposed.length === 1) {
-    return exposed[0]!;
+    const key = exposed[0]!;
+    const child = input.childProfile;
+    if (!child) {
+      return key;
+    }
+    if (childProfileAllowsParentPlaceholder(child, parent, key)) {
+      return key;
+    }
+    if (
+      nameSuggestsContainer(parent.renderingName) &&
+      nameSuggestsLeaf(child.renderingName)
+    ) {
+      return key;
+    }
+    return null;
   }
 
   if (exposed.length > 1 && input.childProfile) {
@@ -111,7 +160,16 @@ export function pickNestedPlaceholderKeyPattern(input: {
     if (matched) {
       return matched;
     }
-    return exposed[0]!;
+    if (
+      childAllowsNestedPresentation(
+        input.childProfile.renderingPath,
+        input.childProfile.renderingName,
+        [parent, input.childProfile],
+      )
+    ) {
+      return exposed[0]!;
+    }
+    return null;
   }
 
   if (input.childProfile) {
@@ -199,10 +257,6 @@ export function resolveChildPlaceholderKey(
   );
 
   if (allowsNestedUnderParent && parent.exposedChildPlaceholderKeys.length === 1) {
-    return parent.exposedChildPlaceholderKeys[0]!;
-  }
-
-  if (parent.exposedChildPlaceholderKeys.length === 1) {
     return parent.exposedChildPlaceholderKeys[0]!;
   }
 

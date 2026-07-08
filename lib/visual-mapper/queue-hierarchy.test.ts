@@ -290,6 +290,89 @@ describe("inferVisualMapperParentBlockIds", () => {
     expect(parents.get("item-a")).toBe(blockIdByEntryId.get("list-a"));
     expect(parents.get("item-b")).toBe(blockIdByEntryId.get("list-b"));
   });
+
+  it("keeps Hero as a root mapping when CardLists are on the same page", () => {
+    const profiles: RenderingPlaceholderProfile[] = [
+      {
+        renderingPath: "/sitecore/layout/Renderings/Feature/Hero",
+        renderingId: "hero-id",
+        renderingName: "Hero",
+        allowedParentPlaceholderKeys: ["headless-main"],
+        exposedChildPlaceholderKeys: [],
+        usesSxaDynamicPlaceholders: false,
+        hasDynamicPlaceholders: false,
+        nestedPlaceholderFormat: "path-suffix",
+      },
+      {
+        renderingPath: "/sitecore/layout/Renderings/Feature/CardList-Demo",
+        renderingId: "parent-id",
+        renderingName: "CardList-Demo",
+        allowedParentPlaceholderKeys: ["headless-main"],
+        exposedChildPlaceholderKeys: ["CardList-Demo-{*}"],
+        defaultDynamicPlaceholderId: 2,
+        usesSxaDynamicPlaceholders: true,
+        hasDynamicPlaceholders: true,
+        nestedPlaceholderFormat: "path-suffix",
+      },
+      {
+        renderingPath: "/sitecore/layout/Renderings/Feature/CardItem",
+        renderingId: "child-id",
+        renderingName: "CardItem",
+        allowedParentPlaceholderKeys: ["headless-main/CardList-Demo-{*}"],
+        exposedChildPlaceholderKeys: [],
+        usesSxaDynamicPlaceholders: true,
+        hasDynamicPlaceholders: true,
+        nestedPlaceholderFormat: "path-suffix",
+      },
+    ];
+
+    const hero: MappingEntry = {
+      id: "hero-entry",
+      templateKey: "Hero::main > section.hero:nth-of-type(1)",
+      sourceSelector: "main > section.hero:nth-of-type(1)",
+      sourcePageUrl: "https://example.com",
+      renderingName: "Hero",
+      renderingPath: "/sitecore/layout/Renderings/Feature/Hero",
+      templateName: "Hero",
+      templatePath: "/sitecore/templates/Feature/Hero",
+      fieldAssignments: [],
+      createdAt: new Date(),
+    };
+    const listA: MappingEntry = {
+      id: "list-a",
+      templateKey: "CardList-Demo::main > section.card-list:nth-of-type(1)",
+      sourceSelector: "main > section.card-list:nth-of-type(1)",
+      sourcePageUrl: "https://example.com",
+      renderingName: "CardList-Demo",
+      renderingPath: "/sitecore/layout/Renderings/Feature/CardList-Demo",
+      templateName: "CardList-Demo",
+      templatePath: "/sitecore/templates/Feature/CardList-Demo",
+      fieldAssignments: [],
+      createdAt: new Date(),
+    };
+    const itemA: MappingEntry = {
+      id: "item-a",
+      templateKey:
+        "CardItem::main > section.card-list:nth-of-type(1) > article.card-item",
+      sourceSelector:
+        "main > section.card-list:nth-of-type(1) > article.card-item",
+      sourcePageUrl: "https://example.com",
+      renderingName: "CardItem",
+      renderingPath: "/sitecore/layout/Renderings/Feature/CardItem",
+      templateName: "CardItem",
+      templatePath: "/sitecore/templates/Feature/CardItem",
+      fieldAssignments: [],
+      createdAt: new Date(),
+    };
+
+    const parents = inferVisualMapperParentBlockIds(
+      [hero, listA, itemA],
+      profiles,
+    );
+
+    expect(parents.has("hero-entry")).toBe(false);
+    expect(parents.get("item-a")).toBe(listA.templateKey);
+  });
 });
 
 describe("mappingEntriesToQueueItems", () => {

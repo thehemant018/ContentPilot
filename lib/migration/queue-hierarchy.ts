@@ -4,6 +4,7 @@ import {
   pickDefaultPagePlaceholder,
   resolveChildPlaceholderKeyForNesting,
   findRenderingProfile,
+  childAllowsNestedPresentation,
 } from "@/lib/migration/placeholder-registry";
 
 function isAncestor(
@@ -34,6 +35,16 @@ function inferParentFromRenderingProfiles(
   byId: Map<string, MigrationQueueItem>,
   renderingProfiles?: RenderingPlaceholderProfile[],
 ): { parentQueueItemId: string; childPlaceholderKey: string } | undefined {
+  if (
+    !childAllowsNestedPresentation(
+      item.renderingPath,
+      item.renderingName,
+      renderingProfiles,
+    )
+  ) {
+    return undefined;
+  }
+
   if (item.parentBlockId) {
     const parentByBlock = pageItems.find(
       (candidate) =>
