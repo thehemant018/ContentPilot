@@ -1,4 +1,7 @@
-import { canNestUnderParentRendering } from "@/lib/migration/placeholder-registry";
+import {
+  canNestUnderParentRendering,
+  childAllowsNestedPresentation,
+} from "@/lib/migration/placeholder-registry";
 import type { RenderingPlaceholderProfile } from "@/types/discovery";
 import type { MappingEntry } from "@/types/visual-mapper";
 import { mappingEntryBlockId } from "@/lib/visual-mapper/template-key";
@@ -134,6 +137,16 @@ export function inferVisualMapperParentBlockIds(
   const assignedChildrenCount = new Map<string, number>();
 
   for (const [childIndex, child] of entries.entries()) {
+    if (
+      !childAllowsNestedPresentation(
+        child.renderingPath,
+        child.renderingName,
+        renderingProfiles,
+      )
+    ) {
+      continue;
+    }
+
     const selectorMatches = entries
       .map((candidate, candidateIndex) => ({ candidate, candidateIndex }))
       .filter(

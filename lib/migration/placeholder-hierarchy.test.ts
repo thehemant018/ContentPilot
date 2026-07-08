@@ -394,6 +394,37 @@ describe("resolveChildPlaceholderKey", () => {
       ),
     ).toBe("CardList-Demo-{*}");
   });
+
+  it("does not nest Hero under CardList when profiles only allow page root", () => {
+    const mixedProfiles: RenderingPlaceholderProfile[] = [
+      {
+        renderingPath: "/sitecore/layout/Renderings/Feature/Hero",
+        renderingId: "hero-id",
+        renderingName: "Hero",
+        allowedParentPlaceholderKeys: ["headless-main"],
+        exposedChildPlaceholderKeys: [],
+        nestedPlaceholderFormat: "path-suffix",
+      },
+      {
+        renderingPath: "/sitecore/layout/Renderings/Feature/CardList-Demo",
+        renderingId: "parent-id",
+        renderingName: "CardList-Demo",
+        allowedParentPlaceholderKeys: ["headless-main"],
+        exposedChildPlaceholderKeys: ["CardList-Demo-{*}"],
+        hasDynamicPlaceholders: true,
+        usesSxaDynamicPlaceholders: true,
+        nestedPlaceholderFormat: "path-suffix",
+      },
+    ];
+
+    expect(
+      resolveChildPlaceholderKey(
+        mixedProfiles[1]!.renderingPath,
+        mixedProfiles[0]!.renderingPath,
+        mixedProfiles,
+      ),
+    ).toBeNull();
+  });
 });
 
 describe("linkQueueHierarchy", () => {
