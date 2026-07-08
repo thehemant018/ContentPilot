@@ -104,12 +104,45 @@ function readDynamicIdFromPlaceholderPath(
   );
 }
 
+function readDynamicPlaceholderIdFromLayout(
+  layoutXml: string,
+  renderingUid: string,
+): number | undefined {
+  const renderings = extractRenderingsFromLayout(layoutXml);
+  const match = renderings.find((rendering) => rendering.uid === renderingUid);
+  if (!match) {
+    return undefined;
+  }
+
+  return (
+    readDynamicPlaceholderIdFromParameters(match.parameters) ??
+    readDynamicIdFromPlaceholderPath(
+      match.placeholder,
+      match.placeholder.split("/").pop() ?? "",
+    )
+  );
+}
+
 function ensureParentDynamicPlaceholderId(
   layoutXml: string,
   parentNode: PresentationTreeNode,
   parentProfile: RenderingPlaceholderProfile | undefined,
   components: MigrationComponentExport[],
 ): { layoutXml: string; parentNode: PresentationTreeNode } {
+  const existingId = readDynamicPlaceholderIdFromLayout(
+    layoutXml,
+    parentNode.renderingUid,
+  );
+  if (existingId !== undefined) {
+    return {
+      layoutXml,
+      parentNode: {
+        ...parentNode,
+        dynamicPlaceholderId: existingId,
+      },
+    };
+  }
+
   if (parentNode.dynamicPlaceholderId) {
     return { layoutXml, parentNode };
   }
@@ -210,10 +243,14 @@ function findParentRenderingInLayout(
   layoutXml: string,
   parentComponent: MigrationComponentExport,
   renderingId: string,
+  datasourceId: string | undefined,
   profile: RenderingPlaceholderProfile | undefined,
 ): PresentationTreeNode | undefined {
   const renderings = extractRenderingsFromLayout(layoutXml);
   const normalizedRenderingId = formatSitecoreGuid(renderingId);
+  const normalizedDatasourceId = datasourceId
+    ? formatSitecoreGuid(datasourceId)
+    : undefined;
   const candidates = renderings.filter(
     (rendering) =>
       formatSitecoreGuid(rendering.renderingId) === normalizedRenderingId,
@@ -226,7 +263,16 @@ function findParentRenderingInLayout(
   const rootPlaceholder = normalizePlaceholderKey(
     parentComponent.presentation.placeHolder,
   );
+
+  const datasourceMatch = normalizedDatasourceId
+    ? candidates.find(
+        (rendering) =>
+          formatSitecoreGuid(rendering.datasourceId) === normalizedDatasourceId,
+      )
+    : undefined;
+
   const match =
+    datasourceMatch ??
     candidates.find(
       (rendering) =>
         normalizePlaceholderKey(rendering.placeholder) === rootPlaceholder,
@@ -301,6 +347,7 @@ function resolveParentNode(
       layoutXml,
       parentComponent,
       renderingId,
+      datasourceId,
       profile,
     )
   );
@@ -426,6 +473,7 @@ export function applyPresentationTreeToLayoutXml(
           layoutXml,
           component,
           renderingId,
+          datasourceId,
           profile,
         );
       }
@@ -441,6 +489,7 @@ export function applyPresentationTreeToLayoutXml(
           datasourceIdByPath,
           nodeByQueueId,
         );
+        registerExistingNode(existingNode, nodeByQueueId);
       }
 
       const hasPendingChildren = components.some((candidate) => {

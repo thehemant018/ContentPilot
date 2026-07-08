@@ -213,14 +213,71 @@ export function buildBridgeScript(pageSourceUrl: string): string {
     } catch(err) {}
   }
 
+  function buildNodeSelector(node) {
+    if (node.id) {
+      try {
+        return '#' + CSS.escape(node.id);
+      } catch (err) {
+        return '#' + node.id;
+      }
+    }
+
+    var tag = node.tagName.toLowerCase();
+    var classes = Array.from(node.classList || [])
+      .filter(function(c) { return c && !c.startsWith('migratex'); })
+      .slice(0, 3);
+    if (classes.length) {
+      tag += '.' + classes.join('.');
+    }
+
+    var parent = node.parentElement;
+    if (parent) {
+      var sameTag = Array.from(parent.children).filter(function(child) {
+        return child.tagName === node.tagName;
+      });
+      if (sameTag.length > 1) {
+        tag += ':nth-of-type(' + (sameTag.indexOf(node) + 1) + ')';
+      }
+    }
+
+    return tag;
+  }
+
   function getSelector(el) {
-    if (el.id) return '#' + el.id;
-    const tag = el.tagName.toLowerCase();
-    const classes = Array.from(el.classList)
-      .filter(function(c) { return !c.startsWith('migratex'); })
-      .slice(0, 3)
-      .join('.');
-    return classes ? tag + '.' + classes : tag;
+    if (!el || el.nodeType !== 1) {
+      return '';
+    }
+
+    if (el.id) {
+      try {
+        var idSelector = '#' + CSS.escape(el.id);
+        if (document.querySelectorAll(idSelector).length === 1) {
+          return idSelector;
+        }
+      } catch (err) {}
+    }
+
+    var parts = [];
+    var node = el;
+    while (node && node.nodeType === 1 && node !== document.documentElement) {
+      parts.unshift(buildNodeSelector(node));
+      if (node.id) {
+        break;
+      }
+      node = node.parentElement;
+    }
+
+    for (var start = 0; start < parts.length; start++) {
+      var selector = parts.slice(start).join(' > ');
+      try {
+        var matches = document.querySelectorAll(selector);
+        if (matches.length === 1 && matches[0] === el) {
+          return selector;
+        }
+      } catch (err) {}
+    }
+
+    return parts.join(' > ');
   }
 
   function unwrapProxiedUrl(url) {

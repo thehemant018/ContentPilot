@@ -6,7 +6,10 @@ import { queueItemFromMatch, queueItemKey } from "@/lib/migration-queue/from-mat
 import { prepareQueueForMigration } from "@/lib/migration/queue-sync";
 import { prepareVisualMapperMigration } from "@/lib/visual-mapper/migrate";
 import { inferVisualMapperParentBlockIds } from "@/lib/visual-mapper/queue-hierarchy";
-import { mappingEntryBlockId } from "@/lib/visual-mapper/template-key";
+import {
+  mappingEntryBlockId,
+  resolveEntryBlockIds,
+} from "@/lib/visual-mapper/template-key";
 import { getMigrationQueue, saveMigrationQueue } from "@/lib/storage/migration-queue";
 import { getDiscoveryResult } from "@/lib/storage/workflow-data";
 import type { BlockMatchResult } from "@/types/ai-match";
@@ -33,22 +36,29 @@ export function mappingEntriesToQueueItems(
   renderingProfiles?: RenderingPlaceholderProfile[],
 ): MigrationQueueItem[] {
   const discovery = getDiscoveryResult();
+  const profiles = renderingProfiles ?? discovery?.renderingProfiles;
   const { matches } = prepareVisualMapperMigration(entries, pageUrl, pageTitle);
-  const parentBlockIdByEntryId = inferVisualMapperParentBlockIds(entries);
+  const blockIdByEntryId = resolveEntryBlockIds(entries);
+  const parentBlockIdByEntryId = inferVisualMapperParentBlockIds(
+    entries,
+    profiles,
+    blockIdByEntryId,
+  );
   const matchByBlockId = new Map(
     matches.map((match) => [match.blockId, match]),
   );
 
   const rawItems = entries.map((entry) => {
-    const blockId = mappingEntryBlockId(entry);
+    const blockId = blockIdByEntryId.get(entry.id) ?? mappingEntryBlockId(entry);
     const match =
       matchByBlockId.get(blockId) ??
+      matchByBlockId.get(mappingEntryBlockId(entry)) ??
       matches.find((candidate) => candidate.blockId === entry.id);
     if (!match) {
       throw new Error(`Missing match for visual mapper entry ${entry.id}`);
     }
 
-    const item = queueItemFromMatch(match, [], {
+    const item = queueItemFromMatch({ ...match, blockId }, [], {
       parentBlockId: parentBlockIdByEntryId.get(entry.id),
       language: resolveMappedPageLanguage(pageUrl, undefined, {
         instanceLanguages: discovery?.instanceLanguages,
@@ -62,6 +72,7 @@ export function mappingEntriesToQueueItems(
 
     return {
       ...item,
+      blockId,
       languages: defaultLanguages,
       targetPagePath: targetPagePath.trim(),
       fields: item.fields.map((field, index) => ({
@@ -73,7 +84,7 @@ export function mappingEntriesToQueueItems(
     };
   });
 
-  return prepareVisualMapperQueueItems(rawItems, renderingProfiles);
+  return prepareVisualMapperQueueItems(rawItems, profiles);
 }
 
 export function appendVisualMapperToMigrationQueue(
