@@ -143,16 +143,66 @@ export function buildBridgeScript(pageSourceUrl: string): string {
     return null;
   }
 
+  function cssEscapeIdent(value) {
+    if (typeof CSS !== 'undefined' && CSS.escape) {
+      return CSS.escape(String(value));
+    }
+    return String(value).replace(/[^\\w-]/g, function(char) {
+      return '\\\\' + char.charCodeAt(0).toString(16) + ' ';
+    });
+  }
+
+  function quoteAttrValue(value) {
+    return '"' + String(value).replace(/\\\\/g, '\\\\\\\\').replace(/"/g, '\\\\"') + '"';
+  }
+
+  function isHeadingElement(el) {
+    return !!(el && el.tagName && /^H[1-6]$/.test(el.tagName));
+  }
+
+  function isRichTextContainer(el) {
+    if (!el || !el.tagName) return false;
+    if (el.classList) {
+      var classNames = Array.from(el.classList);
+      for (var i = 0; i < classNames.length; i += 1) {
+        if (/^(rte|rich-?text|richtext|wysiwyg|prose)$/i.test(classNames[i]) || /rich-?text/i.test(classNames[i])) {
+          return true;
+        }
+      }
+    }
+    var dataComponent = el.getAttribute && el.getAttribute('data-component');
+    if (dataComponent && /rte|rich-?text|article-?body|blog-?body|blog-?rte|page-?content/i.test(dataComponent)) {
+      return true;
+    }
+    var ariaLabel = el.getAttribute && el.getAttribute('aria-label');
+    if (ariaLabel && /article body|rich text|main content|page content/i.test(ariaLabel)) {
+      return true;
+    }
+    return false;
+  }
+
+  function findRichTextContainerInStack(stack, fromIndex) {
+    for (var i = fromIndex; i < stack.length; i += 1) {
+      if (isRichTextContainer(stack[i])) {
+        return stack[i];
+      }
+    }
+    return null;
+  }
+
+  function isPrimaryInteractivePickTarget(el) {
+    if (!el || !el.tagName) return false;
+    var tag = el.tagName;
+    return tag === 'BUTTON' || tag === 'A' || tag === 'IMG' || tag === 'SUMMARY';
+  }
+
   function isInteractivePickTarget(el) {
     if (!el || !el.tagName) return false;
     const tag = el.tagName;
-    if (tag === 'BUTTON' || tag === 'A' || tag === 'IMG') {
+    if (isPrimaryInteractivePickTarget(el)) {
       return true;
     }
-    if (tag === 'SUMMARY') {
-      return true;
-    }
-    if (/^H[1-6]$/.test(tag)) {
+    if (isHeadingElement(el)) {
       return true;
     }
     if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA' || tag === 'LABEL') {
@@ -266,7 +316,22 @@ export function buildBridgeScript(pageSourceUrl: string): string {
       if (cardItem) {
         return cardItem;
       }
+
+      const richText = findRichTextContainerInStack(stack, targetIndex);
       const interactive = findInteractiveTargetInStack(stack, targetIndex);
+
+      if (richText) {
+        if (
+          !interactive ||
+          isHeadingElement(interactive) ||
+          isRichTextContainer(interactive) ||
+          !isPrimaryInteractivePickTarget(interactive)
+        ) {
+          return richText;
+        }
+        return interactive;
+      }
+
       if (interactive) {
         return interactive;
       }
@@ -361,31 +426,69 @@ export function buildBridgeScript(pageSourceUrl: string): string {
     } catch(err) {}
   }
 
+  function getNthOfTypeIndex(node) {
+    var parent = node.parentElement;
+    if (!parent) {
+      return null;
+    }
+    var sameTag = Array.from(parent.children).filter(function(child) {
+      return child.tagName === node.tagName;
+    });
+    if (sameTag.length <= 1) {
+      return null;
+    }
+    return sameTag.indexOf(node) + 1;
+  }
+
+  function pickClassNamesForSelector(classList) {
+    var cleaned = Array.from(classList || []).filter(function(c) {
+      return c && !c.startsWith('migratex');
+    });
+    var semantic = cleaned.filter(function(c) {
+      return /^(rte|rich-?text|richtext|wysiwyg|prose|content|card|hero|accordion|tile|feature)$/i.test(c);
+    });
+    if (semantic.length) {
+      return semantic.slice(0, 2);
+    }
+    return cleaned.slice(0, 3);
+  }
+
   function buildNodeSelector(node) {
     if (node.id) {
       try {
-        return '#' + CSS.escape(node.id);
+        return '#' + cssEscapeIdent(node.id);
       } catch (err) {
         return '#' + node.id;
       }
     }
 
     var tag = node.tagName.toLowerCase();
-    var classes = Array.from(node.classList || [])
-      .filter(function(c) { return c && !c.startsWith('migratex'); })
-      .slice(0, 3);
-    if (classes.length) {
-      tag += '.' + classes.join('.');
+    var nth = getNthOfTypeIndex(node);
+    var dataComponent = node.getAttribute && node.getAttribute('data-component');
+    if (dataComponent && dataComponent.trim()) {
+      tag += '[data-component=' + quoteAttrValue(dataComponent.trim()) + ']';
+      if (nth && nth > 1) {
+        tag += ':nth-of-type(' + nth + ')';
+      }
+      return tag;
     }
 
-    var parent = node.parentElement;
-    if (parent) {
-      var sameTag = Array.from(parent.children).filter(function(child) {
-        return child.tagName === node.tagName;
-      });
-      if (sameTag.length > 1) {
-        tag += ':nth-of-type(' + (sameTag.indexOf(node) + 1) + ')';
+    var ariaLabel = node.getAttribute && node.getAttribute('aria-label');
+    if (ariaLabel && ariaLabel.trim()) {
+      tag += '[aria-label=' + quoteAttrValue(ariaLabel.trim()) + ']';
+      if (nth && nth > 1) {
+        tag += ':nth-of-type(' + nth + ')';
       }
+      return tag;
+    }
+
+    var classes = pickClassNamesForSelector(node.classList);
+    if (classes.length) {
+      tag += '.' + classes.map(function(c) { return cssEscapeIdent(c); }).join('.');
+    }
+
+    if (nth && nth > 1) {
+      tag += ':nth-of-type(' + nth + ')';
     }
 
     return tag;
@@ -398,18 +501,56 @@ export function buildBridgeScript(pageSourceUrl: string): string {
 
     if (el.id) {
       try {
-        var idSelector = '#' + CSS.escape(el.id);
+        var idSelector = '#' + cssEscapeIdent(el.id);
         if (document.querySelectorAll(idSelector).length === 1) {
           return idSelector;
         }
       } catch (err) {}
     }
 
+    var dataComponent = el.getAttribute && el.getAttribute('data-component');
+    if (dataComponent && dataComponent.trim()) {
+      var attrOnly = '[data-component=' + quoteAttrValue(dataComponent.trim()) + ']';
+      var taggedAttr = el.tagName.toLowerCase() + attrOnly;
+      try {
+        if (document.querySelectorAll(attrOnly).length === 1) {
+          return attrOnly;
+        }
+        if (document.querySelectorAll(taggedAttr).length === 1) {
+          return taggedAttr;
+        }
+      } catch (err) {}
+    }
+
+    var ariaLabel = el.getAttribute && el.getAttribute('aria-label');
+    if (ariaLabel && ariaLabel.trim()) {
+      var ariaSel = el.tagName.toLowerCase() + '[aria-label=' + quoteAttrValue(ariaLabel.trim()) + ']';
+      try {
+        if (document.querySelectorAll(ariaSel).length === 1) {
+          return ariaSel;
+        }
+      } catch (err) {}
+    }
+
+    if (el.classList) {
+      var semanticClasses = ['rte', 'rich-text', 'richtext', 'wysiwyg', 'prose'];
+      for (var si = 0; si < semanticClasses.length; si += 1) {
+        if (el.classList.contains(semanticClasses[si])) {
+          var semSel = el.tagName.toLowerCase() + '.' + cssEscapeIdent(semanticClasses[si]);
+          try {
+            if (document.querySelectorAll(semSel).length === 1) {
+              return semSel;
+            }
+          } catch (err) {}
+        }
+      }
+    }
+
     var parts = [];
     var node = el;
     while (node && node.nodeType === 1 && node !== document.documentElement) {
       parts.unshift(buildNodeSelector(node));
-      if (node.id) {
+      if (node.id || (node.getAttribute && node.getAttribute('data-component'))) {
         break;
       }
       node = node.parentElement;
@@ -534,7 +675,11 @@ export function buildBridgeScript(pageSourceUrl: string): string {
     var hasImgChild = el.tagName === 'IMG' || (el.querySelector && el.querySelector('img') !== null);
     return {
       text: extractLinkText(el),
-      html: (el.innerHTML && el.innerHTML.slice(0, 1000)) || '',
+      html: (function() {
+        var raw = (el.innerHTML && el.innerHTML) || '';
+        var limit = isRichTextContainer(el) ? 100000 : 1000;
+        return raw.slice(0, limit);
+      })(),
       src: src,
       href: extractHref(el),
       alt: el.alt || '',
@@ -542,7 +687,7 @@ export function buildBridgeScript(pageSourceUrl: string): string {
       isImage: hasImgChild || Boolean(backgroundSrc),
       isLink: el.tagName === 'A' || !!linkEl,
       isHeading: /^H[1-6]$/.test(el.tagName),
-      isRichText: el.tagName === 'P' || (el.tagName === 'DIV' && el.children.length > 1),
+      isRichText: isRichTextContainer(el) || el.tagName === 'P' || (el.tagName === 'DIV' && el.children.length > 1),
       linkTarget: extractLinkTarget(el)
     };
   }

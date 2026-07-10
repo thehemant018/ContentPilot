@@ -35,4 +35,20 @@ describe("extract-from-dom", () => {
     expect(content.src).toBe("https://example.com/images/hero.jpg");
     expect(content.isImage).toBe(true);
   });
+
+  it("finds RTE via fallback when Tailwind class selector is invalid", () => {
+    const $ = cheerio.load(`
+      <section data-component="blog-rte" class="border-t border-stone-200/80 pt-12" aria-label="Article body">
+        <div class="rte"><p>Hello RTE</p></div>
+      </section>
+    `);
+    const el = querySelectorElement(
+      $,
+      "section.border-t.border-stone-200/80.pt-12",
+    );
+    expect(el).not.toBeNull();
+    const content = extractContentFromElement($, el!, "https://example.com");
+    expect(content.isRichText).toBe(true);
+    expect(content.html).toContain("Hello RTE");
+  });
 });

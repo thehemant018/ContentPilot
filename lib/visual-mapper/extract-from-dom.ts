@@ -1,6 +1,7 @@
 import type { Cheerio, CheerioAPI } from "cheerio";
 import type { AnyNode } from "domhandler";
 import type { ExtractedContent } from "@/types/visual-mapper";
+import { buildSelectorFallbacks } from "@/lib/visual-mapper/build-css-selector";
 import { resolveNavigationHref } from "@/lib/visual-mapper/resolve-extracted-url";
 
 type CheerioElement = Cheerio<AnyNode>;
@@ -111,10 +112,19 @@ export function extractContentFromElement(
   const backgroundSrc = extractBackgroundImageUrl($, el, pageUrl);
   const src = extractSrc($, el, pageUrl);
   const hasImgChild = tagName === "IMG" || el.find("img").length > 0;
+  const classNames = (el.attr("class") || "").split(/\s+/).filter(Boolean);
+  const dataComponent = el.attr("data-component") || "";
+  const ariaLabel = el.attr("aria-label") || "";
+  const isRichTextContainer =
+    classNames.some((name) =>
+      /^(rte|rich-?text|richtext|wysiwyg|prose)$/i.test(name),
+    ) ||
+    /rte|rich-?text|article-?body|blog-?body|blog-?rte/i.test(dataComponent) ||
+    /article body|rich text|main content/i.test(ariaLabel);
 
   return {
     text: extractLinkText($, el),
-    html: html.slice(0, 1000),
+    html: html.slice(0, isRichTextContainer ? 100_000 : 1000),
     src,
     href: extractHref($, el, pageUrl),
     alt: el.attr("alt") || el.find("img").first().attr("alt") || "",
@@ -122,7 +132,10 @@ export function extractContentFromElement(
     isImage: hasImgChild || Boolean(backgroundSrc),
     isLink: tagName === "A" || Boolean(linkEl),
     isHeading: /^H[1-6]$/.test(tagName),
-    isRichText: tagName === "P" || (tagName === "DIV" && childCount > 1),
+    isRichText:
+      isRichTextContainer ||
+      tagName === "P" ||
+      (tagName === "DIV" && childCount > 1),
     linkTarget: extractLinkTarget($, el),
   };
 }
@@ -135,12 +148,19 @@ export function querySelectorElement(
   if (!trimmed) {
     return null;
   }
-  try {
-    const el = $(trimmed).first();
-    return el.length > 0 ? el : null;
-  } catch {
-    return null;
+
+  for (const candidate of buildSelectorFallbacks(trimmed)) {
+    try {
+      const el = $(candidate).first();
+      if (el.length > 0) {
+        return el;
+      }
+    } catch {
+      // try next fallback
+    }
   }
+
+  return null;
 }
 
 export function extractPageTitle($: CheerioAPI): string {
