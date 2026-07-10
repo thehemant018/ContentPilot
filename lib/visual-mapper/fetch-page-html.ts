@@ -1,22 +1,44 @@
-const FETCH_TIMEOUT_MS = 10_000;
-const USER_AGENT = "Mozilla/5.0 (compatible; MigrateX/1.0)";
+import {
+  buildBrowserFetchHeaders,
+  fetchWithRateLimitRetry,
+  formatProxyRateLimitMessage,
+  getCachedPageHtml,
+  isRateLimitedStatus,
+  setCachedPageHtml,
+} from "@/lib/visual-mapper/proxy-fetch";
+
+const FETCH_TIMEOUT_MS = 20_000;
 
 export async function fetchPageHtml(url: string): Promise<string> {
+  const cached = getCachedPageHtml(url);
+  if (cached) {
+    return cached.html;
+  }
+
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
 
   try {
-    const response = await fetch(url, {
+    let pageOrigin = "";
+    try {
+      pageOrigin = new URL(url).origin + "/";
+    } catch {
+      pageOrigin = "";
+    }
+
+    const response = await fetchWithRateLimitRetry(url, {
       method: "GET",
-      headers: {
-        "User-Agent": USER_AGENT,
-        Accept: "text/html",
-      },
+      headers: buildBrowserFetchHeaders({
+        referer: pageOrigin || undefined,
+      }),
       signal: controller.signal,
       redirect: "follow",
     });
 
     if (!response.ok) {
+      if (isRateLimitedStatus(response.status)) {
+        throw new Error(formatProxyRateLimitMessage(response.status));
+      }
       throw new Error(
         `Target page returned ${response.status} ${response.statusText}.`,
       );
@@ -32,7 +54,9 @@ export async function fetchPageHtml(url: string): Promise<string> {
       );
     }
 
-    return await response.text();
+    const html = await response.text();
+    setCachedPageHtml(url, html, contentType);
+    return html;
   } finally {
     clearTimeout(timeout);
   }
