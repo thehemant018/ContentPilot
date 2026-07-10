@@ -303,6 +303,11 @@ export function linkQueueHierarchy(
       siblingCounts.set(siblingKey, siblingIndex + 1);
       presentationSiblingIndex = siblingIndex;
     } else {
+      const rootSiblingKey = `${item.sourcePageUrl}::root::${(item.placeholder ?? "").trim()}`;
+      const rootSiblingIndex = siblingCounts.get(rootSiblingKey) ?? 0;
+      siblingCounts.set(rootSiblingKey, rootSiblingIndex + 1);
+      presentationSiblingIndex = rootSiblingIndex;
+
       const hasChildren = withInferredParents.some(
         (candidate) => candidate.parentQueueItemId === item.id,
       );
