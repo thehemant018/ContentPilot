@@ -3,9 +3,14 @@ import {
   extractNextImageInnerUrl,
   normalizeAssetUrlString,
 } from "@/lib/visual-mapper/asset-proxy";
+import {
+  buildBrowserFetchHeaders,
+  fetchWithRateLimitRetry,
+  formatProxyRateLimitMessage,
+  isRateLimitedStatus,
+} from "@/lib/visual-mapper/proxy-fetch";
 
-const FETCH_TIMEOUT_MS = 15_000;
-const USER_AGENT = "Mozilla/5.0 (compatible; MigrateX/1.0)";
+const FETCH_TIMEOUT_MS = 20_000;
 
 function jsonError(message: string, status = 502): NextResponse {
   return NextResponse.json({ error: message }, { status });
@@ -16,16 +21,23 @@ async function fetchAsset(
   referer: string,
   signal: AbortSignal,
 ): Promise<Response> {
-  return fetch(targetUrl.toString(), {
-    method: "GET",
-    headers: {
-      "User-Agent": USER_AGENT,
-      Accept: "image/*,video/*,audio/*,font/*,*/*;q=0.8",
-      Referer: referer,
+  return fetchWithRateLimitRetry(
+    targetUrl.toString(),
+    {
+      method: "GET",
+      headers: buildBrowserFetchHeaders({
+        accept: "image/*,video/*,audio/*,font/*,*/*;q=0.8",
+        referer,
+      }),
+      signal,
+      redirect: "follow",
     },
-    signal,
-    redirect: "follow",
-  });
+    {
+      // Assets can burst; keep retries shorter than page fetches.
+      maxRetries: 2,
+      initialDelayMs: 750,
+    },
+  );
 }
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
@@ -80,6 +92,12 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     }
 
     if (!response.ok) {
+      if (isRateLimitedStatus(response.status)) {
+        return jsonError(
+          formatProxyRateLimitMessage(response.status),
+          response.status,
+        );
+      }
       return jsonError(
         `Asset returned ${response.status} ${response.statusText}.`,
         response.status === 404 ? 404 : 502,
@@ -100,7 +118,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     });
   } catch (error) {
     if (error instanceof Error && error.name === "AbortError") {
-      return jsonError("Asset request timed out after 15 seconds.");
+      return jsonError("Asset request timed out after 20 seconds.");
     }
 
     const message =

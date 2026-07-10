@@ -27,6 +27,7 @@ interface IframeViewerProps {
 
 export function IframeViewer({ sourceUrl, highlightSelector }: IframeViewerProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const [reloadNonce, setReloadNonce] = useState(0);
   const [loadErrorState, setLoadErrorState] = useState<{
     url: string;
     message: string;
@@ -121,9 +122,14 @@ export function IframeViewer({ sourceUrl, highlightSelector }: IframeViewerProps
 
         if (!response.ok) {
           const payload = (await response.json()) as { error?: string };
+          const rateLimited = response.status === 429 || response.status === 503;
           setLoadErrorState({
             url: sourceUrl,
-            message: payload.error ?? "Proxy returned an error.",
+            message:
+              payload.error ??
+              (rateLimited
+                ? "The target site rate-limited this request. Wait a moment and reload."
+                : "Proxy returned an error."),
           });
           pageLoadFailed();
         }
@@ -143,7 +149,7 @@ export function IframeViewer({ sourceUrl, highlightSelector }: IframeViewerProps
     return () => {
       cancelled = true;
     };
-  }, [sourceUrl, pageLoadFailed]);
+  }, [sourceUrl, reloadNonce, pageLoadFailed]);
 
   useEffect(() => {
     function handleMessage(event: MessageEvent) {
@@ -248,12 +254,23 @@ export function IframeViewer({ sourceUrl, highlightSelector }: IframeViewerProps
           <div className="max-w-md rounded-xl border border-rose-200 bg-white p-5 text-center">
             <p className="text-sm font-semibold text-rose-900">Could not load page</p>
             <p className="mt-2 text-sm text-rose-700">{loadError}</p>
+            <button
+              type="button"
+              className="mt-4 rounded-lg bg-rose-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-rose-800"
+              onClick={() => {
+                setLoadErrorState(null);
+                setReloadNonce((value) => value + 1);
+              }}
+            >
+              Retry
+            </button>
           </div>
         </div>
       )}
 
       {sourceUrl && !loadError ? (
         <iframe
+          key={`${sourceUrl}::${reloadNonce}`}
           ref={iframeRef}
           src={proxySrc}
           title="Visual Mapper page preview"

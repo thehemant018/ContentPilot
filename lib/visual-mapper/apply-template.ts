@@ -229,7 +229,11 @@ export async function applyTemplateToUrls(
 ): Promise<BulkApplyResult> {
   const results: BulkApplyPageResult[] = [];
 
-  for (const url of urls) {
+  for (const [index, url] of urls.entries()) {
+    if (index > 0) {
+      // Pace bulk fetches so rate-limited origins are less likely to return 429.
+      await new Promise((resolve) => setTimeout(resolve, 400));
+    }
     results.push(
       await applyTemplateToPage(url, template, targetPagePathPattern),
     );
