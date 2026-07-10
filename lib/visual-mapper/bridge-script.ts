@@ -10,6 +10,7 @@ export function buildBridgeScript(pageSourceUrl: string): string {
   let pickingMode = false;
   let pickingFieldId = null;
   let pickingPreferImage = false;
+  let interactivityEnabled = false;
   let layerPickIndex = 0;
   let lastPickX = 0;
   let lastPickY = 0;
@@ -28,6 +29,16 @@ export function buildBridgeScript(pageSourceUrl: string): string {
       pickingPreferImage = false;
       document.body.style.cursor = '';
     }
+    if (e.data.type === 'SET_INTERACTION_MODE') {
+      interactivityEnabled = !!e.data.enabled;
+      if (interactivityEnabled) {
+        if (activeOverlay) {
+          activeOverlay.style.outline = '';
+          activeOverlay = null;
+        }
+        clearAllHighlights();
+      }
+    }
     if (e.data.type === 'HIGHLIGHT_SELECTOR') {
       highlightSelector(e.data.selector);
     }
@@ -37,7 +48,7 @@ export function buildBridgeScript(pageSourceUrl: string): string {
   });
 
   document.addEventListener('mouseover', (e) => {
-    if (pickingMode) return;
+    if (pickingMode || interactivityEnabled) return;
     if (activeOverlay) activeOverlay.style.outline = '';
     const el = resolvePickTarget(e, false);
     el.style.outline = '2px solid #3B82F6';
@@ -47,7 +58,7 @@ export function buildBridgeScript(pageSourceUrl: string): string {
   });
 
   document.addEventListener('mouseout', (e) => {
-    if (pickingMode) return;
+    if (pickingMode || interactivityEnabled) return;
     if (!e.target.dataset.migratexSelected) {
       e.target.style.outline = '';
     }
@@ -88,14 +99,118 @@ export function buildBridgeScript(pageSourceUrl: string): string {
 
   function isHeroLikeContainer(el) {
     if (!el || !el.tagName) return false;
+    if (isCardLikeItem(el)) {
+      return false;
+    }
     const tag = el.tagName;
-    if (tag === 'SECTION' || tag === 'HEADER' || tag === 'ARTICLE') {
+    if (tag === 'SECTION' || tag === 'HEADER') {
       return true;
     }
     if (!el.classList) return false;
     return Array.from(el.classList).some(function(className) {
       return /hero|banner|jumbotron|masthead|cover/i.test(className);
     });
+  }
+
+  function isCardLikeItem(el) {
+    if (!el || el.tagName !== 'ARTICLE') {
+      return false;
+    }
+    if (el.closest && el.closest('[class*="grid"]')) {
+      return true;
+    }
+    if (!el.classList) {
+      return false;
+    }
+    return Array.from(el.classList).some(function(className) {
+      return /card|tile|item|feature|promo|teaser|group/i.test(className);
+    });
+  }
+
+  function findCardItemInStack(stack, fromIndex) {
+    for (let i = fromIndex; i < stack.length; i += 1) {
+      const el = stack[i];
+      if (isCardLikeItem(el)) {
+        return el;
+      }
+      if (el.closest) {
+        const article = el.closest('article');
+        if (article && isCardLikeItem(article)) {
+          return article;
+        }
+      }
+    }
+    return null;
+  }
+
+  function isInteractivePickTarget(el) {
+    if (!el || !el.tagName) return false;
+    const tag = el.tagName;
+    if (tag === 'BUTTON' || tag === 'A' || tag === 'IMG') {
+      return true;
+    }
+    if (tag === 'SUMMARY') {
+      return true;
+    }
+    if (/^H[1-6]$/.test(tag)) {
+      return true;
+    }
+    if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA' || tag === 'LABEL') {
+      return true;
+    }
+    if (el.getAttribute && el.getAttribute('aria-controls')) {
+      return true;
+    }
+    if (el.getAttribute && el.getAttribute('data-component')) {
+      return true;
+    }
+    return false;
+  }
+
+  function findAccordionTrigger(el) {
+    if (!el || !el.closest) return null;
+    if (el.tagName === 'SUMMARY') {
+      return el;
+    }
+    var summary = el.closest('summary');
+    if (summary && summary.closest('details')) {
+      return summary;
+    }
+    if (el.tagName === 'BUTTON' && el.getAttribute('aria-controls')) {
+      return el;
+    }
+    return el.closest('button[aria-controls]');
+  }
+
+  function expandAccordionFromTrigger(trigger) {
+    if (!trigger) return;
+
+    var details = trigger.closest && trigger.closest('details');
+    if (details) {
+      details.open = true;
+      return;
+    }
+
+    var panelId = trigger.getAttribute('aria-controls');
+    if (!panelId) return;
+
+    var panel = document.getElementById(panelId);
+    if (!panel) return;
+
+    trigger.setAttribute('aria-expanded', 'true');
+    panel.classList.remove('hidden');
+    panel.classList.add('block');
+    panel.removeAttribute('hidden');
+  }
+
+  function findInteractiveTargetInStack(stack, fromIndex) {
+    for (let i = fromIndex; i < stack.length; i += 1) {
+      const el = stack[i];
+      if (isInteractivePickTarget(el)) {
+        return el;
+      }
+    }
+    return null;
   }
 
   function findContainerInStack(stack, fromIndex) {
@@ -147,6 +262,14 @@ export function buildBridgeScript(pageSourceUrl: string): string {
     }
 
     if (!pickingMode) {
+      const cardItem = findCardItemInStack(stack, targetIndex);
+      if (cardItem) {
+        return cardItem;
+      }
+      const interactive = findInteractiveTargetInStack(stack, targetIndex);
+      if (interactive) {
+        return interactive;
+      }
       const container = findContainerInStack(stack, targetIndex);
       if (container) {
         return container;
@@ -160,8 +283,33 @@ export function buildBridgeScript(pageSourceUrl: string): string {
     if (isConsentTarget(e.target)) {
       return;
     }
+    if (interactivityEnabled && !pickingMode) {
+      var linkEl = findLinkElement(e.target);
+      if (linkEl) {
+        var navHref = extractHref(linkEl);
+        if (
+          navHref &&
+          /^https?:\\/\\//i.test(navHref) &&
+          navHref.indexOf('/api/proxy-page') === -1
+        ) {
+          e.preventDefault();
+          e.stopPropagation();
+          window.location.href =
+            window.location.origin +
+            '/api/proxy-page?url=' +
+            encodeURIComponent(navHref);
+          return;
+        }
+      }
+      return;
+    }
     e.preventDefault();
     e.stopPropagation();
+
+    var accordionTrigger = findAccordionTrigger(e.target);
+    if (accordionTrigger) {
+      expandAccordionFromTrigger(accordionTrigger);
+    }
 
     const el = resolvePickTarget(e, true);
     const selector = getSelector(el);
@@ -398,6 +546,8 @@ export function buildBridgeScript(pageSourceUrl: string): string {
       linkTarget: extractLinkTarget(el)
     };
   }
+
+  window.parent.postMessage({ type: 'BRIDGE_READY' }, '*');
 })();
 `.trim();
 }

@@ -43,6 +43,42 @@ function rewriteGenericUrl(url: string, baseUrl: URL): string {
   return resolveUrl(url, baseUrl);
 }
 
+const SKIP_NAVIGATION_HREF_PATTERN = /^(#|mailto:|tel:|javascript:|blob:)/i;
+
+export function toProxiedPageUrl(
+  absoluteUrl: string,
+  proxyOrigin: string,
+): string {
+  const normalized = absoluteUrl.trim();
+  if (!normalized || isProxiedAssetPath(normalized)) {
+    return normalized;
+  }
+  if (normalized.includes("/api/proxy-page?")) {
+    return normalized;
+  }
+  const origin = proxyOrigin.replace(/\/$/, "");
+  return `${origin}/api/proxy-page?url=${encodeURIComponent(normalized)}`;
+}
+
+/** Rewrites in-site navigation links to stay inside the Visual Mapper proxy iframe. */
+export function rewriteNavigationHref(
+  url: string,
+  baseUrl: URL,
+  proxyOrigin: string,
+): string {
+  const trimmed = url.trim();
+  if (!trimmed || SKIP_NAVIGATION_HREF_PATTERN.test(trimmed)) {
+    return trimmed;
+  }
+
+  const resolved = resolveUrl(trimmed, baseUrl);
+  if (!/^https?:\/\//i.test(resolved)) {
+    return resolved;
+  }
+
+  return toProxiedPageUrl(resolved, proxyOrigin);
+}
+
 function rewriteTagAttributes(
   html: string,
   tagName: string,
@@ -132,7 +168,7 @@ export function rewriteRelativeUrls(
   );
 
   result = rewriteTagAttributes(result, "a", ["href"], (url) =>
-    rewriteGenericUrl(url, baseUrl),
+    rewriteNavigationHref(url, baseUrl, proxyOrigin),
   );
 
   result = rewriteTagAttributes(result, "form", ["action"], (url) =>

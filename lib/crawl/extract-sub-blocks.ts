@@ -41,7 +41,10 @@ function inferSubBlockType($: CheerioAPI, element: Element): SemanticBlockType {
     return "card-grid";
   }
 
-  if ($(element).find('[role="button"][aria-controls]').length > 0) {
+  if (
+    $(element).find('summary, button[aria-controls], [role="button"][aria-controls]')
+      .length > 0
+  ) {
     return "rich-text";
   }
 
@@ -50,7 +53,7 @@ function inferSubBlockType($: CheerioAPI, element: Element): SemanticBlockType {
 
 function getSubBlockHeading($: CheerioAPI, element: Element): string | undefined {
   const accordionLabel = $(element)
-    .find('[role="button"][aria-controls]')
+    .find('summary, button[aria-controls], [role="button"][aria-controls]')
     .first()
     .text()
     .replace(/\s+/g, " ")
@@ -76,14 +79,17 @@ function pickAccordionItems($: CheerioAPI, root: Element): Element[] {
   const $root = $(root);
   const items = new Map<string, Element>();
 
-  $root.find('[role="button"][aria-controls]').each((_, trigger) => {
+  $root.find('button[aria-controls], summary, [role="button"][aria-controls]').each((_, trigger) => {
     if (trigger.type !== "tag") {
       return;
     }
 
     const wrapper =
-      $(trigger).closest("div[class*='mt-'], div[class*='accordion'], li").get(0) ??
-      trigger.parent;
+      $(trigger)
+        .closest(
+          "[data-component='accordion-item'], details, div[class*='mt-'], div[class*='accordion'], li",
+        )
+        .get(0) ?? trigger.parent;
     if (wrapper?.type === "tag") {
       items.set(elementIdentity($, wrapper), wrapper);
     }
@@ -99,7 +105,11 @@ function pickAccordionItems($: CheerioAPI, root: Element): Element[] {
     }
 
     const wrapper =
-      $(panel).closest("div[class*='mt-'], div[class*='accordion'], li").get(0) ?? panel;
+      $(panel)
+        .closest(
+          "[data-component='accordion-item'], div[class*='mt-'], div[class*='accordion'], li",
+        )
+        .get(0) ?? panel;
     if (wrapper.type === "tag") {
       items.set(elementIdentity($, wrapper), wrapper);
     }

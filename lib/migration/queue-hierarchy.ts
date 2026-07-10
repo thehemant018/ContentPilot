@@ -1,6 +1,11 @@
-import type { RenderingPlaceholderProfile } from "@/types/discovery";
+import type {
+  PlaceholderDefinition,
+  RenderingPlaceholderProfile,
+} from "@/types/discovery";
 import type { MigrationQueueItem } from "@/types/migration-queue";
+import { renderingNamesSuggestParentChild } from "@/lib/ai-match/catalog-shape";
 import {
+  childAllowedInParentExposedPlaceholder,
   pickDefaultPagePlaceholder,
   resolveChildPlaceholderKeyForNesting,
   findRenderingProfile,
@@ -34,6 +39,7 @@ function inferParentFromRenderingProfiles(
   pageItems: MigrationQueueItem[],
   byId: Map<string, MigrationQueueItem>,
   renderingProfiles?: RenderingPlaceholderProfile[],
+  placeholders?: PlaceholderDefinition[],
 ): { parentQueueItemId: string; childPlaceholderKey: string } | undefined {
   if (
     !childAllowsNestedPresentation(
@@ -58,6 +64,7 @@ function inferParentFromRenderingProfiles(
         {
           childRenderingName: item.renderingName,
           parentRenderingName: parentByBlock.renderingName,
+          placeholders,
         },
       );
       if (childPlaceholderKey) {
@@ -98,6 +105,7 @@ function inferParentFromRenderingProfiles(
       {
         childRenderingName: item.renderingName,
         parentRenderingName: candidate.renderingName,
+        placeholders,
       },
     );
     if (!childPlaceholderKey) {
@@ -109,6 +117,17 @@ function inferParentFromRenderingProfiles(
       candidate.renderingPath,
     );
     let score = 1;
+    if (
+      parentProfile &&
+      childAllowedInParentExposedPlaceholder(
+        parentProfile,
+        item.renderingPath,
+        item.renderingName,
+        placeholders,
+      )
+    ) {
+      score += 25;
+    }
     if ((parentProfile?.exposedChildPlaceholderKeys.length ?? 0) > 0) {
       score += 2;
     }
@@ -124,6 +143,14 @@ function inferParentFromRenderingProfiles(
       item.blockId.startsWith(`${candidate.blockId}-sub-`)
     ) {
       score += 10;
+    }
+    if (
+      renderingNamesSuggestParentChild(
+        candidate.renderingName ?? "",
+        item.renderingName ?? "",
+      )
+    ) {
+      score += 20;
     }
 
     matches.push({
@@ -176,6 +203,7 @@ function computeDepth(
 export function linkQueueHierarchy(
   queue: MigrationQueueItem[],
   renderingProfiles?: RenderingPlaceholderProfile[],
+  placeholders?: PlaceholderDefinition[],
 ): MigrationQueueItem[] {
   const byId = new Map(queue.map((item) => [item.id, item]));
   const byBlockOnPage = new Map<string, MigrationQueueItem>();
@@ -203,6 +231,11 @@ export function linkQueueHierarchy(
           parent.renderingPath,
           next.renderingPath,
           renderingProfiles,
+          {
+            childRenderingName: next.renderingName,
+            parentRenderingName: parent.renderingName,
+            placeholders,
+          },
         );
         if (childKey) {
           next = { ...next, childPlaceholderKey: childKey };
@@ -242,6 +275,7 @@ export function linkQueueHierarchy(
       byPage.get(item.sourcePageUrl) ?? [],
       byId,
       renderingProfiles,
+      placeholders,
     );
     if (!inferred) {
       return item;

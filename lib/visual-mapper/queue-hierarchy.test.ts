@@ -373,6 +373,154 @@ describe("inferVisualMapperParentBlockIds", () => {
     expect(parents.has("hero-entry")).toBe(false);
     expect(parents.get("item-a")).toBe(listA.templateKey);
   });
+
+  it("links AccordionItem under Accordion when CardLists are on the same page", () => {
+    const profiles: RenderingPlaceholderProfile[] = [
+      {
+        renderingPath: "/sitecore/layout/Renderings/Feature/Hero",
+        renderingId: "hero-id",
+        renderingName: "Hero",
+        allowedParentPlaceholderKeys: ["headless-main"],
+        exposedChildPlaceholderKeys: [],
+        nestedPlaceholderFormat: "path-suffix",
+      },
+      {
+        renderingPath: "/sitecore/layout/Renderings/Feature/CardList-Demo",
+        renderingId: "parent-id",
+        renderingName: "CardList-Demo",
+        allowedParentPlaceholderKeys: ["headless-main"],
+        exposedChildPlaceholderKeys: ["CardList-Demo-{*}"],
+        defaultDynamicPlaceholderId: 1,
+        usesSxaDynamicPlaceholders: true,
+        hasDynamicPlaceholders: true,
+        nestedPlaceholderFormat: "path-suffix",
+      },
+      {
+        renderingPath: "/sitecore/layout/Renderings/Feature/CardItem",
+        renderingId: "child-id",
+        renderingName: "CardItem",
+        allowedParentPlaceholderKeys: ["headless-main/CardList-Demo-{*}"],
+        exposedChildPlaceholderKeys: [],
+        nestedPlaceholderFormat: "path-suffix",
+      },
+      {
+        renderingPath:
+          "/sitecore/layout/Renderings/Feature/Hemant/Atlas Line Logistics/Accordion",
+        renderingId: "accordion-id",
+        renderingName: "Accordion",
+        allowedParentPlaceholderKeys: ["1"],
+        exposedChildPlaceholderKeys: ["Accordion-Demo-{*}"],
+        defaultDynamicPlaceholderId: 1,
+        usesSxaDynamicPlaceholders: true,
+        hasDynamicPlaceholders: true,
+        nestedPlaceholderFormat: "path-suffix",
+      },
+      {
+        renderingPath:
+          "/sitecore/layout/Renderings/Feature/Hemant/Atlas Line Logistics/AccordionItem",
+        renderingId: "accordion-item-id",
+        renderingName: "AccordionItem",
+        allowedParentPlaceholderKeys: ["1"],
+        exposedChildPlaceholderKeys: [],
+        nestedPlaceholderFormat: "path-suffix",
+      },
+    ];
+
+    const hero: MappingEntry = {
+      id: "hero-entry",
+      templateKey: "Hero::main > section.hero",
+      sourceSelector: "main > section.hero",
+      sourcePageUrl: "https://example.com",
+      renderingName: "Hero",
+      renderingPath: "/sitecore/layout/Renderings/Feature/Hero",
+      templateName: "Hero",
+      templatePath: "/sitecore/templates/Feature/Hero",
+      fieldAssignments: [],
+      createdAt: new Date(),
+    };
+    const cardList: MappingEntry = {
+      id: "list-entry",
+      templateKey: "CardList-Demo::main > section.card-list",
+      sourceSelector: "main > section.card-list",
+      sourcePageUrl: "https://example.com",
+      renderingName: "CardList-Demo",
+      renderingPath: "/sitecore/layout/Renderings/Feature/CardList-Demo",
+      templateName: "CardList-Demo",
+      templatePath: "/sitecore/templates/Feature/CardList-Demo",
+      fieldAssignments: [],
+      createdAt: new Date(),
+    };
+    const cardItem: MappingEntry = {
+      id: "card-item-entry",
+      templateKey: "CardItem::main > section.card-list > article.card-item",
+      sourceSelector: "main > section.card-list > article.card-item",
+      sourcePageUrl: "https://example.com",
+      renderingName: "CardItem",
+      renderingPath: "/sitecore/layout/Renderings/Feature/CardItem",
+      templateName: "CardItem",
+      templatePath: "/sitecore/templates/Feature/CardItem",
+      fieldAssignments: [],
+      createdAt: new Date(),
+    };
+    const accordion: MappingEntry = {
+      id: "accordion-entry",
+      templateKey: "Accordion::main > section.accordion",
+      sourceSelector: "main > section.accordion",
+      sourcePageUrl: "https://example.com",
+      renderingName: "Accordion",
+      renderingPath:
+        "/sitecore/layout/Renderings/Feature/Hemant/Atlas Line Logistics/Accordion",
+      templateName: "Accordion",
+      templatePath:
+        "/sitecore/templates/Feature/Hemant/Atlas Line Logistics/Accordion",
+      fieldAssignments: [],
+      createdAt: new Date(),
+    };
+    const accordionItem: MappingEntry = {
+      id: "accordion-item-entry",
+      templateKey:
+        "AccordionItem::main > section.accordion > article.accordion-item",
+      sourceSelector: "main > section.accordion > article.accordion-item",
+      sourcePageUrl: "https://example.com",
+      renderingName: "AccordionItem",
+      renderingPath:
+        "/sitecore/layout/Renderings/Feature/Hemant/Atlas Line Logistics/AccordionItem",
+      templateName: "AccordionItem",
+      templatePath:
+        "/sitecore/templates/Feature/Hemant/Atlas Line Logistics/AccordionItem",
+      fieldAssignments: [],
+      createdAt: new Date(),
+    };
+
+    const placeholders = [
+      {
+        itemId: "accordion-placeholder-id",
+        name: "Accordion1234",
+        path: "/sitecore/layout/Placeholder Settings/Feature/Hemant/Accordion1234",
+        key: "Accordion-Demo-{*}",
+        allowedRenderingNames: ["AccordionItem"],
+        allowedRenderingPaths: [profiles[4]!.renderingPath],
+      },
+      {
+        itemId: "card-list-placeholder-id",
+        name: "CardList1234",
+        path: "/sitecore/layout/Placeholder Settings/Feature/Hemant/CardList1234",
+        key: "CardList-Demo-{*}",
+        allowedRenderingNames: ["CardItem"],
+        allowedRenderingPaths: [profiles[2]!.renderingPath],
+      },
+    ];
+
+    const parents = inferVisualMapperParentBlockIds(
+      [hero, cardList, cardItem, accordion, accordionItem],
+      profiles,
+      undefined,
+      placeholders,
+    );
+
+    expect(parents.get("accordion-item-entry")).toBe(accordion.templateKey);
+    expect(parents.get("card-item-entry")).toBe(cardList.templateKey);
+  });
 });
 
 describe("mappingEntriesToQueueItems", () => {

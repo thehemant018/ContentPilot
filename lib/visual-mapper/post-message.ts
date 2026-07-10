@@ -1,6 +1,7 @@
 import type { ExtractedContent } from "@/types/visual-mapper";
 
 export type IframeToParentMessage =
+  | { type: "BRIDGE_READY" }
   | {
       type: "ELEMENT_SELECTED";
       selector: string;
@@ -18,6 +19,7 @@ export type IframeToParentMessage =
 export type ParentToIframeMessage =
   | { type: "ENABLE_PICK_MODE"; fieldId: string; preferImage?: boolean }
   | { type: "DISABLE_PICK_MODE" }
+  | { type: "SET_INTERACTION_MODE"; enabled: boolean }
   | { type: "HIGHLIGHT_SELECTOR"; selector: string }
   | { type: "CLEAR_HIGHLIGHTS" };
 
@@ -28,6 +30,7 @@ export function isIframeMessage(data: unknown): data is IframeToParentMessage {
 
   const type = (data as { type: unknown }).type;
   return (
+    type === "BRIDGE_READY" ||
     type === "ELEMENT_SELECTED" ||
     type === "FIELD_VALUE_PICKED"
   );

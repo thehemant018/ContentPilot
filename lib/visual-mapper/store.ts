@@ -36,8 +36,10 @@ interface VisualMapperStore {
   discoveryTemplates: TemplateDefinition[];
   targetPagePath: string;
   migrationWarning: string | null;
+  pageInteractivityEnabled: boolean;
 
   resetStore: () => void;
+  setPageInteractivityEnabled: (enabled: boolean) => void;
   setDiscoveryData: (
     renderings: DiscoveryItem[],
     templates: TemplateDefinition[],
@@ -95,6 +97,7 @@ export const useVisualMapperStore = create<VisualMapperStore>((set, get) => ({
   discoveryTemplates: [],
   targetPagePath: "",
   migrationWarning: null,
+  pageInteractivityEnabled: false,
 
   resetStore: () =>
     set({
@@ -106,7 +109,11 @@ export const useVisualMapperStore = create<VisualMapperStore>((set, get) => ({
       draftFieldAssignments: [],
       targetPagePath: "",
       migrationWarning: null,
+      pageInteractivityEnabled: false,
     }),
+
+  setPageInteractivityEnabled: (enabled) =>
+    set({ pageInteractivityEnabled: enabled }),
 
   setDiscoveryData: (renderings, templates, siteId) =>
     set({
@@ -131,6 +138,7 @@ export const useVisualMapperStore = create<VisualMapperStore>((set, get) => ({
       draftRendering: null,
       draftFieldAssignments: [],
       migrationWarning: null,
+      pageInteractivityEnabled: false,
     });
   },
 

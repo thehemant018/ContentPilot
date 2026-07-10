@@ -49,6 +49,36 @@ export function nameSuggestsLeaf(name: string): boolean {
   );
 }
 
+function normalizeRenderingStem(name: string): string {
+  return compactName(name)
+    .toLowerCase()
+    .replace(/(list|grid|container|wrapper|demo|collection|group|stack)$/i, "")
+    .replace(/item$/i, "");
+}
+
+/**
+ * True when rendering names suggest a container/leaf pair
+ * (e.g. Accordion + AccordionItem, CardList + CardItem).
+ */
+export function renderingNamesSuggestParentChild(
+  parentRenderingName: string,
+  childRenderingName: string,
+): boolean {
+  const parent = compactName(parentRenderingName).toLowerCase();
+  const child = compactName(childRenderingName).toLowerCase();
+  if (!parent || !child || parent === child) {
+    return false;
+  }
+
+  if (child.startsWith(parent)) {
+    return true;
+  }
+
+  const parentStem = normalizeRenderingStem(parentRenderingName);
+  const childStem = normalizeRenderingStem(childRenderingName);
+  return Boolean(parentStem && childStem && parentStem === childStem);
+}
+
 export function templateHasImageField(template: TemplateDefinition): boolean {
   return template.fields.some((field) => IMAGE_FIELD_PATTERN.test(field.name));
 }

@@ -143,7 +143,7 @@ export function prepareQueueForMigration(
     sorted,
     options?.placeholders,
   );
-  return linkQueueHierarchy(withDefaults, options?.renderingProfiles);
+  return linkQueueHierarchy(withDefaults, options?.renderingProfiles, options?.placeholders);
 }
 
 export function applyTargetPageChangeToQueueItem(

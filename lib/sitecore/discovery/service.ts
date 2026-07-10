@@ -5,6 +5,7 @@ import {
   VALIDATE_PATH_QUERY,
 } from "@/lib/sitecore/discovery/queries";
 import {
+  enrichPlaceholderDefinitionsWithAllowedControls,
   fetchPlaceholderDefinitions,
   fetchRenderingPlaceholderProfiles,
 } from "@/lib/sitecore/discovery/placeholders";
@@ -304,11 +305,18 @@ export async function runDiscovery(
       RENDERING_TEMPLATE_NAMES.has(item.templateName),
   );
 
+  const enrichedPlaceholders = await enrichPlaceholderDefinitionsWithAllowedControls(
+    instanceUrl,
+    accessToken,
+    placeholders,
+    renderings,
+  );
+
   const renderingProfiles = await fetchRenderingPlaceholderProfiles(
     instanceUrl,
     accessToken,
     renderings,
-    placeholders,
+    enrichedPlaceholders,
   );
 
   return slimDiscoveryResult({
@@ -317,7 +325,7 @@ export async function runDiscovery(
     mediaPath,
     placeholdersPath,
     renderings,
-    placeholders,
+    placeholders: enrichedPlaceholders,
     renderingProfiles,
     templates,
     instanceLanguages,

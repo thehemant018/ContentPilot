@@ -120,4 +120,19 @@ describe("url-rewrite", () => {
     );
     expect(html).toContain('allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"');
   });
+
+  it("rewrites anchor href through the page proxy for in-iframe navigation", () => {
+    const html = rewriteRelativeUrls(
+      '<a href="/about">About</a><a href="https://external.com/page">External</a><a href="#faq">FAQ</a>',
+      base,
+      { proxyOrigin: PROXY_ORIGIN },
+    );
+    expect(html).toContain(
+      `${PROXY_ORIGIN}/api/proxy-page?url=${encodeURIComponent("https://www.dpworld.com/about")}`,
+    );
+    expect(html).toContain(
+      `${PROXY_ORIGIN}/api/proxy-page?url=${encodeURIComponent("https://external.com/page")}`,
+    );
+    expect(html).toContain('href="#faq"');
+  });
 });

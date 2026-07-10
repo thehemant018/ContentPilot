@@ -605,4 +605,243 @@ describe("linkQueueHierarchy", () => {
       3,
     );
   });
+
+  it("links AccordionItem using exposed Layout Service placeholders, not name heuristics", () => {
+    const accordionProfiles: RenderingPlaceholderProfile[] = [
+      {
+        renderingPath:
+          "/sitecore/layout/Renderings/Feature/Hemant/Atlas Line Logistics/Accordion",
+        renderingId: "accordion-id",
+        renderingName: "Accordion",
+        allowedParentPlaceholderKeys: ["1"],
+        exposedChildPlaceholderKeys: ["Accordion-Demo-{*}"],
+        defaultDynamicPlaceholderId: 1,
+        hasDynamicPlaceholders: true,
+        usesSxaDynamicPlaceholders: true,
+        nestedPlaceholderFormat: "path-suffix",
+      },
+      {
+        renderingPath:
+          "/sitecore/layout/Renderings/Feature/Hemant/Atlas Line Logistics/AccordionItem",
+        renderingId: "accordion-item-id",
+        renderingName: "AccordionItem",
+        allowedParentPlaceholderKeys: ["1"],
+        exposedChildPlaceholderKeys: [],
+        defaultDynamicPlaceholderId: 1,
+        hasDynamicPlaceholders: true,
+        usesSxaDynamicPlaceholders: true,
+        nestedPlaceholderFormat: "path-suffix",
+      },
+    ];
+
+    const parent: MigrationQueueItem = {
+      id: "accordion-queue",
+      addedAt: "2026-01-01T00:00:00.000Z",
+      blockId: "accordion-block",
+      sourcePageUrl: "https://example.com/page",
+      blockType: "accordion",
+      renderingName: "Accordion",
+      renderingPath: accordionProfiles[0]!.renderingPath,
+      templateName: "Accordion",
+      matchScore: 90,
+      confidence: "high",
+      reasoning: "test",
+      targetPagePath: "/sitecore/content/site/home",
+      placeholder: "headless-main",
+      fields: [],
+    };
+
+    const child: MigrationQueueItem = {
+      id: "accordion-item-queue",
+      addedAt: "2026-01-01T00:00:01.000Z",
+      blockId: "accordion-item-block",
+      parentBlockId: "accordion-block",
+      sourcePageUrl: "https://example.com/page",
+      blockType: "accordion-item",
+      renderingName: "AccordionItem",
+      renderingPath: accordionProfiles[1]!.renderingPath,
+      templateName: "AccordionItem",
+      matchScore: 88,
+      confidence: "high",
+      reasoning: "test",
+      targetPagePath: "/sitecore/content/site/home",
+      fields: [],
+    };
+
+    const linked = linkQueueHierarchy([parent, child], accordionProfiles);
+    const linkedChild = linked.find((item) => item.id === "accordion-item-queue");
+
+    expect(linkedChild?.parentQueueItemId).toBe("accordion-queue");
+    expect(linkedChild?.childPlaceholderKey).toBe("Accordion-Demo-{*}");
+    expect(linkedChild?.presentationDepth).toBe(1);
+  });
+
+  it("links AccordionItem under Accordion instead of CardList on mixed pages", () => {
+    const mixedProfiles: RenderingPlaceholderProfile[] = [
+      {
+        renderingPath: "/sitecore/layout/Renderings/Feature/Hero",
+        renderingId: "hero-id",
+        renderingName: "Hero",
+        allowedParentPlaceholderKeys: ["headless-main"],
+        exposedChildPlaceholderKeys: [],
+        nestedPlaceholderFormat: "path-suffix",
+      },
+      {
+        renderingPath: "/sitecore/layout/Renderings/Feature/CardList-Demo",
+        renderingId: "card-list-id",
+        renderingName: "CardList-Demo",
+        allowedParentPlaceholderKeys: ["headless-main"],
+        exposedChildPlaceholderKeys: ["CardList-Demo-{*}"],
+        defaultDynamicPlaceholderId: 1,
+        hasDynamicPlaceholders: true,
+        usesSxaDynamicPlaceholders: true,
+        nestedPlaceholderFormat: "path-suffix",
+      },
+      {
+        renderingPath: "/sitecore/layout/Renderings/Feature/CardItem",
+        renderingId: "card-item-id",
+        renderingName: "CardItem",
+        allowedParentPlaceholderKeys: ["headless-main/CardList-Demo-{*}"],
+        exposedChildPlaceholderKeys: [],
+        nestedPlaceholderFormat: "path-suffix",
+      },
+      {
+        renderingPath:
+          "/sitecore/layout/Renderings/Feature/Hemant/Atlas Line Logistics/Accordion",
+        renderingId: "accordion-id",
+        renderingName: "Accordion",
+        allowedParentPlaceholderKeys: ["1"],
+        exposedChildPlaceholderKeys: ["Accordion-Demo-{*}"],
+        defaultDynamicPlaceholderId: 1,
+        hasDynamicPlaceholders: true,
+        usesSxaDynamicPlaceholders: true,
+        nestedPlaceholderFormat: "path-suffix",
+      },
+      {
+        renderingPath:
+          "/sitecore/layout/Renderings/Feature/Hemant/Atlas Line Logistics/AccordionItem",
+        renderingId: "accordion-item-id",
+        renderingName: "AccordionItem",
+        allowedParentPlaceholderKeys: ["1"],
+        exposedChildPlaceholderKeys: [],
+        nestedPlaceholderFormat: "path-suffix",
+      },
+    ];
+
+    const hero: MigrationQueueItem = {
+      id: "hero-queue",
+      addedAt: "2026-01-01T00:00:00.000Z",
+      blockId: "hero-block",
+      sourcePageUrl: "https://example.com/page",
+      blockType: "hero",
+      renderingName: "Hero",
+      renderingPath: mixedProfiles[0]!.renderingPath,
+      templateName: "Hero",
+      matchScore: 90,
+      confidence: "high",
+      reasoning: "test",
+      targetPagePath: "/sitecore/content/site/home",
+      placeholder: "headless-main",
+      fields: [],
+    };
+
+    const cardList: MigrationQueueItem = {
+      id: "card-list-queue",
+      addedAt: "2026-01-01T00:00:01.000Z",
+      blockId: "card-list-block",
+      sourcePageUrl: "https://example.com/page",
+      blockType: "card-grid",
+      renderingName: "CardList-Demo",
+      renderingPath: mixedProfiles[1]!.renderingPath,
+      templateName: "CardList-Demo",
+      matchScore: 90,
+      confidence: "high",
+      reasoning: "test",
+      targetPagePath: "/sitecore/content/site/home",
+      placeholder: "headless-main",
+      fields: [],
+    };
+
+    const cardItem: MigrationQueueItem = {
+      id: "card-item-queue",
+      addedAt: "2026-01-01T00:00:02.000Z",
+      blockId: "card-item-block",
+      parentBlockId: "card-list-block",
+      sourcePageUrl: "https://example.com/page",
+      blockType: "card-grid",
+      renderingName: "CardItem",
+      renderingPath: mixedProfiles[2]!.renderingPath,
+      templateName: "CardItem",
+      matchScore: 88,
+      confidence: "high",
+      reasoning: "test",
+      targetPagePath: "/sitecore/content/site/home",
+      fields: [],
+    };
+
+    const accordion: MigrationQueueItem = {
+      id: "accordion-queue",
+      addedAt: "2026-01-01T00:00:03.000Z",
+      blockId: "accordion-block",
+      sourcePageUrl: "https://example.com/page",
+      blockType: "accordion",
+      renderingName: "Accordion",
+      renderingPath: mixedProfiles[3]!.renderingPath,
+      templateName: "Accordion",
+      matchScore: 90,
+      confidence: "high",
+      reasoning: "test",
+      targetPagePath: "/sitecore/content/site/home",
+      placeholder: "headless-main",
+      fields: [],
+    };
+
+    const accordionItem: MigrationQueueItem = {
+      id: "accordion-item-queue",
+      addedAt: "2026-01-01T00:00:04.000Z",
+      blockId: "accordion-item-block",
+      sourcePageUrl: "https://example.com/page",
+      blockType: "accordion-item",
+      renderingName: "AccordionItem",
+      renderingPath: mixedProfiles[4]!.renderingPath,
+      templateName: "AccordionItem",
+      matchScore: 88,
+      confidence: "high",
+      reasoning: "test",
+      targetPagePath: "/sitecore/content/site/home",
+      fields: [],
+    };
+
+    const mixedPlaceholders = [
+      {
+        itemId: "accordion-placeholder-id",
+        name: "Accordion1234",
+        path: "/sitecore/layout/Placeholder Settings/Feature/Hemant/Accordion1234",
+        key: "Accordion-Demo-{*}",
+        allowedRenderingNames: ["AccordionItem"],
+        allowedRenderingPaths: [mixedProfiles[4]!.renderingPath],
+      },
+      {
+        itemId: "card-list-placeholder-id",
+        name: "CardList1234",
+        path: "/sitecore/layout/Placeholder Settings/Feature/Hemant/CardList1234",
+        key: "CardList-Demo-{*}",
+        allowedRenderingNames: ["CardItem"],
+        allowedRenderingPaths: [mixedProfiles[2]!.renderingPath],
+      },
+    ];
+
+    const linked = linkQueueHierarchy(
+      [hero, cardList, cardItem, accordion, accordionItem],
+      mixedProfiles,
+      mixedPlaceholders,
+    );
+    const linkedAccordionItem = linked.find(
+      (item) => item.id === "accordion-item-queue",
+    );
+
+    expect(linkedAccordionItem?.parentQueueItemId).toBe("accordion-queue");
+    expect(linkedAccordionItem?.childPlaceholderKey).toBe("Accordion-Demo-{*}");
+    expect(linkedAccordionItem?.presentationDepth).toBe(1);
+  });
 });

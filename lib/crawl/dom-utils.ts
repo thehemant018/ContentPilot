@@ -163,9 +163,12 @@ export function countStructuralItems($: CheerioAPI, root: Element): {
     articles: (html.match(/<article\b/gi) ?? []).length,
     figures: (html.match(/<figure\b/gi) ?? []).length,
     blockquotes: (html.match(/<blockquote\b/gi) ?? []).length,
-    accordionTriggers: $root.find('[role="button"][aria-controls]').length,
-    accordionPanels: $root.find('[id*="accordion-panel"], [id*="accordion_panel"]')
-      .length,
+    accordionTriggers: $root.find(
+      'button[aria-controls], summary, [role="button"][aria-controls]',
+    ).length,
+    accordionPanels: $root.find(
+      '[id*="accordion-panel"], [id*="accordion_panel"], [id*="-content-"]',
+    ).length,
     gridChildren: pickLargestDirectGridChildren($, root).length,
   };
 }

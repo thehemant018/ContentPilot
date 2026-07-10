@@ -46,6 +46,10 @@ export interface PlaceholderDefinition {
   path: string;
   /** Value of the Placeholder Key field — used in layout XML s:ph. */
   key: string;
+  /** Rendering paths allowed in this placeholder (Placeholder Setting Allowed Controls). */
+  allowedRenderingPaths?: string[];
+  /** Rendering names allowed in this placeholder (Placeholder Setting Allowed Controls). */
+  allowedRenderingNames?: string[];
 }
 
 export type NestedPlaceholderFormat = "path-suffix" | "guid-suffix";
