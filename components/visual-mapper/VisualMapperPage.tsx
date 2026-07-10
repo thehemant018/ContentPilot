@@ -67,6 +67,12 @@ export function VisualMapperPage() {
   const resetStore = useVisualMapperStore((s) => s.resetStore);
   const setDiscoveryData = useVisualMapperStore((s) => s.setDiscoveryData);
   const loadPage = useVisualMapperStore((s) => s.loadPage);
+  const pageInteractivityEnabled = useVisualMapperStore(
+    (s) => s.pageInteractivityEnabled,
+  );
+  const setPageInteractivityEnabled = useVisualMapperStore(
+    (s) => s.setPageInteractivityEnabled,
+  );
   const startMigration = useVisualMapperStore((s) => s.startMigration);
   const migrationComplete = useVisualMapperStore((s) => s.migrationComplete);
   const migrationFailed = useVisualMapperStore((s) => s.migrationFailed);
@@ -396,6 +402,28 @@ export function VisualMapperPage() {
           >
             Load Page
           </button>
+          <label
+            className={`flex shrink-0 cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm ${
+              pageInteractivityEnabled
+                ? "border-amber-300 bg-amber-50 text-amber-900"
+                : "border-zinc-200 bg-white text-zinc-700"
+            }`}
+            title={
+              pageInteractivityEnabled
+                ? "Page clicks work normally. Turn off to select components for mapping."
+                : "Enable to interact with accordions, tabs, and other page controls."
+            }
+          >
+            <input
+              type="checkbox"
+              checked={pageInteractivityEnabled}
+              onChange={(event) =>
+                setPageInteractivityEnabled(event.target.checked)
+              }
+              className="h-4 w-4 rounded border-zinc-300 text-amber-600 focus:ring-amber-500"
+            />
+            <span className="font-medium whitespace-nowrap">Page interactivity</span>
+          </label>
         </div>
 
         <button

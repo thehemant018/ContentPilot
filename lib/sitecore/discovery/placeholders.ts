@@ -44,6 +44,7 @@ const ALLOWED_PLACEHOLDER_FIELD_NAMES = new Set([
 const EXPOSED_PLACEHOLDER_FIELD_NAMES = new Set([
   "Placeholders",
   "Placeholder Settings",
+  "Layout Service Placeholders",
 ]);
 
 const DYNAMIC_PLACEHOLDER_ID_FIELD_NAMES = [
@@ -402,6 +403,137 @@ function resolveMultilistToKeys(
   }
 
   return Array.from(keys);
+}
+
+function findRenderingByReference(
+  reference: string,
+  renderingById: Map<string, DiscoveryItem>,
+): DiscoveryItem | undefined {
+  const trimmed = reference.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+
+  if (trimmed.startsWith("/sitecore/")) {
+    const normalizedPath = normalizePath(trimmed);
+    return [...renderingById.values()].find(
+      (rendering) => normalizePath(rendering.path) === normalizedPath,
+    );
+  }
+
+  const normalizedId = normalizeGuid(trimmed);
+  return (
+    renderingById.get(normalizedId) ??
+    [...renderingById.values()].find(
+      (rendering) => normalizeGuid(rendering.itemId) === normalizedId,
+    )
+  );
+}
+
+async function resolveMultilistToRenderings(
+  instanceUrl: string,
+  accessToken: string,
+  multilistValue: string | undefined,
+  renderingById: Map<string, DiscoveryItem>,
+): Promise<DiscoveryItem[]> {
+  const renderings: DiscoveryItem[] = [];
+  const seen = new Set<string>();
+
+  for (const reference of parseMultilistValue(multilistValue)) {
+    const trimmed = reference.trim();
+    if (!trimmed) {
+      continue;
+    }
+
+    let rendering = findRenderingByReference(trimmed, renderingById);
+    if (!rendering && isSitecoreItemIdReference(trimmed)) {
+      const path = await resolveItemPathFromId(instanceUrl, accessToken, trimmed);
+      if (path) {
+        rendering = findRenderingByReference(path, renderingById);
+        if (!rendering) {
+          const name = path.split("/").filter(Boolean).pop() ?? path;
+          rendering = {
+            itemId: normalizeGuid(trimmed),
+            name,
+            path,
+          };
+        }
+      }
+    }
+
+    if (!rendering) {
+      continue;
+    }
+
+    const dedupeKey = normalizePath(rendering.path);
+    if (seen.has(dedupeKey)) {
+      continue;
+    }
+    seen.add(dedupeKey);
+    renderings.push(rendering);
+  }
+
+  return renderings;
+}
+
+/**
+ * Reads Placeholder Setting Allowed Controls and resolves them to rendering paths/names.
+ */
+export async function enrichPlaceholderDefinitionsWithAllowedControls(
+  instanceUrl: string,
+  accessToken: string,
+  placeholders: PlaceholderDefinition[],
+  renderings: DiscoveryItem[],
+): Promise<PlaceholderDefinition[]> {
+  const renderingById = new Map<string, DiscoveryItem>();
+  for (const rendering of renderings) {
+    renderingById.set(normalizeGuid(rendering.itemId), rendering);
+  }
+
+  const enriched: PlaceholderDefinition[] = [];
+
+  for (const placeholder of placeholders) {
+    let allowedRenderingPaths = placeholder.allowedRenderingPaths ?? [];
+    let allowedRenderingNames = placeholder.allowedRenderingNames ?? [];
+
+    if (
+      allowedRenderingPaths.length === 0 &&
+      allowedRenderingNames.length === 0
+    ) {
+      try {
+        const fields = await fetchItemFields(
+          instanceUrl,
+          accessToken,
+          placeholder.path,
+        );
+        const allowedControlsValue = readFieldValue(
+          fields,
+          ["Allowed Controls"],
+        );
+        const allowedRenderings = await resolveMultilistToRenderings(
+          instanceUrl,
+          accessToken,
+          allowedControlsValue,
+          renderingById,
+        );
+        allowedRenderingPaths = allowedRenderings.map(
+          (rendering) => rendering.path,
+        );
+        allowedRenderingNames = allowedRenderings.map(
+          (rendering) => rendering.name,
+        );
+      } catch {
+      }
+    }
+
+    enriched.push({
+      ...placeholder,
+      allowedRenderingPaths,
+      allowedRenderingNames,
+    });
+  }
+
+  return enriched;
 }
 
 async function resolveMultilistToKeysWithLookup(

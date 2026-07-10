@@ -1,8 +1,14 @@
 import {
   canNestUnderParentRendering,
   childAllowsNestedPresentation,
+  childAllowedInParentExposedPlaceholder,
+  findRenderingProfile,
 } from "@/lib/migration/placeholder-registry";
-import type { RenderingPlaceholderProfile } from "@/types/discovery";
+import { renderingNamesSuggestParentChild } from "@/lib/ai-match/catalog-shape";
+import type {
+  PlaceholderDefinition,
+  RenderingPlaceholderProfile,
+} from "@/types/discovery";
 import type { MappingEntry } from "@/types/visual-mapper";
 import { mappingEntryBlockId } from "@/lib/visual-mapper/template-key";
 
@@ -51,6 +57,7 @@ function canVisualMapperNestUnder(
   parent: MappingEntry,
   child: MappingEntry,
   renderingProfiles?: RenderingPlaceholderProfile[],
+  placeholders?: PlaceholderDefinition[],
 ): boolean {
   if (parent.id === child.id) {
     return false;
@@ -73,15 +80,52 @@ function canVisualMapperNestUnder(
     {
       parentRenderingName: parent.renderingName,
       childRenderingName: child.renderingName,
+      placeholders,
     },
   );
+}
+
+function scoreParentCandidate(
+  parent: MappingEntry,
+  child: MappingEntry,
+  renderingProfiles?: RenderingPlaceholderProfile[],
+  placeholders?: PlaceholderDefinition[],
+): number {
+  let score = 0;
+  const parentProfile = findRenderingProfile(
+    renderingProfiles,
+    parent.renderingPath,
+  );
+  if (
+    parentProfile &&
+    childAllowedInParentExposedPlaceholder(
+      parentProfile,
+      child.renderingPath,
+      child.renderingName,
+      placeholders,
+    )
+  ) {
+    score += 30;
+  }
+  if (
+    renderingNamesSuggestParentChild(
+      parent.renderingName ?? "",
+      child.renderingName ?? "",
+    )
+  ) {
+    score += 20;
+  }
+  return score;
 }
 
 function pickBestParentCandidate(
   matches: Array<{ candidate: MappingEntry; candidateIndex: number }>,
   childIndex: number,
+  child: MappingEntry,
   blockIdByEntryId: Map<string, string> | undefined,
   assignedChildrenCount: Map<string, number>,
+  renderingProfiles?: RenderingPlaceholderProfile[],
+  placeholders?: PlaceholderDefinition[],
 ): MappingEntry | undefined {
   if (matches.length === 0) {
     return undefined;
@@ -108,6 +152,24 @@ function pickBestParentCandidate(
       current.candidate,
       blockIdByEntryId,
     );
+    const bestNameScore = scoreParentCandidate(
+      best.candidate,
+      child,
+      renderingProfiles,
+      placeholders,
+    );
+    const currentNameScore = scoreParentCandidate(
+      current.candidate,
+      child,
+      renderingProfiles,
+      placeholders,
+    );
+    if (currentNameScore > bestNameScore) {
+      return current;
+    }
+    if (currentNameScore < bestNameScore) {
+      return best;
+    }
     const bestCount = assignedChildrenCount.get(bestBlockId) ?? 0;
     const currentCount = assignedChildrenCount.get(currentBlockId) ?? 0;
 
@@ -132,6 +194,7 @@ export function inferVisualMapperParentBlockIds(
   entries: MappingEntry[],
   renderingProfiles?: RenderingPlaceholderProfile[],
   blockIdByEntryId?: Map<string, string>,
+  placeholders?: PlaceholderDefinition[],
 ): Map<string, string> {
   const parentBlockIdByEntryId = new Map<string, string>();
   const assignedChildrenCount = new Map<string, number>();
@@ -159,8 +222,11 @@ export function inferVisualMapperParentBlockIds(
     const selectorParent = pickBestParentCandidate(
       selectorMatches,
       childIndex,
+      child,
       blockIdByEntryId,
       assignedChildrenCount,
+      renderingProfiles,
+      placeholders,
     );
 
     if (selectorParent) {
@@ -183,14 +249,17 @@ export function inferVisualMapperParentBlockIds(
         ({ candidate, candidateIndex }) =>
           candidateIndex < childIndex &&
           candidate.sourcePageUrl === child.sourcePageUrl &&
-          canVisualMapperNestUnder(candidate, child, renderingProfiles),
+          canVisualMapperNestUnder(candidate, child, renderingProfiles, placeholders),
       );
 
     const nestingParent = pickBestParentCandidate(
       nestingParents,
       childIndex,
+      child,
       blockIdByEntryId,
       assignedChildrenCount,
+      renderingProfiles,
+      placeholders,
     );
 
     if (!nestingParent) {

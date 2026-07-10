@@ -43,14 +43,65 @@ export function IframeViewer({ sourceUrl, highlightSelector }: IframeViewerProps
   const activeFieldId = useVisualMapperStore((s) => s.activeFieldId);
   const draftFieldAssignments = useVisualMapperStore((s) => s.draftFieldAssignments);
   const sessionStatus = useVisualMapperStore((s) => s.session.status);
+  const pageInteractivityEnabled = useVisualMapperStore(
+    (s) => s.pageInteractivityEnabled,
+  );
 
   const activeField = draftFieldAssignments.find(
     (field) => field.sitecoreField === activeFieldId,
   );
 
+  const bridgeStateRef = useRef({
+    pageInteractivityEnabled,
+    activeFieldId,
+    activeField,
+    highlightSelector,
+  });
+
+  useEffect(() => {
+    bridgeStateRef.current = {
+      pageInteractivityEnabled,
+      activeFieldId,
+      activeField,
+      highlightSelector,
+    };
+  }, [
+    pageInteractivityEnabled,
+    activeFieldId,
+    activeField,
+    highlightSelector,
+  ]);
+
   const postToIframe = useCallback((message: ParentToIframeMessage) => {
     iframeRef.current?.contentWindow?.postMessage(message, "*");
   }, []);
+
+  const syncBridgeState = useCallback(() => {
+    const state = bridgeStateRef.current;
+    postToIframe({
+      type: "SET_INTERACTION_MODE",
+      enabled: state.pageInteractivityEnabled,
+    });
+
+    if (state.activeFieldId) {
+      postToIframe({
+        type: "ENABLE_PICK_MODE",
+        fieldId: state.activeFieldId,
+        preferImage: fieldPrefersImagePick(state.activeField),
+      });
+    } else {
+      postToIframe({ type: "DISABLE_PICK_MODE" });
+    }
+
+    if (state.highlightSelector) {
+      postToIframe({
+        type: "HIGHLIGHT_SELECTOR",
+        selector: state.highlightSelector,
+      });
+    } else {
+      postToIframe({ type: "CLEAR_HIGHLIGHTS" });
+    }
+  }, [postToIframe]);
 
   useEffect(() => {
     if (!sourceUrl) {
@@ -105,7 +156,15 @@ export function IframeViewer({ sourceUrl, highlightSelector }: IframeViewerProps
         return;
       }
 
+      if (message.type === "BRIDGE_READY") {
+        syncBridgeState();
+        return;
+      }
+
       if (message.type === "ELEMENT_SELECTED") {
+        if (bridgeStateRef.current.pageInteractivityEnabled) {
+          return;
+        }
         if (mappingPhase !== "select-component" && !activeFieldId) {
           return;
         }
@@ -135,33 +194,25 @@ export function IframeViewer({ sourceUrl, highlightSelector }: IframeViewerProps
     postToIframe,
     setActiveFieldId,
     setSelectedElement,
+    syncBridgeState,
     mappingPhase,
     activeFieldId,
   ]);
 
   useEffect(() => {
-    if (activeFieldId) {
-      postToIframe({
-        type: "ENABLE_PICK_MODE",
-        fieldId: activeFieldId,
-        preferImage: fieldPrefersImagePick(activeField),
-      });
-    } else {
-      postToIframe({ type: "DISABLE_PICK_MODE" });
-    }
-  }, [activeField, activeFieldId, postToIframe]);
-
-  useEffect(() => {
-    if (highlightSelector) {
-      postToIframe({ type: "HIGHLIGHT_SELECTOR", selector: highlightSelector });
-    } else {
-      postToIframe({ type: "CLEAR_HIGHLIGHTS" });
-    }
-  }, [highlightSelector, postToIframe]);
+    syncBridgeState();
+  }, [
+    activeField,
+    activeFieldId,
+    highlightSelector,
+    pageInteractivityEnabled,
+    syncBridgeState,
+  ]);
 
   function handleIframeLoad() {
     setLoadErrorState(null);
     pageLoaded();
+    syncBridgeState();
   }
 
   function handleIframeError() {

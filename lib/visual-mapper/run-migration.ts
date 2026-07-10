@@ -37,12 +37,14 @@ export function mappingEntriesToQueueItems(
 ): MigrationQueueItem[] {
   const discovery = getDiscoveryResult();
   const profiles = renderingProfiles ?? discovery?.renderingProfiles;
+  const placeholders = discovery?.placeholders;
   const { matches } = prepareVisualMapperMigration(entries, pageUrl, pageTitle);
   const blockIdByEntryId = resolveEntryBlockIds(entries);
   const parentBlockIdByEntryId = inferVisualMapperParentBlockIds(
     entries,
     profiles,
     blockIdByEntryId,
+    placeholders,
   );
   const matchByBlockId = new Map(
     matches.map((match) => [match.blockId, match]),

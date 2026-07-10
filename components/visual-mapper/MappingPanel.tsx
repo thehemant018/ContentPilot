@@ -61,6 +61,9 @@ export function MappingPanel({
   const discoveryRenderings = useVisualMapperStore((s) => s.discoveryRenderings);
   const mappings = useVisualMapperStore((s) => s.session.mappings);
   const targetPagePath = useVisualMapperStore((s) => s.targetPagePath);
+  const pageInteractivityEnabled = useVisualMapperStore(
+    (s) => s.pageInteractivityEnabled,
+  );
   const setTargetPagePath = useVisualMapperStore((s) => s.setTargetPagePath);
 
   const setDraftRenderingByName = useVisualMapperStore(
@@ -165,7 +168,9 @@ export function MappingPanel({
                     No component selected
                   </p>
                   <p className="mt-1 text-xs text-zinc-500">
-                    Click a section in the page preview on the left.
+                    {pageInteractivityEnabled
+                      ? "Turn off Page interactivity in the header, then click a section in the preview."
+                      : "Click a section in the page preview on the left."}
                   </p>
                 </div>
               ) : (

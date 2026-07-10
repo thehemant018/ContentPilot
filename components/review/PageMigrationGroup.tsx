@@ -172,43 +172,31 @@ function PageGroupBody({
               htmlFor={`placeholder-page-${lead.id}`}
               className={reviewLabelClass}
             >
-              Page placeholder
+              Main placeholder
             </label>
-            {pagePlaceholderKeys.length > 0 ? (
-              <select
-                id={`placeholder-page-${lead.id}`}
-                value={placeholder}
-                onChange={(event) =>
-                  onUpdatePageSettings(sourcePageUrl, {
-                    placeholder: event.target.value,
-                  })
-                }
-                className={reviewInputClass}
-              >
-                {pagePlaceholderKeys.map((key) => (
-                  <option key={key} value={key}>
-                    {key}
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <input
-                id={`placeholder-page-${lead.id}`}
-                type="text"
-                value={placeholder}
-                onChange={(event) =>
-                  onUpdatePageSettings(sourcePageUrl, {
-                    placeholder: event.target.value,
-                  })
-                }
-                placeholder={DEFAULT_PRESENTATION_PLACEHOLDER}
-                className={reviewInputClass}
-              />
-            )}
+            <input
+              id={`placeholder-page-${lead.id}`}
+              type="text"
+              list={`placeholder-suggestions-${lead.id}`}
+              value={placeholder}
+              onChange={(event) =>
+                onUpdatePageSettings(sourcePageUrl, {
+                  placeholder: event.target.value,
+                })
+              }
+              placeholder={DEFAULT_PRESENTATION_PLACEHOLDER}
+              className={reviewInputClass}
+            />
+            <datalist id={`placeholder-suggestions-${lead.id}`}>
+              {pagePlaceholderKeys.map((key) => (
+                <option key={key} value={key} />
+              ))}
+            </datalist>
             <p className="mt-1.5 text-xs text-zinc-600">
-              Root placeholder for page-level components (from Placeholder
-              Settings when Discovery includes a placeholders path). Nested
-              children use parent exposed placeholders automatically.
+              Root placeholder for page-level components (default{" "}
+              {DEFAULT_PRESENTATION_PLACEHOLDER}). Edit if your layout uses a
+              different key. Nested children use parent exposed placeholders
+              automatically.
             </p>
           </div>
           <div className="md:col-span-2">
@@ -303,11 +291,18 @@ export function PageMigrationGroup({
   ];
   const pagePlaceholderKeys = useMemo(() => {
     const discovery = getDiscoveryResult();
-    const keys = listPageRootPlaceholderKeys(discovery?.placeholders);
-    if (keys.length > 0) {
-      return keys;
-    }
-    return [placeholder];
+    const discovered = listPageRootPlaceholderKeys(discovery?.placeholders).filter(
+      (key) => !key.includes("{") && !key.includes("/"),
+    );
+    return [
+      ...new Set([
+        DEFAULT_PRESENTATION_PLACEHOLDER,
+        ...discovered,
+        placeholder.trim(),
+      ]),
+    ]
+      .filter(Boolean)
+      .sort();
   }, [placeholder]);
 
   const crawl = getCrawlResult();

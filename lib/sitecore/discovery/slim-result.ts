@@ -42,6 +42,8 @@ function slimPlaceholder(item: PlaceholderDefinition): PlaceholderDefinition {
     name: item.name,
     path: item.path,
     key: item.key,
+    allowedRenderingPaths: item.allowedRenderingPaths,
+    allowedRenderingNames: item.allowedRenderingNames,
   };
 }
 
