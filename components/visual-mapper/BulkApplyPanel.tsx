@@ -185,7 +185,7 @@ export function BulkApplyPanel({
     if (skipped > 0 && added === 0) {
       setFeedback({
         type: "warning",
-        message: `${skipped} component(s) were already in Review. Opening Review…`,
+        message: `${skipped} component(s) were already in Review. Opening Review...`,
       });
       return;
     }
@@ -206,7 +206,7 @@ export function BulkApplyPanel({
           type="checkbox"
           checked={bulkApplyEnabled}
           onChange={(event) => setBulkApplyEnabled(event.target.checked)}
-          className="mt-0.5 h-4 w-4 shrink-0 rounded border-zinc-300 text-violet-600 focus:ring-violet-500"
+          className="mt-0.5 h-4 w-4 shrink-0 rounded border-zinc-300 text-teal-600 focus:ring-teal-500"
         />
         <span>
           <span className="text-sm font-semibold text-zinc-900">
@@ -222,7 +222,7 @@ export function BulkApplyPanel({
       </label>
 
       {bulkApplyEnabled && (
-        <div className="mt-4 space-y-3 border-l-2 border-violet-200 pl-4">
+        <div className="mt-4 space-y-3 border-l-2 border-teal-200 pl-4">
           <label className="block text-xs font-semibold uppercase tracking-wide text-zinc-500">
             Page URLs (one per line)
           </label>
@@ -256,9 +256,9 @@ export function BulkApplyPanel({
               type="button"
               onClick={() => void handleApply()}
               disabled={isApplying || mappings.length === 0}
-              className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-lg bg-teal-600 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {isApplying ? "Applying…" : "Apply template"}
+              {isApplying ? "Applying..." : "Apply template"}
             </button>
 
             {readyResults.length > 0 && (
@@ -310,7 +310,7 @@ export function BulkApplyPanel({
                         {item.url}
                       </td>
                       <td className="px-2 py-2 font-medium text-zinc-800">
-                        {item.pageName || "—"}
+                        {item.pageName || "-"}
                       </td>
                       <td className="px-2 py-2">
                         <StatusBadge status={item.status} />
@@ -327,7 +327,7 @@ export function BulkApplyPanel({
                         {item.mappings.length}
                       </td>
                       <td className="max-w-44 truncate px-2 py-2 font-mono text-zinc-600">
-                        {item.targetPagePath || "—"}
+                        {item.targetPagePath || "-"}
                       </td>
                     </tr>
                   ))}

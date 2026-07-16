@@ -161,22 +161,30 @@ export function WorkflowTabs() {
   );
 
   return (
-    <section id="workflow" className="w-full scroll-mt-24">
-      <div className="mb-4">
-        <h2 className="text-sm font-semibold uppercase tracking-wider text-zinc-500">
-          Migration workflow
-        </h2>
-        <p className="mt-1 text-sm text-zinc-600">
-          Complete each phase in order. After Map (step 3), use Crawl + AI Match
-          or Visual Mapper — then Review and Migrate.
+    <section id="workflow" className="animate-rise-delay w-full scroll-mt-24">
+      <div className="mb-5 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h2 className="font-display text-lg font-semibold tracking-tight text-slate-900">
+            Migration workflow
+          </h2>
+          <p className="mt-1 max-w-2xl text-sm text-slate-600">
+            Complete each phase in order. After Map, use Crawl + AI Match or
+            Visual Mapper — then Review and Migrate.
+          </p>
+        </div>
+        <p className="text-xs text-slate-500">
+          Active:{" "}
+          <span className={`font-semibold ${activePhase.labelColor}`}>
+            {activePhase.number}. {activePhase.name}
+          </span>
         </p>
       </div>
 
-      <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
+      <div className="overflow-hidden rounded-2xl border border-slate-200/90 bg-white/90 shadow-[0_1px_0_rgb(15_23_42_/_0.04)] backdrop-blur-sm">
         <div
           role="tablist"
           aria-label="Migration workflow phases"
-          className="flex gap-1 overflow-x-auto border-b border-zinc-200 bg-zinc-50 p-2"
+          className="flex gap-1.5 overflow-x-auto border-b border-slate-200 bg-slate-50/90 p-2.5"
         >
           {WORKFLOW_PHASES.map((phase) => {
             const phaseIndex = getPhaseIndex(phase.id);
@@ -228,12 +236,12 @@ export function WorkflowTabs() {
                             : undefined
                 }
                 onClick={() => selectTab(phase.id)}
-                className={`flex shrink-0 items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors ${
+                className={`flex shrink-0 items-center gap-2 rounded-xl border px-3 py-2 text-sm transition-all duration-150 ${
                   isActive
                     ? `${phase.activeBg} ${phase.activeBorder} ${phase.activeRing} ${phase.labelColor} ring-1 font-semibold`
                     : isDisabled
-                      ? "cursor-not-allowed border-transparent font-medium text-zinc-400 opacity-60"
-                      : "border-transparent font-medium text-zinc-600 hover:bg-white hover:text-zinc-900"
+                      ? "cursor-not-allowed border-transparent font-medium text-slate-400 opacity-60"
+                      : "border-transparent font-medium text-slate-600 hover:bg-white hover:text-slate-900"
                 }`}
               >
                 <PhaseTabBadge
@@ -247,10 +255,10 @@ export function WorkflowTabs() {
                 )}
                 {!phase.available && (
                   <span
-                    className={`rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase ${
+                    className={`rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase ${
                       isActive
-                        ? "bg-white/80 text-zinc-700"
-                        : "bg-zinc-200 text-zinc-600"
+                        ? "bg-white/80 text-slate-700"
+                        : "bg-slate-200 text-slate-600"
                     }`}
                   >
                     Soon
@@ -272,7 +280,7 @@ export function WorkflowTabs() {
                 id={`panel-${phase.id}`}
                 aria-labelledby={`tab-${phase.id}`}
                 hidden={!isActive}
-                className={isActive ? "block" : "hidden"}
+                className={isActive ? "block animate-rise" : "hidden"}
               >
                 {phase.id === "auth" && <ConnectSitecoreForm embedded />}
                 {phase.id === "discovery" && <DiscoveryPanel embedded />}
@@ -301,13 +309,6 @@ export function WorkflowTabs() {
           })}
         </div>
       </div>
-
-      <p className="mt-3 text-xs text-zinc-500">
-        Active phase:{" "}
-        <span className={`font-semibold ${activePhase.labelColor}`}>
-          {activePhase.number}. {activePhase.name}
-        </span>
-      </p>
     </section>
   );
 }

@@ -16,7 +16,7 @@ function MenuIcon({ open }: { open: boolean }) {
     return (
       <svg
         aria-hidden="true"
-        className="h-5 w-5 text-zinc-700"
+        className="h-5 w-5 text-slate-700"
         fill="none"
         viewBox="0 0 24 24"
         stroke="currentColor"
@@ -30,7 +30,7 @@ function MenuIcon({ open }: { open: boolean }) {
   return (
     <svg
       aria-hidden="true"
-      className="h-5 w-5 text-zinc-700"
+      className="h-5 w-5 text-slate-700"
       fill="none"
       viewBox="0 0 24 24"
       stroke="currentColor"
@@ -89,17 +89,17 @@ export function Header() {
   }, []);
 
   return (
-    <header className="sticky top-0 z-50 border-b border-violet-100/80 bg-white/85 backdrop-blur-md">
+    <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/95 backdrop-blur-xl">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-6 py-3.5 lg:px-8">
-        <Link href="/" className="group flex items-center gap-2.5">
-          <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-violet-600 text-sm font-bold text-white shadow-sm transition-transform group-hover:scale-105">
+        <Link href="/" className="group flex items-center gap-3">
+          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-teal-600 text-sm font-bold tracking-tight text-white transition-transform duration-200 group-hover:scale-105">
             CP
           </span>
           <div className="leading-tight">
-            <span className="block text-sm font-bold tracking-tight text-zinc-900">
+            <span className="font-display block text-sm font-semibold tracking-tight text-slate-900">
               ContentPilot
             </span>
-            <span className="hidden text-xs text-zinc-500 sm:block">
+            <span className="hidden text-xs text-slate-500 sm:block">
               Sitecore XM Cloud
             </span>
           </div>
@@ -112,7 +112,7 @@ export function Header() {
           {!isConnected && (
             <a
               href="#auth"
-              className="inline-flex items-center justify-center rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-violet-700"
+              className="inline-flex items-center justify-center rounded-xl bg-teal-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-teal-700"
             >
               {needsReconnect ? "Reconnect" : "Get started"}
             </a>
@@ -121,7 +121,7 @@ export function Header() {
 
         <button
           type="button"
-          className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-zinc-200 bg-white text-zinc-700 transition-colors hover:bg-zinc-50 md:hidden"
+          className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 transition-colors hover:bg-slate-50 md:hidden"
           aria-label={menuOpen ? "Close menu" : "Open menu"}
           aria-expanded={menuOpen}
           aria-controls="mobile-header-menu"
@@ -134,7 +134,7 @@ export function Header() {
       {menuOpen && (
         <div
           id="mobile-header-menu"
-          className="border-t border-zinc-200 bg-white px-6 py-4 md:hidden"
+          className="border-t border-slate-200 bg-white px-6 py-4 md:hidden"
         >
           <div className="flex flex-col gap-3">
             <HeaderConnectionStatus mobile />
@@ -150,7 +150,7 @@ export function Header() {
               <a
                 href="#auth"
                 onClick={() => setMenuOpen(false)}
-                className="inline-flex items-center justify-center rounded-lg bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-violet-700"
+                className="inline-flex items-center justify-center rounded-xl bg-teal-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-teal-700"
               >
                 {needsReconnect ? "Reconnect" : "Get started"}
               </a>

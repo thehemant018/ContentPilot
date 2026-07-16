@@ -1,28 +1,49 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  color-scheme: light only;
+  --background: #f4f7f8;
+  --foreground: #0f172a;
+  --brand: #0d9488;
+  --brand-dark: #0f766e;
+  --brand-soft: #ccfbf1;
+  --surface: #ffffff;
+  --surface-muted: #f1f5f9;
+  --line: #e2e8f0;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  --color-brand: var(--brand);
+  --color-brand-dark: var(--brand-dark);
+  --color-brand-soft: var(--brand-soft);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-line: var(--line);
+  --font-sans: var(--font-dm-sans);
+  --font-display: var(--font-sora);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  color-scheme: light only;
+  background-color: var(--background);
 }
 
 body {
-  background: var(--background);
+  color-scheme: light only;
+  background-color: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif;
+}
+
+h1,
+h2,
+h3,
+.font-display {
+  font-family: var(--font-sora), var(--font-dm-sans), ui-sans-serif, system-ui,
+    sans-serif;
 }
 
 @layer base {
@@ -40,5 +61,67 @@ body {
   [role="tab"][aria-disabled="true"],
   [role="tab"]:disabled {
     cursor: not-allowed;
+  }
+}
+
+@layer utilities {
+  .app-shell {
+    background-color: #f4f7f8;
+    background-image:
+      radial-gradient(
+        ellipse 80% 50% at 50% -20%,
+        rgb(13 148 136 / 0.16),
+        transparent 55%
+      ),
+      radial-gradient(
+        ellipse 50% 40% at 100% 0%,
+        rgb(14 165 233 / 0.12),
+        transparent 50%
+      ),
+      radial-gradient(
+        ellipse 40% 30% at 0% 20%,
+        rgb(45 212 191 / 0.1),
+        transparent 45%
+      ),
+      linear-gradient(to bottom, #f4f7f8 0%, #f1f5f9 100%);
+  }
+
+  .app-grid {
+    background-image: linear-gradient(
+        rgb(15 23 42 / 0.035) 1px,
+        transparent 1px
+      ),
+      linear-gradient(90deg, rgb(15 23 42 / 0.035) 1px, transparent 1px);
+    background-size: 48px 48px;
+    mask-image: linear-gradient(to bottom, black 0%, black 40%, transparent 85%);
+  }
+
+  .animate-rise {
+    animation: rise-in 0.45s ease-out both;
+  }
+
+  .animate-rise-delay {
+    animation: rise-in 0.45s ease-out 0.12s both;
+  }
+
+  .animate-rise-delay-2 {
+    animation: rise-in 0.45s ease-out 0.22s both;
+  }
+}
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-rise,
+  .animate-rise-delay,
+  .animate-rise-delay-2 {
+    animation: none;
   }
 }

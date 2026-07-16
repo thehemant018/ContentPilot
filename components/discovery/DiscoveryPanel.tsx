@@ -190,7 +190,7 @@ export function DiscoveryPanel({ embedded = false }: { embedded?: boolean }) {
         }
       >
         <p className="text-xs font-semibold uppercase tracking-wider text-teal-600">
-          Phase 2 — Discovery
+          Phase 2 - Discovery
         </p>
         <h2 className="mt-1 text-xl font-semibold text-zinc-900">
           Site &amp; template discovery
@@ -202,7 +202,7 @@ export function DiscoveryPanel({ embedded = false }: { embedded?: boolean }) {
             onClick={() => {
               window.location.hash = "auth";
             }}
-            className="font-medium text-violet-600 underline-offset-2 hover:underline"
+            className="font-medium text-teal-600 underline-offset-2 hover:underline"
           >
             Auth tab
           </button>{" "}
@@ -224,7 +224,7 @@ export function DiscoveryPanel({ embedded = false }: { embedded?: boolean }) {
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wider text-teal-600">
-            Phase 2 — Discovery
+            Phase 2 - Discovery
           </p>
           <h2 className="mt-1 text-xl font-semibold text-zinc-900">
             Site &amp; template discovery
@@ -232,7 +232,7 @@ export function DiscoveryPanel({ embedded = false }: { embedded?: boolean }) {
           <p className="mt-2 max-w-3xl text-sm leading-relaxed text-zinc-600">
             Select a site, then provide the renderings, placeholders, media, and templates
             paths for ContentPilot to verify. When all paths exist, we load the
-            target schema — read-only, nothing is modified in Sitecore.
+            target schema - read-only, nothing is modified in Sitecore.
           </p>
         </div>
         <button
@@ -241,7 +241,7 @@ export function DiscoveryPanel({ embedded = false }: { embedded?: boolean }) {
           disabled={isLoadingSites}
           className="rounded-lg border border-teal-200 bg-teal-50 px-3 py-1.5 text-xs font-semibold text-teal-800 transition-colors hover:bg-teal-100 disabled:opacity-60"
         >
-          {isLoadingSites ? "Refreshing…" : "Refresh sites"}
+          {isLoadingSites ? "Refreshing..." : "Refresh sites"}
         </button>
       </div>
 
@@ -407,7 +407,7 @@ export function DiscoveryPanel({ embedded = false }: { embedded?: boolean }) {
                 aria-hidden="true"
               />
             )}
-            {isDiscovering ? "Discovering…" : "Validate paths & discover"}
+            {isDiscovering ? "Discovering..." : "Validate paths & discover"}
           </button>
         </form>
 

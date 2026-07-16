@@ -193,7 +193,7 @@ export function ReviewPanel({ embedded = false }: { embedded?: boolean }) {
     <div className={embedded ? "space-y-6" : "mx-auto max-w-5xl space-y-6"}>
       <div>
         <p className="text-xs font-semibold uppercase tracking-wider text-rose-600">
-          Phase 6 — Review
+          Phase 6 - Review
         </p>
         <h3 className="mt-1 text-lg font-semibold text-zinc-900">
           Migration queue
@@ -203,7 +203,7 @@ export function ReviewPanel({ embedded = false }: { embedded?: boolean }) {
           Each component keeps its own datasource path and field content.
           Language is mapped from the crawled page to the matching Sitecore
           language discovered in Phase 2.
-          When you push in Migrate, the queue is sent directly to Sitecore — nothing
+          When you push in Migrate, the queue is sent directly to Sitecore - nothing
           is written to disk.
         </p>
         {getCrawlResult()?.sourceLanguages?.length ? (
@@ -298,7 +298,7 @@ export function ReviewPanel({ embedded = false }: { embedded?: boolean }) {
           {multiPage && (
             <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-900">
               <p className="font-medium">
-                {queueBySourcePage.length} source pages — queue grouped by page
+                {queueBySourcePage.length} source pages - queue grouped by page
               </p>
               <p className="mt-1 text-xs text-blue-800">
                 Expand each page to edit target paths, placeholders, and

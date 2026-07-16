@@ -24,7 +24,7 @@ export function NextPhaseButton({
     <button
       type="button"
       onClick={() => advanceToWorkflowPhase(nextPhaseId)}
-      className={`inline-flex items-center justify-center rounded-lg px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors ${className}`}
+      className={`inline-flex items-center justify-center rounded-xl px-5 py-2.5 text-sm font-semibold text-white transition-colors ${className}`}
     >
       Continue to {nextPhase.name} →
     </button>

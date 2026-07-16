@@ -6,7 +6,7 @@ const STRATEGY_STYLES: Record<
 > = {
   llm: {
     label: "AI matched",
-    className: "bg-violet-100 text-violet-800 ring-violet-200",
+    className: "bg-teal-100 text-teal-800 ring-teal-200",
   },
   "rule-based": {
     label: "Rule-based",
@@ -29,7 +29,7 @@ export function MatchStrategyBadge({
 
   return (
     <span
-      className={`inline-flex shrink-0 items-center rounded-full font-semibold uppercase tracking-wide ring-1 ring-inset ${
+      className={`inline-flex shrink-0 items-center rounded-md font-semibold uppercase tracking-wide ring-1 ring-inset ${
         compact
           ? "px-1.5 py-0.5 text-[10px]"
           : "px-2 py-0.5 text-[11px]"

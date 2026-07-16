@@ -24,7 +24,7 @@ function ConfidenceBadge({ match }: { match: BlockMatchResult }) {
     <span
       className={`rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase ${styles[match.confidence]}`}
     >
-      {match.confidence} · {match.matchScore}%
+      {match.confidence} Â· {match.matchScore}%
     </span>
   );
 }
@@ -47,7 +47,7 @@ function FieldMappingTable({
           <tr className="border-b border-zinc-200 text-xs uppercase tracking-wide text-zinc-500">
             <th className="px-2 py-2 font-semibold">Source region</th>
             <th className="px-2 py-2 font-semibold">Source preview</th>
-            <th className="px-2 py-2 font-semibold">→</th>
+            <th className="px-2 py-2 font-semibold">â†’</th>
             <th className="px-2 py-2 font-semibold">Sitecore field</th>
             <th className="px-2 py-2 font-semibold">Section</th>
           </tr>
@@ -64,7 +64,7 @@ function FieldMappingTable({
               <td className="max-w-xs px-2 py-2 text-zinc-600">
                 <span className="line-clamp-2">{mapping.sourcePreview}</span>
               </td>
-              <td className="px-2 py-2 text-zinc-400">→</td>
+              <td className="px-2 py-2 text-zinc-400">â†’</td>
               <td className="px-2 py-2">
                 <span className="font-mono text-xs text-orange-800">
                   {mapping.sitecoreField}
@@ -76,7 +76,7 @@ function FieldMappingTable({
                 )}
               </td>
               <td className="px-2 py-2 text-zinc-600">
-                {mapping.section ?? "—"}
+                {mapping.section ?? "-"}
               </td>
             </tr>
           ))}
@@ -129,7 +129,7 @@ export function MatchCard({
               </span>
             )}
             {inQueue && (
-              <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[11px] font-semibold uppercase text-violet-800">
+              <span className="rounded-full bg-teal-100 px-2 py-0.5 text-[11px] font-semibold uppercase text-teal-800">
                 In queue
               </span>
             )}
@@ -163,7 +163,7 @@ export function MatchCard({
                 : undefined
             }
             onClick={() => onAddToQueue(match)}
-            className="rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-lg bg-teal-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isUnmatched ? "No component" : "Add to queue"}
           </button>
@@ -173,7 +173,7 @@ export function MatchCard({
       {isUnmatched ? (
         <div className="mt-4 rounded-lg border border-zinc-200 bg-white px-3 py-3">
           <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
-            Skipped — no Sitecore match
+            Skipped - no Sitecore match
           </p>
           <p className="mt-2 text-sm text-zinc-700">{match.reasoning}</p>
         </div>

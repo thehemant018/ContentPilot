@@ -35,7 +35,7 @@ function ConfidenceBadge({
     <span
       className={`rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase ${styles[confidence]}`}
     >
-      {confidence} · {score}%
+      {confidence} Â· {score}%
     </span>
   );
 }
@@ -131,16 +131,16 @@ export function QueueItemCard({
               Queued
             </span>
             {(item.presentationDepth ?? 0) > 0 && (
-              <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[11px] font-semibold uppercase text-violet-800">
+              <span className="rounded-full bg-teal-100 px-2 py-0.5 text-[11px] font-semibold uppercase text-teal-800">
                 Nested
               </span>
             )}
           </div>
           {parentRenderingName && (
-            <p className="mt-1 text-xs text-violet-700">
+            <p className="mt-1 text-xs text-teal-700">
               Child of <span className="font-medium">{parentRenderingName}</span>
               {item.childPlaceholderKey
-                ? ` → placeholder ${item.childPlaceholderKey}`
+                ? ` â†’ placeholder ${item.childPlaceholderKey}`
                 : ""}
             </p>
           )}
@@ -164,7 +164,7 @@ export function QueueItemCard({
             Rendering
           </p>
           <p className="mt-1 text-sm font-medium text-zinc-900">
-            {item.renderingName || "—"}
+            {item.renderingName || "-"}
           </p>
           {item.renderingPath && (
             <p className="mt-0.5 break-all font-mono text-xs text-zinc-500">
@@ -177,7 +177,7 @@ export function QueueItemCard({
             Template
           </p>
           <p className="mt-1 text-sm font-medium text-zinc-900">
-            {item.templateName || "—"}
+            {item.templateName || "-"}
           </p>
           {item.templatePath && (
             <p className="mt-0.5 break-all font-mono text-xs text-zinc-500">
@@ -394,7 +394,7 @@ export function QueueItemCard({
                 {(field.fieldType || field.section) && (
                   <p className="mt-2 text-xs text-zinc-500">
                     {field.fieldType && `Type: ${field.fieldType}`}
-                    {field.fieldType && field.section && " · "}
+                    {field.fieldType && field.section && " Â· "}
                     {field.section && `Section: ${field.section}`}
                   </p>
                 )}

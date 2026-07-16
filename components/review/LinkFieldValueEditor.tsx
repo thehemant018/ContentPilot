@@ -68,7 +68,7 @@ export function LinkFieldValueEditor({
       : parsed.url;
 
   return (
-    <div className="space-y-3 rounded-lg border border-violet-100 bg-violet-50/40 p-3">
+    <div className="space-y-3 rounded-lg border border-teal-100 bg-teal-50/40 p-3">
       <div className="flex flex-wrap gap-1">
         {(["internal", "external"] as const).map((kind) => (
           <button
@@ -78,7 +78,7 @@ export function LinkFieldValueEditor({
             className={`rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
               parsed.linkType === kind
                 ? kind === "internal"
-                  ? "bg-violet-200 text-violet-900"
+                  ? "bg-teal-200 text-teal-900"
                   : "bg-sky-200 text-sky-900"
                 : "bg-white text-zinc-500 hover:bg-zinc-100"
             }`}
@@ -88,7 +88,7 @@ export function LinkFieldValueEditor({
         ))}
       </div>
 
-      <p className="text-xs font-medium text-violet-900">
+      <p className="text-xs font-medium text-teal-900">
         {formatLinkPreview(parsed, sourcePageUrl)}
       </p>
 

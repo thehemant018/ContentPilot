@@ -54,7 +54,7 @@ export function AiMatchPanel({ embedded = false }: { embedded?: boolean }) {
   const matchModeLabel = useRuleBasedMatching
     ? "Rule-based matching"
     : llmReady
-      ? `LLM · ${getDefaultModelLabel(provider)}`
+      ? `LLM Â· ${getDefaultModelLabel(provider)}`
       : `Set ${provider === "claude" ? "ANTHROPIC_API_KEY" : provider === "groq" ? "GROQ_API_KEY" : "GEMINI_API_KEY"} in .env.local`;
 
   const refreshPrerequisites = useCallback(() => {
@@ -206,7 +206,7 @@ export function AiMatchPanel({ embedded = false }: { embedded?: boolean }) {
     <div className={embedded ? "space-y-6" : "mx-auto max-w-5xl space-y-6"}>
       <div>
         <p className="text-xs font-semibold uppercase tracking-wider text-orange-600">
-          Phase 5 — AI Match
+          Phase 5 - AI Match
         </p>
         <div className="mt-1 flex flex-wrap items-center gap-2">
           <h3 className="text-lg font-semibold text-zinc-900">
@@ -244,7 +244,7 @@ export function AiMatchPanel({ embedded = false }: { embedded?: boolean }) {
             {(Object.keys(PROVIDER_LABELS) as LlmProvider[]).map((key) => (
               <option key={key} value={key}>
                 {PROVIDER_LABELS[key]} ({getDefaultModelLabel(key)})
-                {providerConfigured[key] ? "" : " — key not set"}
+                {providerConfigured[key] ? "" : " - key not set"}
               </option>
             ))}
           </select>
@@ -270,7 +270,7 @@ export function AiMatchPanel({ embedded = false }: { embedded?: boolean }) {
             </span>
             <span className="mt-0.5 block text-xs text-zinc-500">
               Match crawl block types to Sitecore component names by keywords
-              (e.g. hero → Hero). No API key required.
+              (e.g. hero â†’ Hero). No API key required.
             </span>
           </span>
         </label>
@@ -282,7 +282,7 @@ export function AiMatchPanel({ embedded = false }: { embedded?: boolean }) {
             disabled={isMatching || !canRunMatch}
             className="inline-flex items-center justify-center rounded-lg bg-orange-500 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {isMatching ? "Matching blocks…" : "Run matching"}
+            {isMatching ? "Matching blocks..." : "Run matching"}
           </button>
           <span className="text-xs text-zinc-500">{matchModeLabel}</span>
         </div>
@@ -319,9 +319,9 @@ export function AiMatchPanel({ embedded = false }: { embedded?: boolean }) {
           <button
             type="button"
             onClick={() => advanceToWorkflowPhase("review")}
-            className="inline-flex items-center justify-center rounded-lg border border-violet-300 bg-violet-50 px-4 py-2 text-sm font-semibold text-violet-800 transition-colors hover:bg-violet-100"
+            className="inline-flex items-center justify-center rounded-lg border border-teal-300 bg-teal-50 px-4 py-2 text-sm font-semibold text-teal-800 transition-colors hover:bg-teal-100"
           >
-            Open Review queue →
+            Open Review queue â†’
           </button>
           <NextPhaseButton
             currentPhaseId="ai-match"
