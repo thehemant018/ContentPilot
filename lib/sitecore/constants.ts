@@ -19,6 +19,7 @@ export const STORAGE_KEYS = {
   reviewComplete: "contentpilot_review_complete",
   migrateComplete: "contentpilot_migrate_complete",
   migrationCycleId: "contentpilot_migration_cycle_id",
+  visualMapperSourceLanguages: "contentpilot_visual_mapper_source_languages",
 } as const;
 
 export const SESSION_CHANGED_EVENT = "contentpilot-session-changed";

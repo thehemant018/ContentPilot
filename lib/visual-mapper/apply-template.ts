@@ -8,6 +8,10 @@ import {
   querySelectorElement,
 } from "@/lib/visual-mapper/extract-from-dom";
 import { fetchPageHtml } from "@/lib/visual-mapper/fetch-page-html";
+import {
+  extractVisualMapperSourceLanguages,
+  saveVisualMapperSourceLanguages,
+} from "@/lib/visual-mapper/source-page-languages";
 import { resolveTargetPagePath, pageNameFromTargetPath } from "@/lib/visual-mapper/target-path-pattern";
 import { componentTemplateKey } from "@/lib/visual-mapper/template-key";
 import type {
@@ -205,6 +209,8 @@ export async function applyTemplateToPage(
 ): Promise<BulkApplyPageResult> {
   try {
     const html = await fetchPageHtml(pageUrl);
+    const languages = extractVisualMapperSourceLanguages(html, pageUrl);
+    saveVisualMapperSourceLanguages(pageUrl, languages);
     return applyTemplateToHtml(html, pageUrl, template, targetPagePathPattern);
   } catch (error) {
     return {

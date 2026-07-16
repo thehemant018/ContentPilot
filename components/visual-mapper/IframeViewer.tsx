@@ -5,8 +5,13 @@ import {
   parseIframeMessage,
   type ParentToIframeMessage,
 } from "@/lib/visual-mapper/post-message";
+import {
+  extractVisualMapperSourceLanguages,
+  saveVisualMapperSourceLanguages,
+} from "@/lib/visual-mapper/source-page-languages";
 import { useVisualMapperStore } from "@/lib/visual-mapper/store";
 import type { FieldAssignment } from "@/types/visual-mapper";
+import type { SourcePageLanguage } from "@/types/language";
 
 const IMAGE_FIELD_PATTERN = /\b(image|photo|media|thumbnail|picture|banner)\b/i;
 
@@ -23,15 +28,24 @@ function fieldPrefersImagePick(field: FieldAssignment | undefined): boolean {
 interface IframeViewerProps {
   sourceUrl: string;
   highlightSelector?: string | null;
+  onSourceLanguagesChecked?: (result: {
+    pageUrl: string;
+    languages: SourcePageLanguage;
+  }) => void;
 }
 
-export function IframeViewer({ sourceUrl, highlightSelector }: IframeViewerProps) {
+export function IframeViewer({
+  sourceUrl,
+  highlightSelector,
+  onSourceLanguagesChecked,
+}: IframeViewerProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [reloadNonce, setReloadNonce] = useState(0);
   const [loadErrorState, setLoadErrorState] = useState<{
     url: string;
     message: string;
   } | null>(null);
+  const [languageStatus, setLanguageStatus] = useState<string | null>(null);
   const loadError =
     loadErrorState?.url === sourceUrl ? loadErrorState.message : null;
 
@@ -112,6 +126,8 @@ export function IframeViewer({ sourceUrl, highlightSelector }: IframeViewerProps
     let cancelled = false;
 
     async function preflight() {
+      setLanguageStatus("Detecting languages on loaded page…");
+
       try {
         const response = await fetch(
           `/api/proxy-page?url=${encodeURIComponent(sourceUrl)}`,
@@ -132,7 +148,31 @@ export function IframeViewer({ sourceUrl, highlightSelector }: IframeViewerProps
                 : "Proxy returned an error."),
           });
           pageLoadFailed();
+          return;
         }
+
+        const html = await response.text();
+        if (cancelled) {
+          return;
+        }
+
+        const languages = extractVisualMapperSourceLanguages(html, sourceUrl);
+        saveVisualMapperSourceLanguages(sourceUrl, languages);
+
+        if (languages.availableLanguages.length > 0) {
+          setLanguageStatus(
+            `Page languages: ${languages.availableLanguages.join(", ")}`,
+          );
+        } else {
+          setLanguageStatus(
+            "No page languages detected from HTML/URL. Review can still use English.",
+          );
+        }
+
+        onSourceLanguagesChecked?.({
+          pageUrl: sourceUrl,
+          languages,
+        });
       } catch {
         if (!cancelled) {
           setLoadErrorState({
@@ -149,7 +189,7 @@ export function IframeViewer({ sourceUrl, highlightSelector }: IframeViewerProps
     return () => {
       cancelled = true;
     };
-  }, [sourceUrl, reloadNonce, pageLoadFailed]);
+  }, [sourceUrl, reloadNonce, pageLoadFailed, onSourceLanguagesChecked]);
 
   useEffect(() => {
     function handleMessage(event: MessageEvent) {
@@ -245,6 +285,11 @@ export function IframeViewer({ sourceUrl, highlightSelector }: IframeViewerProps
           <div className="space-y-3 text-center">
             <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
             <p className="text-sm text-zinc-600">Loading page via proxy…</p>
+            {languageStatus && (
+              <p className="mx-auto max-w-sm text-xs text-zinc-500">
+                {languageStatus}
+              </p>
+            )}
           </div>
         </div>
       )}

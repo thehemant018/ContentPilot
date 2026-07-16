@@ -3,6 +3,8 @@ import {
   clearPostDiscoveryWorkflowData,
   clearDownstreamOfCrawlData,
 } from "@/lib/storage/workflow-data";
+import { clearMigrationQueue } from "@/lib/storage/migration-queue";
+import { clearVisualMapperSourceLanguages } from "@/lib/visual-mapper/source-page-languages";
 import { clearMigrationMode, getMigrationMode } from "@/lib/workflow/migration-mode";
 import { SESSION_CHANGED_EVENT, STORAGE_KEYS } from "@/lib/sitecore/constants";
 import {
@@ -395,6 +397,8 @@ export function returnToMapModePhase(): void {
     return;
   }
 
+  clearQueueOnMapNavigation();
+
   if (window.location.pathname !== "/") {
     window.location.href = "/#map-mode";
     return;
@@ -405,6 +409,15 @@ export function returnToMapModePhase(): void {
     behavior: "smooth",
     block: "start",
   });
+}
+
+/** Clears Review queue whenever the user navigates to Map from any later phase. */
+export function clearQueueOnMapNavigation(): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+  clearMigrationQueue();
+  clearVisualMapperSourceLanguages();
 }
 
 export function canNavigateToPhase(

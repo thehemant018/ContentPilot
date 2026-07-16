@@ -20,6 +20,7 @@ import {
   canReturnToReviewForEditing,
   canReturnToMapModePhase,
   applyReopenDiscoveryIfRequested,
+  clearQueueOnMapNavigation,
   CONTENT_MIGRATION_RESET_EVENT,
   getDefaultPhaseFromHash,
   getFurthestPhaseIndex,
@@ -66,6 +67,10 @@ export function WorkflowTabs() {
 
       if (!canNavigateToPhase(tabId, furthest)) {
         return;
+      }
+
+      if (tabId === "map-mode") {
+        clearQueueOnMapNavigation();
       }
 
       setFurthestPhaseIndex(index);

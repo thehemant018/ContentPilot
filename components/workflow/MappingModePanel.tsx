@@ -9,6 +9,7 @@ import {
 } from "@/lib/workflow/migration-mode";
 import {
   advanceToWorkflowPhase,
+  clearQueueOnMapNavigation,
   isDiscoveryPhaseComplete,
   isMapModePhaseComplete,
   markMapModePhaseComplete,
@@ -33,12 +34,14 @@ export function MappingModePanel({ embedded = false }: { embedded?: boolean }) {
   }, []);
 
   function handleSelectAiMode() {
+    clearQueueOnMapNavigation();
     saveMigrationMode("ai");
     markMapModePhaseComplete();
     advanceToWorkflowPhase("crawl");
   }
 
   function handleSelectVisualMapper() {
+    clearQueueOnMapNavigation();
     saveMigrationMode("visual-mapper");
     markMapModePhaseComplete();
     window.location.href = "/visual-mapper";
@@ -117,6 +120,7 @@ export function MappingModePanel({ embedded = false }: { embedded?: boolean }) {
           <button
             type="button"
             onClick={() => {
+              clearQueueOnMapNavigation();
               window.location.href = "/visual-mapper";
             }}
             className="inline-flex items-center justify-center rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-indigo-700"
