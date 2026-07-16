@@ -8,7 +8,7 @@ import type { CrawlResult } from "@/types/crawl";
 import type { DiscoveryResult } from "@/types/discovery";
 import type { AiMatchResult } from "@/types/ai-match";
 
-export const WORKFLOW_DATA_CHANGED_EVENT = "migratex-workflow-data-changed";
+export const WORKFLOW_DATA_CHANGED_EVENT = "contentpilot-workflow-data-changed";
 
 export function saveDiscoveryResult(result: DiscoveryResult): void {
   if (!result.success) {

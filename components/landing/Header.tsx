@@ -93,11 +93,11 @@ export function Header() {
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-6 py-3.5 lg:px-8">
         <Link href="/" className="group flex items-center gap-2.5">
           <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-violet-600 text-sm font-bold text-white shadow-sm transition-transform group-hover:scale-105">
-            MX
+            CP
           </span>
           <div className="leading-tight">
             <span className="block text-sm font-bold tracking-tight text-zinc-900">
-              MigrateX
+              ContentPilot
             </span>
             <span className="hidden text-xs text-zinc-500 sm:block">
               Sitecore XM Cloud

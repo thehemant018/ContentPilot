@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "MigrateX — Sitecore XM Cloud Migration",
+  title: "ContentPilot — Sitecore XM Cloud Migration",
   description:
     "Connect to Sitecore XM Cloud and migrate source content with a guided workflow.",
 };

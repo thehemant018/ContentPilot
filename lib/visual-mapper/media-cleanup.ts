@@ -97,7 +97,7 @@ export const MEDIA_CLEANUP_SCRIPT = `
 `.trim();
 
 export function injectMediaCleanup(html: string): string {
-  const injection = `<script id="migratex-media-cleanup">${MEDIA_CLEANUP_SCRIPT}</script>`;
+  const injection = `<script id="contentpilot-media-cleanup">${MEDIA_CLEANUP_SCRIPT}</script>`;
   if (/<head[^>]*>/i.test(html)) {
     return html.replace(/<head[^>]*>/i, (match) => `${match}${injection}`);
   }

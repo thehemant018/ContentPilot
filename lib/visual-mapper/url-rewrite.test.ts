@@ -65,7 +65,7 @@ describe("url-rewrite", () => {
       { proxyOrigin: PROXY_ORIGIN },
     );
     expect(html).toContain(`${PROXY_ORIGIN}/api/proxy-asset?url=`);
-    expect(html).toContain('id="migratex-asset-runtime"');
+    expect(html).toContain('id="contentpilot-asset-runtime"');
   });
 
   it("injects runtime asset rewriter in head", () => {

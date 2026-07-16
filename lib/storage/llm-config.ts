@@ -1,7 +1,7 @@
 import { STORAGE_KEYS } from "@/lib/sitecore/constants";
 import type { LlmConfig, LlmProvider } from "@/types/ai-match";
 
-export const LLM_CONFIG_CHANGED_EVENT = "migratex-llm-config-changed";
+export const LLM_CONFIG_CHANGED_EVENT = "contentpilot-llm-config-changed";
 
 function normalizeProvider(value: unknown): LlmProvider {
   if (value === "claude" || value === "groq" || value === "gemini") {

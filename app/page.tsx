@@ -12,7 +12,7 @@ export default function Home() {
         <WorkflowTabs />
       </main>
       <footer className="border-t border-zinc-200 bg-white px-6 py-6 text-center text-xs text-zinc-500">
-        MigrateX performs read-only Sitecore operations until you explicitly
+        ContentPilot performs read-only Sitecore operations until you explicitly
         approve migration changes.
       </footer>
       <Analytics />

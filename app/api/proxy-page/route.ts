@@ -58,7 +58,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       headers: {
         "Content-Type": "text/html; charset=utf-8",
         "Cache-Control": "no-store",
-        "X-MigrateX-Cache": "HIT",
+        "X-ContentPilot-Cache": "HIT",
       },
     });
   }
@@ -118,7 +118,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       headers: {
         "Content-Type": "text/html; charset=utf-8",
         "Cache-Control": "no-store",
-        "X-MigrateX-Cache": "MISS",
+        "X-ContentPilot-Cache": "MISS",
       },
     });
   } catch (error) {

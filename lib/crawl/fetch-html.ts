@@ -12,7 +12,7 @@ async function fetchStaticHtml(url: string): Promise<string> {
   const response = await fetch(url, {
     headers: {
       Accept: "text/html,application/xhtml+xml",
-      "User-Agent": "MigrateX/1.0 (content migration crawler)",
+      "User-Agent": "ContentPilot/1.0 (content migration crawler)",
     },
     signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     redirect: "follow",

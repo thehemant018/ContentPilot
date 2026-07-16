@@ -49,7 +49,7 @@ export async function fetchRenderedHtml(url: string): Promise<BrowserFetchResult
     try {
       const page = await browser.newPage({
         userAgent:
-          "MigrateX/1.0 (content migration crawler; +https://github.com/)",
+          "ContentPilot/1.0 (content migration crawler; +https://github.com/)",
       });
 
       await page.goto(url, {

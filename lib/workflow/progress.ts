@@ -15,10 +15,10 @@ import {
   isWorkflowPhaseId,
 } from "@/lib/workflow/phases";
 
-export const WORKFLOW_PROGRESS_EVENT = "migratex-workflow-progress-changed";
+export const WORKFLOW_PROGRESS_EVENT = "contentpilot-workflow-progress-changed";
 export const CONTENT_MIGRATION_RESET_EVENT =
-  "migratex-content-migration-reset";
-export const REOPEN_DISCOVERY_SESSION_FLAG = "migratex_reopen_discovery";
+  "contentpilot-content-migration-reset";
+export const REOPEN_DISCOVERY_SESSION_FLAG = "contentpilot_reopen_discovery";
 
 function getPhaseIndex(phaseId: WorkflowPhaseId): number {
   return WORKFLOW_PHASES.findIndex((phase) => phase.id === phaseId);

@@ -61,7 +61,7 @@ export function isRichTextContainerAttrs(input: {
 export function pickClassNamesForSelector(classNames: string[]): string[] {
   const cleaned = classNames
     .map((name) => name.trim())
-    .filter((name) => name && !name.startsWith("migratex"));
+    .filter((name) => name && !name.startsWith("contentpilot"));
 
   const semantic = cleaned.filter(isSemanticClassName);
   if (semantic.length > 0) {
