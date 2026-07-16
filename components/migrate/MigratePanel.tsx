@@ -27,7 +27,7 @@ import { isVisualMapperMode } from "@/lib/workflow/migration-mode";
 import { ReturnToReviewBanner } from "@/components/workflow/ReturnToReviewBanner";
 import { normalizeMediaUploadPath } from "@/lib/sitecore/media-upload";
 import { getDiscoveryResult, getCrawlResult } from "@/lib/storage/workflow-data";
-import { getMigrationQueue } from "@/lib/storage/migration-queue";
+import { getMigrationQueue, MIGRATION_QUEUE_CHANGED_EVENT } from "@/lib/storage/migration-queue";
 import { prepareQueueForMigration } from "@/lib/migration/queue-sync";
 import {
   applyPushResultToPageProgress,
@@ -100,11 +100,11 @@ export function MigratePanel({ embedded = false }: { embedded?: boolean }) {
     }
 
     window.addEventListener(SESSION_CHANGED_EVENT, refreshConnection);
-    window.addEventListener("migratex-migration-queue-changed", handleQueueUpdated);
+    window.addEventListener(MIGRATION_QUEUE_CHANGED_EVENT, handleQueueUpdated);
     return () => {
       window.removeEventListener(SESSION_CHANGED_EVENT, refreshConnection);
       window.removeEventListener(
-        "migratex-migration-queue-changed",
+        MIGRATION_QUEUE_CHANGED_EVENT,
         handleQueueUpdated,
       );
     };

@@ -9,7 +9,7 @@ describe("consent-cleanup", () => {
     const html = injectConsentCleanup(
       "<html><head></head><body><div id='onetrust-consent-sdk'></div></body></html>",
     );
-    expect(html).toContain('id="migratex-consent-hide"');
+    expect(html).toContain('id="contentpilot-consent-hide"');
     expect(html).toContain("removeConsentNodes");
     expect(html).toContain("#onetrust-consent-sdk");
   });

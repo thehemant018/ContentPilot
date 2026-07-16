@@ -101,12 +101,19 @@ export function insertRenderingInLayoutXml(
     )
     .filter((elementIndex) => elementIndex >= 0);
 
-  const insertAt =
-    samePlaceholderIndexes.length === 0
-      ? renderings.length
-      : samePlaceholderIndexes[
-          Math.min(index, samePlaceholderIndexes.length)
-        ]!;
+  // Sibling index is relative to renderings already in this placeholder.
+  // When index >= current count, append after the last same-placeholder
+  // rendering. Using samePlaceholderIndexes[length] is undefined and
+  // Array.splice(undefined, …) coerces to 0 — which reversed queue order
+  // (Hero, CardList, Accordion → Accordion, CardList, Hero).
+  let insertAt: number;
+  if (samePlaceholderIndexes.length === 0) {
+    insertAt = renderings.length;
+  } else if (index >= samePlaceholderIndexes.length) {
+    insertAt = samePlaceholderIndexes[samePlaceholderIndexes.length - 1]! + 1;
+  } else {
+    insertAt = samePlaceholderIndexes[Math.max(0, index)]!;
+  }
 
   renderings.splice(insertAt, 0, renderingElement);
   const rebuiltInner = renderings.join("");

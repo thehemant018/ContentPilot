@@ -6,7 +6,7 @@ describe("media-cleanup", () => {
     const html = injectMediaCleanup(
       "<html><head></head><body><video autoplay loop src='/hero.mp4'></video></body></html>",
     );
-    expect(html).toContain('id="migratex-media-cleanup"');
+    expect(html).toContain('id="contentpilot-media-cleanup"');
     expect(html).toContain("pauseMediaElement");
     expect(html).toContain("HTMLMediaElement.prototype.play");
   });

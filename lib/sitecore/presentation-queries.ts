@@ -1,5 +1,5 @@
 export const GET_PAGE_RENDERINGS_FIELD_QUERY = `
-  query MigrateXGetPageRenderings(
+  query ContentPilotGetPageRenderings(
     $path: String!
     $language: String!
     $fieldName: String!
@@ -15,7 +15,7 @@ export const GET_PAGE_RENDERINGS_FIELD_QUERY = `
 `;
 
 export const UPDATE_ITEM_RENDERINGS_MUTATION = `
-  mutation MigrateXUpdateItemRenderings($input: UpdateItemInput!) {
+  mutation ContentPilotUpdateItemRenderings($input: UpdateItemInput!) {
     updateItem(input: $input) {
       item {
         itemId

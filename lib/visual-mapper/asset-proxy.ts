@@ -488,7 +488,7 @@ export function injectAssetRuntime(
   proxyOrigin: string,
   pageReferer: string,
 ): string {
-  const script = `<script id="migratex-asset-runtime">${buildAssetRuntimeScript(proxyOrigin, pageReferer)}</script>`;
+  const script = `<script id="contentpilot-asset-runtime">${buildAssetRuntimeScript(proxyOrigin, pageReferer)}</script>`;
   if (/<head[^>]*>/i.test(html)) {
     return html.replace(/<head[^>]*>/i, (match) => `${match}${script}`);
   }

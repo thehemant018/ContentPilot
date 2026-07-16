@@ -1,5 +1,5 @@
 export const GET_SITES_QUERY = `
-  query MigrateXGetSites {
+  query ContentPilotGetSites {
     sites {
       name
       rootPath
@@ -14,7 +14,7 @@ export const GET_SITES_QUERY = `
 `;
 
 export const VALIDATE_PATH_QUERY = `
-  query MigrateXValidatePath($path: String!) {
+  query ContentPilotValidatePath($path: String!) {
     item(where: { path: $path }) {
       itemId
       name
@@ -29,7 +29,7 @@ export const VALIDATE_PATH_QUERY = `
 `;
 
 export const SEARCH_UNDER_PATH_QUERY = `
-  query MigrateXSearchUnderPath($path: String!, $pageSize: Int!, $pageIndex: Int!) {
+  query ContentPilotSearchUnderPath($path: String!, $pageSize: Int!, $pageIndex: Int!) {
     search(
       query: {
         index: "sitecore_master_index"
@@ -62,7 +62,7 @@ export const SEARCH_UNDER_PATH_QUERY = `
 `;
 
 export const ITEM_FIELDS_QUERY = `
-  query MigrateXItemFields($path: String!) {
+  query ContentPilotItemFields($path: String!) {
     item(where: { path: $path }) {
       itemId
       name
@@ -78,7 +78,7 @@ export const ITEM_FIELDS_QUERY = `
 `;
 
 export const ITEM_INHERITED_FIELDS_QUERY = `
-  query MigrateXItemInheritedFields($path: String!) {
+  query ContentPilotItemInheritedFields($path: String!) {
     item(where: { path: $path }) {
       itemId
       name
@@ -94,7 +94,7 @@ export const ITEM_INHERITED_FIELDS_QUERY = `
 `;
 
 export const ITEM_PATH_BY_ID_QUERY = `
-  query MigrateXItemPathById($itemId: ID!) {
+  query ContentPilotItemPathById($itemId: ID!) {
     item(where: { itemId: $itemId }) {
       itemId
       path
@@ -103,7 +103,7 @@ export const ITEM_PATH_BY_ID_QUERY = `
 `;
 
 export const ITEM_FIELDS_BY_ID_QUERY = `
-  query MigrateXItemFieldsById($itemId: ID!) {
+  query ContentPilotItemFieldsById($itemId: ID!) {
     item(where: { itemId: $itemId }) {
       itemId
       name
@@ -119,7 +119,7 @@ export const ITEM_FIELDS_BY_ID_QUERY = `
 `;
 
 export const SEARCH_ITEM_BY_ID_QUERY = `
-  query MigrateXSearchItemById($itemId: String!, $pageSize: Int!) {
+  query ContentPilotSearchItemById($itemId: String!, $pageSize: Int!) {
     search(
       query: {
         index: "sitecore_master_index"
@@ -146,7 +146,7 @@ export const SEARCH_ITEM_BY_ID_QUERY = `
 `;
 
 export const TEMPLATE_STRUCTURE_QUERY = `
-  query MigrateXTemplateStructure($path: String!) {
+  query ContentPilotTemplateStructure($path: String!) {
     item(where: { path: $path }) {
       itemId
       name
@@ -179,7 +179,7 @@ export const TEMPLATE_STRUCTURE_QUERY = `
 
 /** Resolves parameter template base templates (e.g. IDynamicPlaceholder inheritance). */
 export const TEMPLATE_INHERITANCE_QUERY = `
-  query MigrateXTemplateInheritance($path: String!) {
+  query ContentPilotTemplateInheritance($path: String!) {
     templates(path: $path) {
       name
       baseTemplates {

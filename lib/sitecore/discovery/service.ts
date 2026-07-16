@@ -294,7 +294,7 @@ export async function runDiscovery(
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Failed to fetch site languages.";
-      console.error("[MigrateX:discovery] Site language fetch failed:", message);
+      console.error("[ContentPilot:discovery] Site language fetch failed:", message);
       siteLanguages = instanceLanguages;
     }
   }

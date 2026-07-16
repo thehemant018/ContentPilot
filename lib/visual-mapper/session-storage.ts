@@ -1,4 +1,4 @@
-export const VISUAL_MAPPER_SITE_KEY = "migratex_visual_mapper_site_id";
+export const VISUAL_MAPPER_SITE_KEY = "contentpilot_visual_mapper_site_id";
 
 export function saveVisualMapperSiteId(siteId: string): void {
   if (typeof window === "undefined") {

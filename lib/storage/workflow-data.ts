@@ -4,11 +4,12 @@ import {
   slimDiscoveryResult,
   type LegacyDiscoveryResult,
 } from "@/lib/sitecore/discovery/slim-result";
+import { clearVisualMapperSourceLanguages } from "@/lib/visual-mapper/source-page-languages";
 import type { CrawlResult } from "@/types/crawl";
 import type { DiscoveryResult } from "@/types/discovery";
 import type { AiMatchResult } from "@/types/ai-match";
 
-export const WORKFLOW_DATA_CHANGED_EVENT = "migratex-workflow-data-changed";
+export const WORKFLOW_DATA_CHANGED_EVENT = "contentpilot-workflow-data-changed";
 
 export function saveDiscoveryResult(result: DiscoveryResult): void {
   if (!result.success) {
@@ -105,6 +106,7 @@ export function clearPostDiscoveryWorkflowData(): void {
   localStorage.removeItem(STORAGE_KEYS.crawlResult);
   localStorage.removeItem(STORAGE_KEYS.aiMatchResult);
   clearMigrationQueue();
+  clearVisualMapperSourceLanguages();
   window.dispatchEvent(new Event(WORKFLOW_DATA_CHANGED_EVENT));
 }
 
@@ -115,6 +117,7 @@ export function clearDownstreamOfCrawlData(): void {
 
   localStorage.removeItem(STORAGE_KEYS.aiMatchResult);
   clearMigrationQueue();
+  clearVisualMapperSourceLanguages();
   window.dispatchEvent(new Event(WORKFLOW_DATA_CHANGED_EVENT));
 }
 
@@ -123,6 +126,7 @@ export function clearWorkflowData(): void {
   localStorage.removeItem(STORAGE_KEYS.crawlResult);
   localStorage.removeItem(STORAGE_KEYS.aiMatchResult);
   clearMigrationQueue();
+  clearVisualMapperSourceLanguages();
   window.dispatchEvent(new Event(WORKFLOW_DATA_CHANGED_EVENT));
 }
 
@@ -131,5 +135,6 @@ export function clearContentMigrationData(): void {
   localStorage.removeItem(STORAGE_KEYS.crawlResult);
   localStorage.removeItem(STORAGE_KEYS.aiMatchResult);
   clearMigrationQueue();
+  clearVisualMapperSourceLanguages();
   window.dispatchEvent(new Event(WORKFLOW_DATA_CHANGED_EVENT));
 }

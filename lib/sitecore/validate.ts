@@ -3,7 +3,7 @@ import { normalizeInstanceUrl } from "@/lib/sitecore/auth";
 import { SitecoreConnectError } from "@/lib/sitecore/connect-errors";
 import { fetchWithTimeout } from "@/lib/sitecore/fetch-with-timeout";
 
-const CONTENT_API_PROBE_QUERY = `query MigrateXConnectionProbe { __typename }`;
+const CONTENT_API_PROBE_QUERY = `query ContentPilotConnectionProbe { __typename }`;
 
 export async function verifyContentApiAccess(
   instanceUrl: string,

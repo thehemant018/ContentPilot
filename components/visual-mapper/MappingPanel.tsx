@@ -154,7 +154,7 @@ export function MappingPanel({
             <div className="mt-4 space-y-4">
               <p className="text-sm text-zinc-600">
                 Click a component on the page (e.g. the Hero section), then pick
-                the matching Sitecore rendering. MigrateX prefers the section
+                the matching Sitecore rendering. ContentPilot prefers the section
                 behind text when you click headings or buttons.
               </p>
               <p className="text-xs text-zinc-500">

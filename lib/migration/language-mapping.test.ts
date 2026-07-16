@@ -4,6 +4,7 @@ import {
   buildLanguagePickerOptions,
   mapSourceToSitecoreLanguage,
   sanitizeSelectedLanguages,
+  sourceCodesFromSitecoreLanguages,
 } from "@/lib/migration/language-mapping";
 import type { MigrationQueueItem } from "@/types/migration-queue";
 
@@ -87,6 +88,31 @@ describe("language-mapping", () => {
     ]);
   });
 
+  it("marks regional English as selectable with default-language hint", () => {
+    const options = buildLanguagePickerOptions(
+      instanceLanguages,
+      [
+        { name: "en-US", iso: "en-US" },
+        { name: "fr-FR", iso: "fr-FR" },
+      ],
+      [],
+    );
+    const enUs = options.find((entry) => entry.language.name === "en-US");
+    expect(enUs?.selectable).toBe(true);
+    expect(enUs?.hint).toMatch(/default language/i);
+  });
+
+  it("marks fr-FR selectable when source includes fr-FR", () => {
+    const options = buildLanguagePickerOptions(
+      instanceLanguages,
+      siteLanguages,
+      ["en", "fr-FR"],
+    );
+    expect(
+      options.find((entry) => entry.language.name === "fr-FR")?.selectable,
+    ).toBe(true);
+  });
+
   it("includes en in picker even when omitted from discovery", () => {
     const options = buildLanguagePickerOptions(
       [{ name: "fr-FR", iso: "fr-FR" }],
@@ -94,6 +120,16 @@ describe("language-mapping", () => {
       ["fr"],
     );
     expect(options.some((entry) => entry.language.name === "en")).toBe(true);
+  });
+
+  it("builds source codes from Sitecore site languages", () => {
+    expect(
+      sourceCodesFromSitecoreLanguages([
+        { name: "en", iso: "en" },
+        { name: "fr-FR", iso: "fr-FR" },
+        { name: "ja-JP", iso: "ja" },
+      ]),
+    ).toEqual(["en", "fr-FR", "ja", "ja-JP"]);
   });
 });
 

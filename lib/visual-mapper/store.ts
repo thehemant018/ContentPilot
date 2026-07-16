@@ -15,6 +15,7 @@ import {
   findTemplateForRendering,
 } from "@/lib/visual-mapper/rendering-template";
 import type { DiscoveryItem, TemplateDefinition } from "@/types/discovery";
+import type { SourcePageLanguage } from "@/types/language";
 import type {
   ComponentMappingPhase,
   DraftRenderingInfo,
@@ -37,6 +38,10 @@ interface VisualMapperStore {
   targetPagePath: string;
   migrationWarning: string | null;
   pageInteractivityEnabled: boolean;
+  /** Languages detected from the loaded Visual Mapper page URL. */
+  pageLanguages: SourcePageLanguage | null;
+  /** Sitecore language names selected after matching against Discovery. */
+  selectedLanguages: string[];
 
   resetStore: () => void;
   setPageInteractivityEnabled: (enabled: boolean) => void;
@@ -46,6 +51,8 @@ interface VisualMapperStore {
     siteId: string,
   ) => void;
   setTargetPagePath: (path: string) => void;
+  setPageLanguages: (languages: SourcePageLanguage | null) => void;
+  setSelectedLanguages: (languages: string[]) => void;
   loadPage: (url: string) => void;
   pageLoaded: () => void;
   pageLoadFailed: () => void;
@@ -98,6 +105,8 @@ export const useVisualMapperStore = create<VisualMapperStore>((set, get) => ({
   targetPagePath: "",
   migrationWarning: null,
   pageInteractivityEnabled: false,
+  pageLanguages: null,
+  selectedLanguages: [],
 
   resetStore: () =>
     set({
@@ -110,6 +119,8 @@ export const useVisualMapperStore = create<VisualMapperStore>((set, get) => ({
       targetPagePath: "",
       migrationWarning: null,
       pageInteractivityEnabled: false,
+      pageLanguages: null,
+      selectedLanguages: [],
     }),
 
   setPageInteractivityEnabled: (enabled) =>
@@ -123,6 +134,10 @@ export const useVisualMapperStore = create<VisualMapperStore>((set, get) => ({
     }),
 
   setTargetPagePath: (path) => set({ targetPagePath: path }),
+
+  setPageLanguages: (languages) => set({ pageLanguages: languages }),
+
+  setSelectedLanguages: (languages) => set({ selectedLanguages: languages }),
 
   loadPage: (url) => {
     set({
@@ -139,6 +154,8 @@ export const useVisualMapperStore = create<VisualMapperStore>((set, get) => ({
       draftFieldAssignments: [],
       migrationWarning: null,
       pageInteractivityEnabled: false,
+      pageLanguages: null,
+      selectedLanguages: [],
     });
   },
 

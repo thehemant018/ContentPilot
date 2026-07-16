@@ -332,6 +332,10 @@ export async function pushQueueToSitecore(
             sxaPageDataTemplatePath: options.sxaPageDataTemplatePath,
           },
         );
+        const failedPage = pageResolution.results.find((entry) => entry.error);
+        if (failedPage?.error) {
+          throw new Error(failedPage.error);
+        }
         pathByRequested = {
           ...pathByRequested,
           ...pageResolution.pathByRequested,

@@ -59,7 +59,7 @@ export function buildBridgeScript(pageSourceUrl: string): string {
 
   document.addEventListener('mouseout', (e) => {
     if (pickingMode || interactivityEnabled) return;
-    if (!e.target.dataset.migratexSelected) {
+    if (!e.target.dataset.contentpilotSelected) {
       e.target.style.outline = '';
     }
   });
@@ -394,7 +394,7 @@ export function buildBridgeScript(pageSourceUrl: string): string {
       setTimeout(function() { el.style.outline = ''; }, 1200);
     } else {
       clearAllHighlights();
-      el.dataset.migratexSelected = 'true';
+      el.dataset.contentpilotSelected = 'true';
       el.style.outline = '2px solid #22C55E';
       el.style.outlineOffset = '2px';
       window.parent.postMessage({
@@ -408,9 +408,9 @@ export function buildBridgeScript(pageSourceUrl: string): string {
   }, true);
 
   function clearAllHighlights() {
-    document.querySelectorAll('[data-migratex-selected]').forEach(function(el) {
+    document.querySelectorAll('[data-contentpilot-selected]').forEach(function(el) {
       el.style.outline = '';
-      delete el.dataset.migratexSelected;
+      delete el.dataset.contentpilotSelected;
     });
   }
 
@@ -419,7 +419,7 @@ export function buildBridgeScript(pageSourceUrl: string): string {
     try {
       const el = document.querySelector(selector);
       if (el) {
-        el.dataset.migratexSelected = 'true';
+        el.dataset.contentpilotSelected = 'true';
         el.style.outline = '2px solid #22C55E';
         el.style.outlineOffset = '2px';
       }
@@ -442,7 +442,7 @@ export function buildBridgeScript(pageSourceUrl: string): string {
 
   function pickClassNamesForSelector(classList) {
     var cleaned = Array.from(classList || []).filter(function(c) {
-      return c && !c.startsWith('migratex');
+      return c && !c.startsWith('contentpilot');
     });
     var semantic = cleaned.filter(function(c) {
       return /^(rte|rich-?text|richtext|wysiwyg|prose|content|card|hero|accordion|tile|feature)$/i.test(c);

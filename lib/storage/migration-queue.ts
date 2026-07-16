@@ -23,7 +23,7 @@ import type { BlockMatchResult } from "@/types/ai-match";
 import type { CrawlImage } from "@/types/crawl";
 import type { MigrationQueueItem } from "@/types/migration-queue";
 
-export const MIGRATION_QUEUE_CHANGED_EVENT = "migratex-migration-queue-changed";
+export const MIGRATION_QUEUE_CHANGED_EVENT = "contentpilot-migration-queue-changed";
 
 function dispatchQueueChanged(): void {
   window.dispatchEvent(new Event(MIGRATION_QUEUE_CHANGED_EVENT));

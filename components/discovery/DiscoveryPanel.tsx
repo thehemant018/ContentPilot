@@ -231,7 +231,7 @@ export function DiscoveryPanel({ embedded = false }: { embedded?: boolean }) {
           </h2>
           <p className="mt-2 max-w-3xl text-sm leading-relaxed text-zinc-600">
             Select a site, then provide the renderings, placeholders, media, and templates
-            paths for MigrateX to verify. When all paths exist, we load the
+            paths for ContentPilot to verify. When all paths exist, we load the
             target schema — read-only, nothing is modified in Sitecore.
           </p>
         </div>
@@ -353,7 +353,7 @@ export function DiscoveryPanel({ embedded = false }: { embedded?: boolean }) {
               />
               <p className="mt-1 text-xs text-zinc-500">
                 Used when creating missing target pages during migrate push. If
-                empty, MigrateX infers the template from a sibling page.
+                empty, ContentPilot infers the template from a sibling page.
               </p>
             </div>
 

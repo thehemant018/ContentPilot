@@ -7,11 +7,16 @@ import { prepareQueueForMigration } from "@/lib/migration/queue-sync";
 import { prepareVisualMapperMigration } from "@/lib/visual-mapper/migrate";
 import { inferVisualMapperParentBlockIds } from "@/lib/visual-mapper/queue-hierarchy";
 import {
+  getVisualMapperSourceLanguageCodes,
+  getVisualMapperSourceLanguages,
+} from "@/lib/visual-mapper/source-page-languages";
+import {
   mappingEntryBlockId,
   resolveEntryBlockIds,
 } from "@/lib/visual-mapper/template-key";
 import { getMigrationQueue, saveMigrationQueue } from "@/lib/storage/migration-queue";
 import { getDiscoveryResult } from "@/lib/storage/workflow-data";
+import { useVisualMapperStore } from "@/lib/visual-mapper/store";
 import type { BlockMatchResult } from "@/types/ai-match";
 import type { RenderingPlaceholderProfile } from "@/types/discovery";
 import type { MappingEntry } from "@/types/visual-mapper";
@@ -28,6 +33,25 @@ function prepareVisualMapperQueueItems(
   });
 }
 
+function visualMapperLanguageOptions(pageUrl: string) {
+  const discovery = getDiscoveryResult();
+  const siteLanguages = discovery?.siteLanguages ?? [];
+  const instanceLanguages = discovery?.instanceLanguages ?? [];
+  const pageLanguages = getVisualMapperSourceLanguages(pageUrl);
+  const sourceLanguages = getVisualMapperSourceLanguageCodes(pageUrl);
+  const selectedFromStore = useVisualMapperStore.getState().selectedLanguages;
+
+  return {
+    discovery,
+    instanceLanguages,
+    siteLanguages,
+    sourceLanguages,
+    pageLanguage: pageLanguages?.detectedLanguage,
+    sourceAlternateUrls: pageLanguages?.alternateUrls,
+    selectedLanguages: selectedFromStore,
+  };
+}
+
 export function mappingEntriesToQueueItems(
   entries: MappingEntry[],
   pageUrl: string,
@@ -35,7 +59,15 @@ export function mappingEntriesToQueueItems(
   targetPagePath: string,
   renderingProfiles?: RenderingPlaceholderProfile[],
 ): MigrationQueueItem[] {
-  const discovery = getDiscoveryResult();
+  const {
+    discovery,
+    instanceLanguages,
+    siteLanguages,
+    sourceLanguages,
+    pageLanguage,
+    sourceAlternateUrls,
+    selectedLanguages,
+  } = visualMapperLanguageOptions(pageUrl);
   const profiles = renderingProfiles ?? discovery?.renderingProfiles;
   const placeholders = discovery?.placeholders;
   const { matches } = prepareVisualMapperMigration(entries, pageUrl, pageTitle);
@@ -50,6 +82,15 @@ export function mappingEntriesToQueueItems(
     matches.map((match) => [match.blockId, match]),
   );
 
+  const defaultLanguages =
+    selectedLanguages.length > 0
+      ? selectedLanguages
+      : resolveDefaultPageLanguages(pageUrl, sourceLanguages, {
+          instanceLanguages,
+          siteLanguages,
+          pageLanguage,
+        });
+
   const rawItems = entries.map((entry) => {
     const blockId = blockIdByEntryId.get(entry.id) ?? mappingEntryBlockId(entry);
     const match =
@@ -60,22 +101,23 @@ export function mappingEntriesToQueueItems(
       throw new Error(`Missing match for visual mapper entry ${entry.id}`);
     }
 
+    const mappedLanguage =
+      defaultLanguages[0] ??
+      resolveMappedPageLanguage(pageUrl, pageLanguage, {
+        instanceLanguages,
+        siteLanguages,
+      });
     const item = queueItemFromMatch({ ...match, blockId }, [], {
       parentBlockId: parentBlockIdByEntryId.get(entry.id),
-      language: resolveMappedPageLanguage(pageUrl, undefined, {
-        instanceLanguages: discovery?.instanceLanguages,
-        siteLanguages: discovery?.siteLanguages,
-      }),
-    });
-    const defaultLanguages = resolveDefaultPageLanguages(pageUrl, [], {
-      instanceLanguages: discovery?.instanceLanguages,
-      siteLanguages: discovery?.siteLanguages,
+      language: mappedLanguage,
     });
 
     return {
       ...item,
       blockId,
       languages: defaultLanguages,
+      primarySourceLanguage: mappedLanguage,
+      sourceAlternateUrls,
       targetPagePath: targetPagePath.trim(),
       fields: item.fields.map((field, index) => ({
         ...field,

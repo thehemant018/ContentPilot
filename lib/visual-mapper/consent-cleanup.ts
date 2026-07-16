@@ -55,8 +55,8 @@ export const CONSENT_CLEANUP_CSS = `
     opacity: 0 !important;
     z-index: -1 !important;
   }
-  html.migratex-scroll-unlock,
-  body.migratex-scroll-unlock {
+  html.contentpilot-scroll-unlock,
+  body.contentpilot-scroll-unlock {
     overflow: auto !important;
     position: static !important;
     height: auto !important;
@@ -80,8 +80,8 @@ export const CONSENT_CLEANUP_SCRIPT = `
     var html = document.documentElement;
     var body = document.body;
     if (!html || !body) return;
-    html.classList.add("migratex-scroll-unlock");
-    body.classList.add("migratex-scroll-unlock");
+    html.classList.add("contentpilot-scroll-unlock");
+    body.classList.add("contentpilot-scroll-unlock");
     html.style.overflow = "";
     html.style.position = "";
     body.style.overflow = "";
@@ -137,7 +137,7 @@ export const CONSENT_CLEANUP_SCRIPT = `
 
 export function injectConsentCleanup(html: string): string {
   const injection =
-    `<style id="migratex-consent-hide">${CONSENT_CLEANUP_CSS}</style>` +
+    `<style id="contentpilot-consent-hide">${CONSENT_CLEANUP_CSS}</style>` +
     `<script>${CONSENT_CLEANUP_SCRIPT}</script>`;
 
   if (/<head[^>]*>/i.test(html)) {

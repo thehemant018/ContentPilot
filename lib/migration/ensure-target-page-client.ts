@@ -15,6 +15,17 @@ export interface EnsureTargetPagesProgressOptions {
   onProgress: (items: TargetPageProgressItem[]) => void;
 }
 
+interface EnsureTargetPagesBatchResult {
+  error?: string;
+  success?: boolean;
+  results?: Array<{
+    path: string;
+    resolvedPath: string;
+    created: boolean;
+    error?: string;
+  }>;
+}
+
 export async function ensureTargetPagesWithProgress(
   options: EnsureTargetPagesProgressOptions,
 ): Promise<{ success: boolean; items: TargetPageProgressItem[] }> {
@@ -24,63 +35,91 @@ export async function ensureTargetPagesWithProgress(
   );
   options.onProgress(items);
 
-  for (const path of options.paths) {
+  const pathsToCreate = options.paths.filter((path) => {
     const current = items.find((item) => item.path === path);
-    if (!current || current.status === "existing") {
-      continue;
-    }
+    return current && current.status !== "existing";
+  });
 
+  if (pathsToCreate.length === 0) {
+    return { success: true, items };
+  }
+
+  for (const path of pathsToCreate) {
     items = updatePageProgressItem(items, path, {
       status: "creating",
       detail: undefined,
     });
-    options.onProgress(items);
+  }
+  options.onProgress(items);
 
-    try {
-      const response = await sitecoreApiFetch("/api/migration/ensure-target-page", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          path,
-          pageTemplatePath: options.pageTemplatePath,
-          sxaPageDataTemplatePath: options.sxaPageDataTemplatePath,
-          language: options.language,
-        }),
-      });
+  try {
+    const response = await sitecoreApiFetch("/api/migration/ensure-target-pages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        paths: pathsToCreate,
+        pageTemplatePath: options.pageTemplatePath,
+        sxaPageDataTemplatePath: options.sxaPageDataTemplatePath,
+        language: options.language,
+      }),
+    });
 
-      const payload = (await response.json()) as {
-        error?: string;
-        created?: boolean;
-        resolvedPath?: string;
-      };
+    const payload = (await response.json()) as EnsureTargetPagesBatchResult;
 
-      if (!response.ok) {
+    if (!response.ok) {
+      for (const path of pathsToCreate) {
         items = updatePageProgressItem(items, path, {
           status: "failed",
           detail: payload.error ?? "Failed to create page.",
         });
-        options.onProgress(items);
-        return { success: false, items };
+      }
+      options.onProgress(items);
+      return { success: false, items };
+    }
+
+    const resultByPath = new Map(
+      (payload.results ?? []).map((entry) => [entry.path, entry]),
+    );
+
+    for (const path of pathsToCreate) {
+      const entry = resultByPath.get(path);
+      if (!entry) {
+        items = updatePageProgressItem(items, path, {
+          status: "failed",
+          detail: "No result returned for this page.",
+        });
+        continue;
+      }
+
+      if (entry.error) {
+        items = updatePageProgressItem(items, path, {
+          status: "failed",
+          detail: entry.error,
+        });
+        continue;
       }
 
       items = updatePageProgressItem(items, path, {
-        path: payload.resolvedPath ?? path,
-        status: payload.created ? "created" : "existing",
-        detail: payload.created ? "New page created" : "Page already existed",
+        path: entry.resolvedPath || path,
+        status: entry.created ? "created" : "existing",
+        detail: entry.created ? "New page created" : "Page already existed",
       });
-      options.onProgress(items);
-    } catch (error) {
+    }
+
+    options.onProgress(items);
+    const failed = items.some((item) => item.status === "failed");
+    return { success: !failed && payload.success !== false, items };
+  } catch (error) {
+    for (const path of pathsToCreate) {
       items = updatePageProgressItem(items, path, {
         status: "failed",
         detail:
           error instanceof Error ? error.message : "Failed to create page.",
       });
-      options.onProgress(items);
-      return { success: false, items };
     }
+    options.onProgress(items);
+    return { success: false, items };
   }
-
-  return { success: true, items };
 }
 
 export function markPagesAsPushing(

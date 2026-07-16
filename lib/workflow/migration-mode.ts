@@ -1,4 +1,7 @@
-import { returnToCrawlPhase } from "@/lib/workflow/progress";
+import {
+  clearQueueOnMapNavigation,
+  returnToCrawlPhase,
+} from "@/lib/workflow/progress";
 import { STORAGE_KEYS } from "@/lib/sitecore/constants";
 
 export type MigrationMode = "ai" | "visual-mapper";
@@ -42,8 +45,9 @@ export function getMappingSourceBackTarget(): MappingSourceBackTarget {
     return {
       label: "Back to Visual Mapper",
       description:
-        "Want to map more components? Return to Visual Mapper — your Review queue is kept.",
+        "Want to map more components? Return to Visual Mapper — the Review queue will be cleared.",
       navigate: () => {
+        clearQueueOnMapNavigation();
         window.location.href = "/visual-mapper";
       },
     };

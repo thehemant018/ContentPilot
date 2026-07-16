@@ -7,6 +7,7 @@ import {
   sanitizeSelectedLanguages,
 } from "@/lib/migration/language-mapping";
 import type { LanguagePickerOption } from "@/lib/migration/language-mapping";
+import { getVisualMapperSourceLanguages } from "@/lib/visual-mapper/source-page-languages";
 import type { DiscoveryResult } from "@/types/discovery";
 
 export function resolveSourceLanguagesForPage(
@@ -44,17 +45,37 @@ export function buildPageLanguagePicker(
     availableLanguages?: string[];
   }>,
   crawlSourceLanguages?: string[],
+  extraSourceLanguages?: string[],
 ): {
   options: LanguagePickerOption[];
   selected: string[];
 } {
   const instanceLanguages = discovery?.instanceLanguages ?? [];
   const siteLanguages = discovery?.siteLanguages ?? [];
-  const sourceLanguages = resolveSourceLanguagesForPage(
+  let sourceLanguages = resolveSourceLanguagesForPage(
     sourcePageUrl,
     crawlPages,
     crawlSourceLanguages,
   );
+  let pageLanguage = crawlPages?.find(
+    (entry) => entry.url === sourcePageUrl,
+  )?.language;
+
+  const extracted = getVisualMapperSourceLanguages(sourcePageUrl);
+  if (extracted) {
+    pageLanguage = extracted.detectedLanguage ?? pageLanguage;
+    sourceLanguages = [
+      ...sourceLanguages,
+      ...(extracted.detectedLanguage ? [extracted.detectedLanguage] : []),
+      ...extracted.availableLanguages,
+    ];
+  }
+
+  if (extraSourceLanguages?.length) {
+    sourceLanguages = [...sourceLanguages, ...extraSourceLanguages];
+  }
+
+  sourceLanguages = [...new Set(sourceLanguages.filter(Boolean))];
 
   const options = buildLanguagePickerOptions(
     listMappableSitecoreLanguages({
@@ -65,14 +86,13 @@ export function buildPageLanguagePicker(
     sourceLanguages,
   );
 
-  const page = crawlPages?.find((entry) => entry.url === sourcePageUrl);
   const fallbackSelected = resolveDefaultPageLanguages(
     sourcePageUrl,
     sourceLanguages,
     {
       instanceLanguages,
       siteLanguages,
-      pageLanguage: page?.language,
+      pageLanguage,
     },
   );
 

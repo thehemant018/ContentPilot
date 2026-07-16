@@ -113,17 +113,17 @@ export function buildLanguagePickerOptions(
       sourceWithEnglish,
       siteLanguages,
     );
+    const isDefaultEnglish =
+      language.name === DEFAULT_MIGRATION_LANGUAGE ||
+      sitecoreLanguageMatchesSource(language, DEFAULT_MIGRATION_LANGUAGE);
 
     let hint: string | undefined;
     if (!onSite) {
       hint = "Not on target Sitecore site";
-    } else if (!onSource && language.name !== DEFAULT_MIGRATION_LANGUAGE) {
-      hint = "Not on source website";
-    } else if (
-      !onSource &&
-      language.name === DEFAULT_MIGRATION_LANGUAGE
-    ) {
+    } else if (isDefaultEnglish && !onSource) {
       hint = "Default language (always available on target site)";
+    } else if (!onSource) {
+      hint = "Not on source website";
     }
 
     return {
@@ -330,6 +330,22 @@ export function resolveDefaultPageLanguages(
     [selectable[0]!.language.name],
     pickerOptions,
   );
+}
+
+/** Codes from Sitecore languages for matching when source HTML extraction is unavailable. */
+export function sourceCodesFromSitecoreLanguages(
+  languages: SitecoreLanguage[],
+): string[] {
+  const codes = new Set<string>();
+  for (const language of languages) {
+    if (language.name?.trim()) {
+      codes.add(language.name.trim());
+    }
+    if (language.iso?.trim()) {
+      codes.add(language.iso.trim());
+    }
+  }
+  return [...codes].sort((left, right) => left.localeCompare(right));
 }
 
 export function sanitizeSelectedLanguages(

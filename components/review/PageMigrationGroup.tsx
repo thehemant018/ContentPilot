@@ -13,6 +13,7 @@ import { DEFAULT_PRESENTATION_PLACEHOLDER } from "@/lib/migration/constants";
 import { buildPageLanguagePicker } from "@/lib/migration/page-language-picker";
 import { listPageRootPlaceholderKeys } from "@/lib/migration/placeholder-registry";
 import { getCrawlResult, getDiscoveryResult } from "@/lib/storage/workflow-data";
+import { getVisualMapperSourceLanguageCodes } from "@/lib/visual-mapper/source-page-languages";
 import type { MigrationQueueItem } from "@/types/migration-queue";
 
 interface PageMigrationGroupProps {
@@ -306,17 +307,26 @@ export function PageMigrationGroup({
   }, [placeholder]);
 
   const crawl = getCrawlResult();
-  const languagePicker = useMemo(
-    () =>
-      buildPageLanguagePicker(
-        sourcePageUrl,
-        getDiscoveryResult(),
-        lead.languages ?? (lead.language ? [lead.language] : []),
-        crawl?.pages,
-        crawl?.sourceLanguages,
-      ),
-    [sourcePageUrl, lead.languages, lead.language, crawl?.pages, crawl?.sourceLanguages],
-  );
+  const languagePicker = useMemo(() => {
+    const alternateSourceCodes = Object.keys(lead.sourceAlternateUrls ?? {});
+    const visualMapperCodes = getVisualMapperSourceLanguageCodes(sourcePageUrl);
+
+    return buildPageLanguagePicker(
+      sourcePageUrl,
+      getDiscoveryResult(),
+      lead.languages ?? (lead.language ? [lead.language] : []),
+      crawl?.pages,
+      crawl?.sourceLanguages,
+      [...visualMapperCodes, ...alternateSourceCodes],
+    );
+  }, [
+    sourcePageUrl,
+    lead.languages,
+    lead.language,
+    lead.sourceAlternateUrls,
+    crawl?.pages,
+    crawl?.sourceLanguages,
+  ]);
 
   return (
     <section className="rounded-2xl border border-zinc-200 bg-zinc-50 p-5">

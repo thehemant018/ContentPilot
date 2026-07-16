@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import Link from "next/link";
 import { MissingTargetPageDialog } from "@/components/migration/TargetPageDialogs";
 import { IframeViewer } from "@/components/visual-mapper/IframeViewer";
 import { MappingPanel } from "@/components/visual-mapper/MappingPanel";
@@ -10,6 +9,7 @@ import {
 } from "@/components/visual-mapper/form-styles";
 import { sitecoreApiFetch } from "@/lib/sitecore/api-client";
 import { validateTargetPages } from "@/lib/migration/validate-target-pages-client";
+import { buildPageLanguagePicker } from "@/lib/migration/page-language-picker";
 import { getDiscoveryResult } from "@/lib/storage/workflow-data";
 import {
   getStoredSession,
@@ -30,6 +30,7 @@ import {
   markCrawlPhaseComplete,
   markMapModePhaseComplete,
   markMigratePhaseComplete,
+  returnToMapModePhase,
 } from "@/lib/workflow/progress";
 import { saveMigrationMode } from "@/lib/workflow/migration-mode";
 import { summarizePushResult } from "@/lib/migration/push-feedback";
@@ -101,6 +102,65 @@ export function VisualMapperPage() {
   const handleClearHighlights = useCallback(() => {
     setHighlightSelector(null);
   }, []);
+
+  const handleSourceLanguagesChecked = useCallback(
+    (result: {
+      pageUrl: string;
+      languages: {
+        detectedLanguage?: string;
+        availableLanguages: string[];
+      };
+    }) => {
+      const setPageLanguages = useVisualMapperStore.getState().setPageLanguages;
+      const setSelectedLanguages =
+        useVisualMapperStore.getState().setSelectedLanguages;
+
+      setPageLanguages(result.languages);
+
+      const picker = buildPageLanguagePicker(
+        result.pageUrl,
+        getDiscoveryResult(),
+        [],
+        [
+          {
+            url: result.pageUrl,
+            language: result.languages.detectedLanguage,
+            availableLanguages: result.languages.availableLanguages,
+          },
+        ],
+        result.languages.availableLanguages,
+      );
+      setSelectedLanguages(picker.selected);
+
+      const matched = picker.options
+        .filter((option) => option.selectable)
+        .map((option) => option.language.name);
+      const codes = result.languages.availableLanguages;
+
+      if (codes.length === 0) {
+        setFeedback({
+          type: "warning",
+          message:
+            "No languages detected on the loaded page. Review can still use English.",
+        });
+        return;
+      }
+
+      if (matched.length === 0) {
+        setFeedback({
+          type: "warning",
+          message: `Page languages detected (${codes.join(", ")}), but none match Sitecore site languages from Discovery.`,
+        });
+        return;
+      }
+
+      setFeedback({
+        type: "success",
+        message: `Page languages detected: ${codes.join(", ")}. Matched Sitecore languages will appear in Review.`,
+      });
+    },
+    [],
+  );
 
   function handleLoadPage() {
     const trimmed = urlInput.trim();
@@ -454,12 +514,13 @@ export function VisualMapperPage() {
           {isMigrating ? "Migrating…" : "Migrate template page"}
         </button>
 
-        <Link
-          href="/#map-mode"
+        <button
+          type="button"
+          onClick={() => returnToMapModePhase()}
           className="inline-flex items-center justify-center rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm font-semibold text-indigo-800 transition-colors hover:bg-indigo-100"
         >
           Back to Map →
-        </Link>
+        </button>
       </header>
 
       {feedback && (
@@ -481,6 +542,7 @@ export function VisualMapperPage() {
           <IframeViewer
             sourceUrl={session.sourceUrl}
             highlightSelector={highlightSelector}
+            onSourceLanguagesChecked={handleSourceLanguagesChecked}
           />
         </div>
         <div className="w-[40%] min-w-0">

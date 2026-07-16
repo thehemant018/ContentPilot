@@ -22,6 +22,13 @@ export const SXA_PAGE_DATA_ITEM_NAME = "Data";
 export interface EnsureSxaPageDataOptions {
   language?: string;
   sxaPageDataTemplatePath?: string;
+  /** Pre-resolved template id — skips repeated template lookups in a batch. */
+  pageDataTemplateId?: string;
+  /**
+   * When true, skip the initial page language probe (caller already verified
+   * the page exists in the target language).
+   */
+  pageVerifiedInLanguage?: boolean;
   sourceLanguage?: string;
   sourceLanguages?: string[];
 }
@@ -159,6 +166,21 @@ async function resolvePageDataTemplateId(
   );
 }
 
+/** Resolves the SXA Page Data template id (for batch caching). */
+export async function resolveSxaPageDataTemplateId(
+  instanceUrl: string,
+  accessToken: string,
+  pagePath: string,
+  sxaPageDataTemplatePath?: string,
+): Promise<string> {
+  return resolvePageDataTemplateId(
+    instanceUrl,
+    accessToken,
+    pagePath,
+    sxaPageDataTemplatePath,
+  );
+}
+
 /**
  * Ensures the SXA page-level Data item exists under a target page.
  * Required for datasource items at {page}/Data/{component}.
@@ -177,42 +199,44 @@ export async function ensureSxaPageDataItem(
     sourceLanguages: options?.sourceLanguages,
   };
 
-  const pageInLanguage = await getSitecoreItemByPathInLanguage(
-    instanceUrl,
-    accessToken,
-    normalizedPagePath,
-    language,
-  );
-  if (!pageInLanguage) {
-    const pageItem = await getSitecoreItemByPath(
-      instanceUrl,
-      accessToken,
-      normalizedPagePath,
-    );
-    if (!pageItem) {
-      throw new Error(
-        `Target page not found at ${normalizedPagePath}. Create the page before adding SXA Data.`,
-      );
-    }
-
-    await ensureItemLanguageVersion(
-      instanceUrl,
-      accessToken,
-      normalizedPagePath,
-      language,
-      versionOptions,
-    );
-
-    const pageVerified = await getSitecoreItemByPathInLanguage(
+  if (!options?.pageVerifiedInLanguage) {
+    const pageInLanguage = await getSitecoreItemByPathInLanguage(
       instanceUrl,
       accessToken,
       normalizedPagePath,
       language,
     );
-    if (!pageVerified) {
-      throw new Error(
-        `Could not create "${language}" version for page at ${normalizedPagePath} before creating SXA Data.`,
+    if (!pageInLanguage) {
+      const pageItem = await getSitecoreItemByPath(
+        instanceUrl,
+        accessToken,
+        normalizedPagePath,
       );
+      if (!pageItem) {
+        throw new Error(
+          `Target page not found at ${normalizedPagePath}. Create the page before adding SXA Data.`,
+        );
+      }
+
+      await ensureItemLanguageVersion(
+        instanceUrl,
+        accessToken,
+        normalizedPagePath,
+        language,
+        versionOptions,
+      );
+
+      const pageVerified = await getSitecoreItemByPathInLanguage(
+        instanceUrl,
+        accessToken,
+        normalizedPagePath,
+        language,
+      );
+      if (!pageVerified) {
+        throw new Error(
+          `Could not create "${language}" version for page at ${normalizedPagePath} before creating SXA Data.`,
+        );
+      }
     }
   }
 
@@ -255,24 +279,28 @@ export async function ensureSxaPageDataItem(
     return { created: false, path: dataPath };
   }
 
-  const pageItem = await getSitecoreItemByPathInLanguage(
-    instanceUrl,
-    accessToken,
-    normalizedPagePath,
-    language,
-  );
-  if (!pageItem) {
-    throw new Error(
-      `Target page not found at ${normalizedPagePath} in "${language}".`,
+  if (!options?.pageVerifiedInLanguage) {
+    const pageItem = await getSitecoreItemByPathInLanguage(
+      instanceUrl,
+      accessToken,
+      normalizedPagePath,
+      language,
     );
+    if (!pageItem) {
+      throw new Error(
+        `Target page not found at ${normalizedPagePath} in "${language}".`,
+      );
+    }
   }
 
-  const templateId = await resolvePageDataTemplateId(
-    instanceUrl,
-    accessToken,
-    normalizedPagePath,
-    options?.sxaPageDataTemplatePath,
-  );
+  const templateId =
+    options?.pageDataTemplateId?.trim() ||
+    (await resolvePageDataTemplateId(
+      instanceUrl,
+      accessToken,
+      normalizedPagePath,
+      options?.sxaPageDataTemplatePath,
+    ));
 
   await createItem(
     instanceUrl,

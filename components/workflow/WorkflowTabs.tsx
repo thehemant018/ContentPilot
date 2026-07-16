@@ -18,7 +18,9 @@ import {
 import {
   canNavigateToPhase,
   canReturnToReviewForEditing,
+  canReturnToMapModePhase,
   applyReopenDiscoveryIfRequested,
+  clearQueueOnMapNavigation,
   CONTENT_MIGRATION_RESET_EVENT,
   getDefaultPhaseFromHash,
   getFurthestPhaseIndex,
@@ -65,6 +67,10 @@ export function WorkflowTabs() {
 
       if (!canNavigateToPhase(tabId, furthest)) {
         return;
+      }
+
+      if (tabId === "map-mode") {
+        clearQueueOnMapNavigation();
       }
 
       setFurthestPhaseIndex(index);
@@ -183,12 +189,17 @@ export function WorkflowTabs() {
               hydrated &&
               phase.id === "review" &&
               canReturnToReviewForEditing();
+            const canEditMapMode =
+              hydrated &&
+              phase.id === "map-mode" &&
+              canReturnToMapModePhase();
             const canReturnToAuth =
               hydrated && phase.id === "auth" && !isAuthPhaseComplete();
             const isPreviousStep =
               hydrated &&
               phaseIndex < furthestIndex &&
               !canEditReview &&
+              !canEditMapMode &&
               !canReturnToAuth;
 
             return (
@@ -206,7 +217,9 @@ export function WorkflowTabs() {
                     ? "Your session expired — reconnect to Sitecore"
                     : canEditReview
                       ? "Edit migration queue before pushing"
-                      : isPreviousStep
+                      : canEditMapMode
+                        ? "Change mapping approach or reopen Visual Mapper"
+                        : isPreviousStep
                         ? "This step is already completed"
                         : isDisabled && !phase.available
                           ? "Coming soon"

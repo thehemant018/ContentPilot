@@ -1,5 +1,5 @@
 export const CREATE_ITEM_MUTATION = `
-  mutation MigrateXCreateItem($input: CreateItemInput!) {
+  mutation ContentPilotCreateItem($input: CreateItemInput!) {
     createItem(input: $input) {
       item {
         itemId
@@ -11,7 +11,7 @@ export const CREATE_ITEM_MUTATION = `
 `;
 
 export const UPDATE_ITEM_MUTATION = `
-  mutation MigrateXUpdateItem($input: UpdateItemInput!) {
+  mutation ContentPilotUpdateItem($input: UpdateItemInput!) {
     updateItem(input: $input) {
       item {
         itemId

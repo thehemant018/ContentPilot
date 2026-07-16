@@ -21,6 +21,8 @@ import {
   getDiscoveryResult,
   WORKFLOW_DATA_CHANGED_EVENT,
 } from "@/lib/storage/workflow-data";
+import { getVisualMapperSourceLanguageCodes } from "@/lib/visual-mapper/source-page-languages";
+import { isVisualMapperMode } from "@/lib/workflow/migration-mode";
 import {
   advanceToWorkflowPhase,
   isAiMatchPhaseComplete,
@@ -208,6 +210,16 @@ export function ReviewPanel({ embedded = false }: { embedded?: boolean }) {
           <p className="mt-2 text-xs text-zinc-500">
             Source website languages detected:{" "}
             {getCrawlResult()?.sourceLanguages?.join(", ")}
+          </p>
+        ) : isVisualMapperMode() &&
+          queue[0] &&
+          getVisualMapperSourceLanguageCodes(queue[0].sourcePageUrl).length >
+            0 ? (
+          <p className="mt-2 text-xs text-zinc-500">
+            Source website languages detected (Visual Mapper):{" "}
+            {getVisualMapperSourceLanguageCodes(queue[0].sourcePageUrl).join(
+              ", ",
+            )}
           </p>
         ) : null}
         {getDiscoveryResult()?.mediaPath && (
