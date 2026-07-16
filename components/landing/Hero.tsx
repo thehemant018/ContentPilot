@@ -6,7 +6,8 @@ export function Hero() {
           ContentPilot
         </p>
         <h1 className="font-display mt-3 text-4xl font-semibold tracking-tight text-slate-900 sm:text-5xl sm:leading-[1.1]">
-          Migrate source content into Sitecore XM Cloud
+          Migrate source content into Sitecore{" "}
+          <span className="text-teal-600">XM Cloud</span>
         </h1>
         <p className="mt-4 max-w-2xl text-lg leading-relaxed text-slate-600">
           Discover your Sitecore structure, map components, review every field,
