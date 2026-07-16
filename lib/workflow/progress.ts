@@ -209,6 +209,14 @@ export function startNewContentMigration(): void {
 }
 
 export function isPhaseComplete(phaseId: WorkflowPhaseId): boolean {
+  const mode = getMigrationMode();
+  // In Visual Mapper mode we skip Crawl + AI Match phases. They may be marked
+  // complete from prior runs, but they shouldn't display as completed for the
+  // current workflow path.
+  if (mode === "visual-mapper" && (phaseId === "crawl" || phaseId === "ai-match")) {
+    return false;
+  }
+
   if (phaseId === "auth") {
     return isAuthPhaseComplete();
   }
@@ -258,6 +266,23 @@ export function canReturnToCrawlPhase(): boolean {
   }
 
   return isMapModePhaseComplete() && getFurthestPhaseIndex() >= crawlIndex;
+}
+
+export function canReturnToMapModePhase(): boolean {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  const mapModeIndex = getPhaseIndex("map-mode");
+  if (mapModeIndex < 0) {
+    return false;
+  }
+
+  return (
+    isDiscoveryPhaseComplete() &&
+    isMapModePhaseComplete() &&
+    getFurthestPhaseIndex() > mapModeIndex
+  );
 }
 
 export function canReturnToDiscoveryPhase(): boolean {
@@ -361,6 +386,27 @@ export function returnToCrawlPhase(): void {
   });
 }
 
+export function returnToMapModePhase(): void {
+  const furthestIndex = getFurthestPhaseIndex();
+  if (
+    !canReturnToMapModePhase() &&
+    !canNavigateToPhase("map-mode", furthestIndex)
+  ) {
+    return;
+  }
+
+  if (window.location.pathname !== "/") {
+    window.location.href = "/#map-mode";
+    return;
+  }
+
+  window.location.hash = "map-mode";
+  document.getElementById("workflow")?.scrollIntoView({
+    behavior: "smooth",
+    block: "start",
+  });
+}
+
 export function canNavigateToPhase(
   phaseId: WorkflowPhaseId,
   furthestIndex: number,
@@ -374,6 +420,9 @@ export function canNavigateToPhase(
 
   if (index < furthestIndex) {
     if (phaseId === "review" && canReturnToReviewForEditing()) {
+      return true;
+    }
+    if (phaseId === "map-mode" && canReturnToMapModePhase()) {
       return true;
     }
     if (phaseId === "discovery" && canReturnToDiscoveryPhase()) {

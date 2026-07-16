@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import Link from "next/link";
 import { MissingTargetPageDialog } from "@/components/migration/TargetPageDialogs";
 import { IframeViewer } from "@/components/visual-mapper/IframeViewer";
 import { MappingPanel } from "@/components/visual-mapper/MappingPanel";
@@ -30,6 +29,7 @@ import {
   markCrawlPhaseComplete,
   markMapModePhaseComplete,
   markMigratePhaseComplete,
+  returnToMapModePhase,
 } from "@/lib/workflow/progress";
 import { saveMigrationMode } from "@/lib/workflow/migration-mode";
 import { summarizePushResult } from "@/lib/migration/push-feedback";
@@ -454,12 +454,13 @@ export function VisualMapperPage() {
           {isMigrating ? "Migrating…" : "Migrate template page"}
         </button>
 
-        <Link
-          href="/#map-mode"
+        <button
+          type="button"
+          onClick={() => returnToMapModePhase()}
           className="inline-flex items-center justify-center rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm font-semibold text-indigo-800 transition-colors hover:bg-indigo-100"
         >
           Back to Map →
-        </Link>
+        </button>
       </header>
 
       {feedback && (

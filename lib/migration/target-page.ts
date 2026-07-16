@@ -1,11 +1,23 @@
+import {
+  mapWithConcurrency,
+  TARGET_PAGE_ENSURE_CONCURRENCY,
+} from "@/lib/migration/concurrency";
 import { DEFAULT_MIGRATION_LANGUAGE } from "@/lib/migration/constants";
 import { normalizeSitecoreItemPath } from "@/lib/migration/sitecore-path";
-import { ensureSxaPageDataItem } from "@/lib/migration/sxa-page-structure";
-import { getSitecoreItemByPathInLanguage, requireItemLanguageVersionBeforeWrite } from "@/lib/sitecore/item-version";
+import {
+  ensureSxaPageDataItem,
+  resolveSxaPageDataTemplateId,
+  DEFAULT_SXA_PAGE_DATA_TEMPLATE_PATH,
+} from "@/lib/migration/sxa-page-structure";
+import {
+  getSitecoreItemByPathInLanguage,
+  requireItemLanguageVersionBeforeWrite,
+} from "@/lib/sitecore/item-version";
 import { SEARCH_UNDER_PATH_QUERY } from "@/lib/sitecore/discovery/queries";
 import { executeGraphQL } from "@/lib/sitecore/graphql-client";
 import {
   getSitecoreItemByPath,
+  type SitecoreItemRef,
 } from "@/lib/sitecore/item-lookup";
 import {
   createItem,
@@ -46,6 +58,23 @@ interface SearchUnderPathResult {
   } | null;
 }
 
+/** Shared lookups for a multi-page ensure/validate batch. */
+export interface TargetPageEnsureCache {
+  itemByPath: Map<string, Promise<SitecoreItemRef | null>>;
+  searchUnderParent: Map<string, Promise<SearchUnderPathResult>>;
+  pageTemplateIdByKey: Map<string, Promise<string>>;
+  sxaDataTemplateIdByKey: Map<string, Promise<string>>;
+}
+
+export function createTargetPageEnsureCache(): TargetPageEnsureCache {
+  return {
+    itemByPath: new Map(),
+    searchUnderParent: new Map(),
+    pageTemplateIdByKey: new Map(),
+    sxaDataTemplateIdByKey: new Map(),
+  };
+}
+
 function normalizeItemName(name: string): string {
   return name.trim().toLowerCase();
 }
@@ -70,20 +99,76 @@ export function isDirectChildItem(parentPath: string, itemPath: string): boolean
   return remainder.length > 0 && !remainder.includes("/");
 }
 
+function getCachedItemByPath(
+  instanceUrl: string,
+  accessToken: string,
+  itemPath: string,
+  cache?: TargetPageEnsureCache,
+): Promise<SitecoreItemRef | null> {
+  const normalized = normalizeSitecoreItemPath(itemPath);
+  if (!cache) {
+    return getSitecoreItemByPath(instanceUrl, accessToken, normalized);
+  }
+
+  const existing = cache.itemByPath.get(normalized);
+  if (existing) {
+    return existing;
+  }
+
+  const pending = getSitecoreItemByPath(instanceUrl, accessToken, normalized);
+  cache.itemByPath.set(normalized, pending);
+  return pending;
+}
+
+function getCachedSearchUnderParent(
+  instanceUrl: string,
+  accessToken: string,
+  parentPath: string,
+  pageSize: number,
+  cache?: TargetPageEnsureCache,
+): Promise<SearchUnderPathResult> {
+  const normalizedParent = normalizeSitecoreItemPath(parentPath);
+  if (!cache) {
+    return executeGraphQL<SearchUnderPathResult>(
+      instanceUrl,
+      accessToken,
+      SEARCH_UNDER_PATH_QUERY,
+      { path: normalizedParent, pageSize, pageIndex: 0 },
+    );
+  }
+
+  const cacheKey = `${normalizedParent}::${pageSize}`;
+  const existing = cache.searchUnderParent.get(cacheKey);
+  if (existing) {
+    return existing;
+  }
+
+  const pending = executeGraphQL<SearchUnderPathResult>(
+    instanceUrl,
+    accessToken,
+    SEARCH_UNDER_PATH_QUERY,
+    { path: normalizedParent, pageSize, pageIndex: 0 },
+  );
+  cache.searchUnderParent.set(cacheKey, pending);
+  return pending;
+}
+
 async function findChildPageByItemName(
   instanceUrl: string,
   accessToken: string,
   parentPath: string,
   itemName: string,
+  cache?: TargetPageEnsureCache,
 ): Promise<{ path: string; itemId: string; name: string } | null> {
   const normalizedParent = normalizeSitecoreItemPath(parentPath);
   const targetName = normalizeItemName(itemName);
 
-  const data = await executeGraphQL<SearchUnderPathResult>(
+  const data = await getCachedSearchUnderParent(
     instanceUrl,
     accessToken,
-    SEARCH_UNDER_PATH_QUERY,
-    { path: normalizedParent, pageSize: 100, pageIndex: 0 },
+    normalizedParent,
+    100,
+    cache,
   );
 
   for (const result of data.search?.results ?? []) {
@@ -119,12 +204,14 @@ async function resolveExistingTargetPage(
   instanceUrl: string,
   accessToken: string,
   pagePath: string,
+  cache?: TargetPageEnsureCache,
 ): Promise<{ exists: boolean; path: string; itemId?: string; name?: string }> {
   const normalizedPath = normalizeSitecoreItemPath(pagePath);
-  const existing = await getSitecoreItemByPath(
+  const existing = await getCachedItemByPath(
     instanceUrl,
     accessToken,
     normalizedPath,
+    cache,
   );
   if (existing) {
     return {
@@ -142,6 +229,7 @@ async function resolveExistingTargetPage(
       accessToken,
       parentPath,
       itemName,
+      cache,
     );
     if (byName) {
       return {
@@ -178,81 +266,143 @@ export async function validateTargetPagePaths(
   paths: string[],
 ): Promise<TargetPageValidation[]> {
   const unique = uniqueNormalizedPaths(paths);
-  const results: TargetPageValidation[] = [];
+  const cache = createTargetPageEnsureCache();
 
-  for (const path of unique) {
-    const resolved = await resolveExistingTargetPage(
-      instanceUrl,
-      accessToken,
-      path,
-    );
-    results.push({
-      path,
-      resolvedPath: resolved.path,
-      exists: resolved.exists,
-      itemId: resolved.itemId,
-      name: resolved.name,
-    });
-  }
-
-  return results;
+  return mapWithConcurrency(
+    unique,
+    TARGET_PAGE_ENSURE_CONCURRENCY,
+    async (path) => {
+      const resolved = await resolveExistingTargetPage(
+        instanceUrl,
+        accessToken,
+        path,
+        cache,
+      );
+      return {
+        path,
+        resolvedPath: resolved.path,
+        exists: resolved.exists,
+        itemId: resolved.itemId,
+        name: resolved.name,
+      };
+    },
+  );
 }
 
 async function resolvePageTemplateId(
   instanceUrl: string,
   accessToken: string,
   pagePath: string,
-  pageTemplatePath?: string,
+  pageTemplatePath: string | undefined,
+  cache?: TargetPageEnsureCache,
 ): Promise<string> {
-  if (pageTemplatePath?.trim()) {
-    const configured = await getSitecoreItemByPath(
+  const configuredPath = pageTemplatePath?.trim();
+  const { parentPath } = splitSitecoreItemPath(pagePath);
+  const cacheKey = configuredPath
+    ? `path:${normalizeSitecoreItemPath(configuredPath)}`
+    : `infer:${normalizeSitecoreItemPath(parentPath)}`;
+
+  const resolve = async (): Promise<string> => {
+    if (configuredPath) {
+      const configured = await getCachedItemByPath(
+        instanceUrl,
+        accessToken,
+        configuredPath,
+        cache,
+      );
+      if (configured?.itemId) {
+        return configured.itemId.replace(/[{}]/g, "");
+      }
+      throw new Error(
+        `Page template not found at ${configuredPath}. Set a valid page template path in Discovery.`,
+      );
+    }
+
+    const data = await getCachedSearchUnderParent(
       instanceUrl,
       accessToken,
-      pageTemplatePath,
+      parentPath,
+      25,
+      cache,
     );
-    if (configured?.itemId) {
-      return configured.itemId.replace(/[{}]/g, "");
+
+    const siblings = data.search?.results ?? [];
+    for (const result of siblings) {
+      const item = result.innerItem;
+      if (!item?.path || !item.template?.templateId) {
+        continue;
+      }
+
+      const normalizedPath = normalizeSitecoreItemPath(item.path);
+      if (normalizedPath === normalizeSitecoreItemPath(pagePath)) {
+        continue;
+      }
+
+      const nameLower = (item.name ?? "").toLowerCase();
+      if (SKIP_SIBLING_NAMES.has(nameLower)) {
+        continue;
+      }
+
+      if (
+        normalizedPath.endsWith("/Data") ||
+        normalizedPath.endsWith("/Presentation")
+      ) {
+        continue;
+      }
+
+      return item.template.templateId.replace(/[{}]/g, "");
     }
+
     throw new Error(
-      `Page template not found at ${pageTemplatePath}. Set a valid page template path in Discovery.`,
+      `Could not infer a page template for ${pagePath}. Add a sibling page under ${parentPath} or set "Page template path" in Discovery.`,
     );
+  };
+
+  if (!cache) {
+    return resolve();
   }
 
-  const { parentPath } = splitSitecoreItemPath(pagePath);
-  const data = await executeGraphQL<SearchUnderPathResult>(
-    instanceUrl,
-    accessToken,
-    SEARCH_UNDER_PATH_QUERY,
-    { path: parentPath, pageSize: 25, pageIndex: 0 },
-  );
-
-  const siblings = data.search?.results ?? [];
-  for (const result of siblings) {
-    const item = result.innerItem;
-    if (!item?.path || !item.template?.templateId) {
-      continue;
-    }
-
-    const normalizedPath = normalizeSitecoreItemPath(item.path);
-    if (normalizedPath === normalizeSitecoreItemPath(pagePath)) {
-      continue;
-    }
-
-    const nameLower = (item.name ?? "").toLowerCase();
-    if (SKIP_SIBLING_NAMES.has(nameLower)) {
-      continue;
-    }
-
-    if (normalizedPath.endsWith("/Data") || normalizedPath.endsWith("/Presentation")) {
-      continue;
-    }
-
-    return item.template.templateId.replace(/[{}]/g, "");
+  const existing = cache.pageTemplateIdByKey.get(cacheKey);
+  if (existing) {
+    return existing;
   }
 
-  throw new Error(
-    `Could not infer a page template for ${pagePath}. Add a sibling page under ${parentPath} or set "Page template path" in Discovery.`,
-  );
+  const pending = resolve();
+  cache.pageTemplateIdByKey.set(cacheKey, pending);
+  return pending;
+}
+
+async function resolveCachedSxaDataTemplateId(
+  instanceUrl: string,
+  accessToken: string,
+  pagePath: string,
+  sxaPageDataTemplatePath: string | undefined,
+  cache?: TargetPageEnsureCache,
+): Promise<string> {
+  const configuredPath =
+    sxaPageDataTemplatePath?.trim() || DEFAULT_SXA_PAGE_DATA_TEMPLATE_PATH;
+  const cacheKey = `path:${normalizeSitecoreItemPath(configuredPath)}`;
+
+  const resolve = () =>
+    resolveSxaPageDataTemplateId(
+      instanceUrl,
+      accessToken,
+      pagePath,
+      sxaPageDataTemplatePath,
+    );
+
+  if (!cache) {
+    return resolve();
+  }
+
+  const existing = cache.sxaDataTemplateIdByKey.get(cacheKey);
+  if (existing) {
+    return existing;
+  }
+
+  const pending = resolve();
+  cache.sxaDataTemplateIdByKey.set(cacheKey, pending);
+  return pending;
 }
 
 export interface EnsureTargetPageOptions {
@@ -261,6 +411,7 @@ export interface EnsureTargetPageOptions {
   sxaPageDataTemplatePath?: string;
   sourceLanguage?: string;
   sourceLanguages?: string[];
+  cache?: TargetPageEnsureCache;
 }
 
 export async function ensureTargetPageExists(
@@ -270,19 +421,29 @@ export async function ensureTargetPageExists(
   options?: EnsureTargetPageOptions,
 ): Promise<{ created: boolean; path: string }> {
   const normalizedPath = normalizeSitecoreItemPath(pagePath);
+  const cache = options?.cache;
   const resolved = await resolveExistingTargetPage(
     instanceUrl,
     accessToken,
     normalizedPath,
+    cache,
   );
 
-  if (resolved.exists) {
-    const language = options?.language ?? DEFAULT_MIGRATION_LANGUAGE;
-    const versionOptions = {
-      sourceLanguage: options?.sourceLanguage,
-      sourceLanguages: options?.sourceLanguages,
-    };
+  const language = options?.language ?? DEFAULT_MIGRATION_LANGUAGE;
+  const versionOptions = {
+    sourceLanguage: options?.sourceLanguage,
+    sourceLanguages: options?.sourceLanguages,
+  };
 
+  const sxaDataTemplateId = await resolveCachedSxaDataTemplateId(
+    instanceUrl,
+    accessToken,
+    resolved.exists ? resolved.path : normalizedPath,
+    options?.sxaPageDataTemplatePath,
+    cache,
+  ).catch(() => undefined);
+
+  if (resolved.exists) {
     const pageVersion = await requireItemLanguageVersionBeforeWrite(
       instanceUrl,
       accessToken,
@@ -297,6 +458,8 @@ export async function ensureTargetPageExists(
     await ensureSxaPageDataItem(instanceUrl, accessToken, resolved.path, {
       language,
       sxaPageDataTemplatePath: options?.sxaPageDataTemplatePath,
+      pageDataTemplateId: sxaDataTemplateId,
+      pageVerifiedInLanguage: true,
       sourceLanguages: options?.sourceLanguages,
       sourceLanguage: options?.sourceLanguage,
     });
@@ -304,10 +467,11 @@ export async function ensureTargetPageExists(
   }
 
   const { parentPath, itemName } = splitSitecoreItemPath(normalizedPath);
-  const parent = await getSitecoreItemByPath(
+  const parent = await getCachedItemByPath(
     instanceUrl,
     accessToken,
     parentPath,
+    cache,
   );
   if (!parent) {
     throw new Error(
@@ -320,6 +484,7 @@ export async function ensureTargetPageExists(
     accessToken,
     normalizedPath,
     options?.pageTemplatePath,
+    cache,
   );
 
   await createItem(
@@ -329,10 +494,12 @@ export async function ensureTargetPageExists(
     itemName,
     templateId,
     {},
-    { language: options?.language ?? DEFAULT_MIGRATION_LANGUAGE },
+    { language },
   );
 
-  const language = options?.language ?? DEFAULT_MIGRATION_LANGUAGE;
+  // Newly created path is known — avoid stale negative cache entries.
+  cache?.itemByPath.delete(normalizedPath);
+
   const createdInLanguage = await getSitecoreItemByPathInLanguage(
     instanceUrl,
     accessToken,
@@ -348,6 +515,8 @@ export async function ensureTargetPageExists(
   await ensureSxaPageDataItem(instanceUrl, accessToken, normalizedPath, {
     language,
     sxaPageDataTemplatePath: options?.sxaPageDataTemplatePath,
+    pageDataTemplateId: sxaDataTemplateId,
+    pageVerifiedInLanguage: true,
     sourceLanguages: options?.sourceLanguages,
     sourceLanguage: options?.sourceLanguage,
   });
@@ -364,28 +533,60 @@ export async function ensureTargetPagesExist(
   created: string[];
   existing: string[];
   pathByRequested: Record<string, string>;
+  results: Array<{
+    path: string;
+    resolvedPath: string;
+    created: boolean;
+    error?: string;
+  }>;
 }> {
   const unique = uniqueNormalizedPaths(paths);
+  const cache = options?.cache ?? createTargetPageEnsureCache();
   const created: string[] = [];
   const existing: string[] = [];
   const pathByRequested: Record<string, string> = {};
 
-  for (const path of unique) {
-    const result = await ensureTargetPageExists(
-      instanceUrl,
-      accessToken,
-      path,
-      options,
-    );
-    pathByRequested[path] = result.path;
+  const results = await mapWithConcurrency(
+    unique,
+    TARGET_PAGE_ENSURE_CONCURRENCY,
+    async (path) => {
+      try {
+        const result = await ensureTargetPageExists(
+          instanceUrl,
+          accessToken,
+          path,
+          { ...options, cache },
+        );
+        return {
+          path,
+          resolvedPath: result.path,
+          created: result.created,
+        };
+      } catch (error) {
+        return {
+          path,
+          resolvedPath: path,
+          created: false,
+          error:
+            error instanceof Error ? error.message : "Failed to ensure page.",
+        };
+      }
+    },
+  );
+
+  for (const result of results) {
+    if (result.error) {
+      continue;
+    }
+    pathByRequested[result.path] = result.resolvedPath;
     if (result.created) {
-      created.push(result.path);
+      created.push(result.resolvedPath);
     } else {
-      existing.push(result.path);
+      existing.push(result.resolvedPath);
     }
   }
 
-  return { created, existing, pathByRequested };
+  return { created, existing, pathByRequested, results };
 }
 
 /** Map requested target paths to existing Sitecore paths (exact path or sibling name). */
@@ -395,15 +596,25 @@ export async function resolveQueueTargetPagePaths(
   paths: string[],
 ): Promise<Record<string, string>> {
   const unique = uniqueNormalizedPaths(paths);
+  const cache = createTargetPageEnsureCache();
   const pathByRequested: Record<string, string> = {};
 
-  for (const path of unique) {
-    const resolved = await resolveExistingTargetPage(
-      instanceUrl,
-      accessToken,
-      path,
-    );
-    pathByRequested[path] = resolved.path;
+  const resolved = await mapWithConcurrency(
+    unique,
+    TARGET_PAGE_ENSURE_CONCURRENCY,
+    async (path) => {
+      const result = await resolveExistingTargetPage(
+        instanceUrl,
+        accessToken,
+        path,
+        cache,
+      );
+      return { path, resolvedPath: result.path };
+    },
+  );
+
+  for (const entry of resolved) {
+    pathByRequested[entry.path] = entry.resolvedPath;
   }
 
   return pathByRequested;
