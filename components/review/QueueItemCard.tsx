@@ -43,10 +43,16 @@ function ConfidenceBadge({
 interface QueueItemCardProps {
   item: MigrationQueueItem;
   pageItems?: MigrationQueueItem[];
+  /** Source page URL for the language currently being edited (for CTA/link parsing). */
+  contentSourceUrl?: string;
+  editingLanguage?: string;
   onUpdate: (
     id: string,
     updates: Partial<
-      Pick<MigrationQueueItem, "fields" | "datasourcePath" | "childPlaceholderKey">
+      Pick<
+        MigrationQueueItem,
+        "fields" | "fieldsByLanguage" | "datasourcePath" | "childPlaceholderKey"
+      >
     >,
   ) => void;
   onRemove: (id: string) => void;
@@ -55,9 +61,12 @@ interface QueueItemCardProps {
 export function QueueItemCard({
   item,
   pageItems = [],
+  contentSourceUrl,
+  editingLanguage,
   onUpdate,
   onRemove,
 }: QueueItemCardProps) {
+  const linkSourceUrl = contentSourceUrl?.trim() || item.sourcePageUrl;
   const queueItemsById = new Map(
     (pageItems.length > 0 ? pageItems : [item]).map((queueItem) => [
       queueItem.id,
@@ -148,6 +157,21 @@ export function QueueItemCard({
             Source:{" "}
             <span className="break-all font-mono">{item.sourcePageUrl}</span>
           </p>
+          {editingLanguage && (
+            <p className="mt-1 text-xs text-teal-700">
+              Editing language:{" "}
+              <span className="font-semibold">{editingLanguage}</span>
+              {contentSourceUrl && contentSourceUrl !== item.sourcePageUrl ? (
+                <>
+                  {" "}
+                  ·{" "}
+                  <span className="break-all font-mono text-zinc-600">
+                    {contentSourceUrl}
+                  </span>
+                </>
+              ) : null}
+            </p>
+          )}
         </div>
         <button
           type="button"
@@ -343,7 +367,7 @@ export function QueueItemCard({
                       fieldName={field.sitecoreField}
                       fieldType={field.fieldType}
                       value={field.value}
-                      sourcePageUrl={item.sourcePageUrl}
+                      sourcePageUrl={linkSourceUrl}
                       onChange={(nextValue) => updateField(field.id, nextValue)}
                     />
                   ) : (
