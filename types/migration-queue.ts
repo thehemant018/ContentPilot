@@ -52,4 +52,9 @@ export interface MigrationQueueItem {
   /** hreflang code → URL for alternate source pages (same content, other languages). */
   sourceAlternateUrls?: Record<string, string>;
   fields: EditableFieldValue[];
+  /**
+   * Per-language field edits from Review. When set for a language, push uses these
+   * values instead of re-extracting from the localized source page.
+   */
+  fieldsByLanguage?: Record<string, EditableFieldValue[]>;
 }

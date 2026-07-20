@@ -1,7 +1,7 @@
 "use client";
 
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
-import { useMemo } from "react";
 import { LanguageMultiSelect } from "@/components/review/LanguageMultiSelect";
 import { QueueItemCard } from "@/components/review/QueueItemCard";
 import {
@@ -10,11 +10,44 @@ import {
   reviewSettingsPanelClass,
 } from "@/components/review/form-styles";
 import { DEFAULT_PRESENTATION_PLACEHOLDER } from "@/lib/migration/constants";
+import {
+  getFieldsForLanguage,
+  isSameMigrationLanguage,
+  resolvePrimarySourceLanguage,
+} from "@/lib/migration/queue-language-fields";
+import { resolveLocalizedSourceUrl } from "@/lib/migration/localized-source-url";
 import { buildPageLanguagePicker } from "@/lib/migration/page-language-picker";
 import { listPageRootPlaceholderKeys } from "@/lib/migration/placeholder-registry";
 import { getCrawlResult, getDiscoveryResult } from "@/lib/storage/workflow-data";
 import { getVisualMapperSourceLanguageCodes } from "@/lib/visual-mapper/source-page-languages";
-import type { MigrationQueueItem } from "@/types/migration-queue";
+import type { EditableFieldValue, MigrationQueueItem } from "@/types/migration-queue";
+
+function fieldValuesMatch(
+  left: EditableFieldValue[],
+  right: EditableFieldValue[],
+): boolean {
+  if (left.length !== right.length) {
+    return false;
+  }
+  return left.every((field, index) => field.value === right[index]?.value);
+}
+
+/** True when language fields still need a successful localized load. */
+function needsLanguageFieldLoad(
+  item: MigrationQueueItem,
+  language: string,
+  primaryLanguage: string,
+): boolean {
+  const cached = getFieldsForLanguage(item, language);
+  if (!cached) {
+    return true;
+  }
+  if (isSameMigrationLanguage(language, primaryLanguage)) {
+    return false;
+  }
+  // Prior failed loads cached English values under the FR key — reload those.
+  return fieldValuesMatch(cached, item.fields);
+}
 
 interface PageMigrationGroupProps {
   sourcePageUrl: string;
@@ -34,10 +67,27 @@ interface PageMigrationGroupProps {
   onUpdateItem: (
     id: string,
     updates: Partial<
-      Pick<MigrationQueueItem, "fields" | "datasourcePath" | "childPlaceholderKey">
+      Pick<
+        MigrationQueueItem,
+        "fields" | "fieldsByLanguage" | "datasourcePath" | "childPlaceholderKey"
+      >
     >,
   ) => void;
   onRemoveItem: (id: string) => void;
+}
+
+interface LocalizedFieldsResponse {
+  success: boolean;
+  message?: string;
+  language?: string;
+  items?: Array<{
+    id: string;
+    language: string;
+    fields: EditableFieldValue[];
+    contentSourceUrl: string;
+    localized: boolean;
+    warning?: string;
+  }>;
 }
 
 function PageGroupHeader({
@@ -103,6 +153,20 @@ function PageGroupHeader({
   );
 }
 
+function seedPrimaryFieldsByLanguage(
+  item: MigrationQueueItem,
+): Record<string, EditableFieldValue[]> {
+  const primary = resolvePrimarySourceLanguage(item);
+  const existing = item.fieldsByLanguage ?? {};
+  if (getFieldsForLanguage(item, primary)) {
+    return existing;
+  }
+  return {
+    ...existing,
+    [primary]: item.fields.map((field) => ({ ...field })),
+  };
+}
+
 function PageGroupBody({
   lead,
   sourcePageUrl,
@@ -128,6 +192,287 @@ function PageGroupBody({
   onUpdateItem: PageMigrationGroupProps["onUpdateItem"];
   onRemoveItem: PageMigrationGroupProps["onRemoveItem"];
 }) {
+  const primaryLanguage = resolvePrimarySourceLanguage(lead);
+  const [editingLanguage, setEditingLanguage] = useState(
+    () => selectedLanguages[0] ?? primaryLanguage,
+  );
+  const [loadingLanguage, setLoadingLanguage] = useState(false);
+  const [languageFeedback, setLanguageFeedback] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (selectedLanguages.length === 0) {
+      return;
+    }
+    if (!selectedLanguages.includes(editingLanguage)) {
+      setEditingLanguage(selectedLanguages[0]!);
+    }
+  }, [selectedLanguages, editingLanguage]);
+
+  const contentSourceUrl = useMemo(() => {
+    return resolveLocalizedSourceUrl(sourcePageUrl, editingLanguage, {
+      alternateUrls: lead.sourceAlternateUrls,
+      primarySourceLanguage: primaryLanguage,
+    });
+  }, [
+    sourcePageUrl,
+    editingLanguage,
+    lead.sourceAlternateUrls,
+    primaryLanguage,
+  ]);
+
+  const ensureLanguageFieldsLoaded = useCallback(
+    async (language: string) => {
+      const needsLoad = items.some((item) =>
+        needsLanguageFieldLoad(item, language, primaryLanguage),
+      );
+
+      console.info("[Review][Edit language] ensureLanguageFieldsLoaded", {
+        language,
+        primaryLanguage,
+        needsLoad,
+        itemCount: items.length,
+        itemsMissingFields: items
+          .filter((item) =>
+            needsLanguageFieldLoad(item, language, primaryLanguage),
+          )
+          .map((item) => ({
+            id: item.id,
+            blockId: item.blockId,
+            sourcePageUrl: item.sourcePageUrl,
+            alternateUrls: item.sourceAlternateUrls,
+            hadStaleCache: Boolean(getFieldsForLanguage(item, language)),
+          })),
+      });
+
+      if (!needsLoad) {
+        console.info(
+          "[Review][Edit language] skipped — fields already loaded for",
+          language,
+        );
+        return;
+      }
+
+      setLoadingLanguage(true);
+      setLanguageFeedback(null);
+
+      try {
+        // Seed primary language from current fields without a network round-trip.
+        if (isSameMigrationLanguage(language, primaryLanguage)) {
+          console.info(
+            "[Review][Edit language] seeding primary language fields locally",
+            { language, primaryLanguage },
+          );
+          for (const item of items) {
+            if (getFieldsForLanguage(item, language)) {
+              continue;
+            }
+            onUpdateItem(item.id, {
+              fieldsByLanguage: seedPrimaryFieldsByLanguage(item),
+            });
+          }
+          return;
+        }
+
+        const crawlPages = getCrawlResult()?.pages ?? [];
+        const requestBody = {
+          language,
+          items,
+          sourcePages: crawlPages,
+        };
+        console.info("[Review][Edit language] POST /api/migration/localize-fields", {
+          language,
+          itemCount: items.length,
+          crawlPageCount: crawlPages.length,
+          crawlPageUrls: crawlPages.map((page) => page.url),
+          sampleAlternates: items[0]?.sourceAlternateUrls,
+          bodyApproxChars: JSON.stringify(requestBody).length,
+        });
+
+        let response: Response;
+        try {
+          response = await fetch("/api/migration/localize-fields", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(requestBody),
+          });
+        } catch (networkError) {
+          console.error(
+            "[Review][Edit language] browser fetch threw (often shown as Failed to fetch)",
+            {
+              language,
+              error:
+                networkError instanceof Error
+                  ? {
+                      name: networkError.name,
+                      message: networkError.message,
+                      cause: (networkError as Error & { cause?: unknown }).cause,
+                      stack: networkError.stack,
+                    }
+                  : networkError,
+            },
+          );
+          throw networkError;
+        }
+
+        console.info("[Review][Edit language] API response status", {
+          language,
+          ok: response.ok,
+          status: response.status,
+          statusText: response.statusText,
+        });
+
+        let payload: LocalizedFieldsResponse;
+        try {
+          payload = (await response.json()) as LocalizedFieldsResponse;
+        } catch (parseError) {
+          console.error(
+            "[Review][Edit language] failed to parse API JSON response",
+            {
+              language,
+              status: response.status,
+              parseError,
+            },
+          );
+          throw parseError;
+        }
+
+        console.info("[Review][Edit language] API payload", {
+          language,
+          success: payload.success,
+          message: payload.message,
+          itemCount: payload.items?.length,
+          warnings: payload.items
+            ?.map((entry) => entry.warning)
+            .filter(Boolean),
+          contentSourceUrls: payload.items?.map((entry) => ({
+            id: entry.id,
+            contentSourceUrl: entry.contentSourceUrl,
+            localized: entry.localized,
+          })),
+        });
+
+        if (!response.ok || !payload.success || !payload.items) {
+          setLanguageFeedback(
+            payload.message || "Failed to load content for this language.",
+          );
+          console.error(
+            "[Review][Edit language] localize-fields returned failure",
+            {
+              language,
+              status: response.status,
+              payload,
+            },
+          );
+          return;
+        }
+
+        const warnings: string[] = [];
+        for (const localized of payload.items) {
+          const item = items.find((entry) => entry.id === localized.id);
+          if (!item) {
+            continue;
+          }
+          if (localized.warning) {
+            warnings.push(localized.warning);
+          }
+
+          // Only persist successfully localized content — avoid caching EN under FR.
+          if (!localized.localized) {
+            console.warn(
+              "[Review][Edit language] skipping cache for non-localized result",
+              {
+                id: localized.id,
+                language,
+                warning: localized.warning,
+              },
+            );
+            continue;
+          }
+
+          const nextByLanguage = {
+            ...(item.fieldsByLanguage ?? {}),
+            [language]: localized.fields,
+          };
+
+          onUpdateItem(item.id, {
+            fieldsByLanguage: nextByLanguage,
+          });
+        }
+
+        if (warnings.length > 0) {
+          console.warn(
+            "[Review][Edit language] localization warnings",
+            warnings,
+          );
+          setLanguageFeedback(warnings[0] ?? null);
+        } else {
+          console.info(
+            "[Review][Edit language] loaded fields successfully for",
+            language,
+          );
+        }
+      } catch (error) {
+        console.error("[Review][Edit language] ensureLanguageFieldsLoaded failed", {
+          language,
+          error:
+            error instanceof Error
+              ? {
+                  name: error.name,
+                  message: error.message,
+                  cause: (error as Error & { cause?: unknown }).cause,
+                  stack: error.stack,
+                }
+              : error,
+        });
+        setLanguageFeedback(
+          error instanceof Error
+            ? error.message
+            : "Failed to load content for this language.",
+        );
+      } finally {
+        setLoadingLanguage(false);
+      }
+    },
+    [items, onUpdateItem, primaryLanguage],
+  );
+
+  useEffect(() => {
+    void ensureLanguageFieldsLoaded(editingLanguage);
+  }, [editingLanguage, ensureLanguageFieldsLoaded]);
+
+  async function handleEditingLanguageChange(language: string) {
+    setEditingLanguage(language);
+    await ensureLanguageFieldsLoaded(language);
+  }
+
+  function handleItemFieldsUpdate(
+    id: string,
+    fields: EditableFieldValue[],
+  ): void {
+    const item = items.find((entry) => entry.id === id);
+    if (!item) {
+      return;
+    }
+
+    const nextByLanguage = {
+      ...(item.fieldsByLanguage ?? {}),
+      [editingLanguage]: fields,
+    };
+
+    // Keep top-level fields in sync when editing the primary source language.
+    if (isSameMigrationLanguage(editingLanguage, primaryLanguage)) {
+      onUpdateItem(id, {
+        fields,
+        fieldsByLanguage: nextByLanguage,
+      });
+      return;
+    }
+
+    onUpdateItem(id, {
+      fieldsByLanguage: nextByLanguage,
+    });
+  }
+
   const sortedItems = [...items].sort((left, right) => {
     const leftDepth = left.presentationDepth ?? 0;
     const rightDepth = right.presentationDepth ?? 0;
@@ -224,25 +569,109 @@ function PageGroupBody({
               push.
             </p>
           </div>
+          {selectedLanguages.length > 0 && (
+            <div className="md:col-span-3">
+              <p className={reviewLabelClass}>Edit content for language</p>
+              <div
+                role="radiogroup"
+                aria-label="Edit content language"
+                className="mt-1.5 flex flex-wrap gap-1.5"
+              >
+                {selectedLanguages.map((language) => {
+                  const isActive = language === editingLanguage;
+                  const isSource = isSameMigrationLanguage(
+                    language,
+                    primaryLanguage,
+                  );
+                  return (
+                    <button
+                      key={language}
+                      type="button"
+                      role="radio"
+                      aria-checked={isActive}
+                      id={`edit-language-${lead.id}-${language}`}
+                      disabled={loadingLanguage && !isActive}
+                      onClick={() => {
+                        void handleEditingLanguageChange(language);
+                      }}
+                      className={`inline-flex items-center gap-1 rounded-md border px-2 py-1 font-mono text-xs font-semibold transition-colors ${
+                        isActive
+                          ? "border-brand bg-brand text-white"
+                          : "border-line bg-surface text-slate-700 hover:border-brand/30 hover:bg-brand-soft hover:text-brand-dark"
+                      } disabled:cursor-wait disabled:opacity-70`}
+                    >
+                      {language}
+                      {isSource ? (
+                        <span
+                          className={`text-[9px] font-semibold uppercase tracking-wide ${
+                            isActive ? "text-white/80" : "text-slate-400"
+                          }`}
+                        >
+                          src
+                        </span>
+                      ) : null}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="mt-1.5 text-xs text-zinc-600">
+                {loadingLanguage
+                  ? `Loading ${editingLanguage} content…`
+                  : `Editing ${editingLanguage} field values (including CTAs).`}
+                {contentSourceUrl !== sourcePageUrl ? (
+                  <>
+                    {" "}
+                    <span className="break-all font-mono text-zinc-500">
+                      {contentSourceUrl}
+                    </span>
+                  </>
+                ) : null}
+              </p>
+              {languageFeedback && (
+                <p className="mt-1 text-xs text-amber-700">{languageFeedback}</p>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
       <div className="mt-5 space-y-4">
-        {sortedItems.map((item) => (
-          <div
-            key={item.id}
-            style={{
-              marginLeft: `${Math.min(item.presentationDepth ?? 0, 4) * 1.25}rem`,
-            }}
-          >
-            <QueueItemCard
-              item={item}
-              pageItems={items}
-              onUpdate={onUpdateItem}
-              onRemove={onRemoveItem}
-            />
-          </div>
-        ))}
+        {sortedItems.map((item) => {
+          const languageFields =
+            getFieldsForLanguage(item, editingLanguage) ?? item.fields;
+
+          return (
+            <div
+              key={item.id}
+              style={{
+                marginLeft: `${Math.min(item.presentationDepth ?? 0, 4) * 1.25}rem`,
+              }}
+            >
+              <QueueItemCard
+                item={{
+                  ...item,
+                  fields: languageFields,
+                }}
+                pageItems={items}
+                contentSourceUrl={contentSourceUrl}
+                editingLanguage={editingLanguage}
+                onUpdate={(id, updates) => {
+                  if (updates.fields) {
+                    handleItemFieldsUpdate(id, updates.fields);
+                    const rest = { ...updates };
+                    delete rest.fields;
+                    if (Object.keys(rest).length > 0) {
+                      onUpdateItem(id, rest);
+                    }
+                    return;
+                  }
+                  onUpdateItem(id, updates);
+                }}
+                onRemove={onRemoveItem}
+              />
+            </div>
+          );
+        })}
       </div>
     </>
   );

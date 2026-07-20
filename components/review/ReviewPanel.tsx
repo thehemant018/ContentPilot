@@ -98,7 +98,10 @@ export function ReviewPanel({ embedded = false }: { embedded?: boolean }) {
   function handleUpdateItem(
     id: string,
     updates: Partial<
-      Pick<MigrationQueueItem, "fields" | "datasourcePath">
+      Pick<
+        MigrationQueueItem,
+        "fields" | "fieldsByLanguage" | "datasourcePath"
+      >
     >,
   ): void {
     updateQueueItem(id, updates);
@@ -202,7 +205,8 @@ export function ReviewPanel({ embedded = false }: { embedded?: boolean }) {
           Set target page paths and SXA placeholders once per source page.
           Each component keeps its own datasource path and field content.
           Language is mapped from the crawled page to the matching Sitecore
-          language discovered in Phase 2.
+          language discovered in Phase 2. Use &quot;Edit content for language&quot;
+          to load and edit each version&apos;s fields (including CTAs) before push.
           When you push in Migrate, the queue is sent directly to Sitecore - nothing
           is written to disk.
         </p>

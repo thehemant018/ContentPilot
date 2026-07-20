@@ -274,6 +274,7 @@ export function updateQueueItem(
       MigrationQueueItem,
       | "targetPagePath"
       | "fields"
+      | "fieldsByLanguage"
       | "placeholder"
       | "datasourcePath"
       | "language"
