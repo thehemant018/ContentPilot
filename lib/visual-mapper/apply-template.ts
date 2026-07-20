@@ -14,6 +14,7 @@ import {
 } from "@/lib/visual-mapper/source-page-languages";
 import { resolveTargetPagePath, pageNameFromTargetPath } from "@/lib/visual-mapper/target-path-pattern";
 import { componentTemplateKey } from "@/lib/visual-mapper/template-key";
+import type { SourcePageLanguage } from "@/types/language";
 import type {
   BulkApplyPageResult,
   BulkApplyResult,
@@ -27,9 +28,15 @@ import type {
 export function buildPageMappingTemplate(
   mappings: MappingEntry[],
   templatePageUrl: string,
+  options?: {
+    selectedLanguages?: string[];
+    languages?: SourcePageLanguage;
+  },
 ): PageMappingTemplate {
   return {
     templatePageUrl,
+    selectedLanguages: options?.selectedLanguages?.filter(Boolean),
+    languages: options?.languages,
     components: mappings.map((entry) => ({
       templateKey:
         entry.templateKey ??
@@ -173,6 +180,7 @@ export function applyTemplateToHtml(
   pageUrl: string,
   template: PageMappingTemplate,
   targetPagePathPattern = "",
+  languages?: SourcePageLanguage,
 ): BulkApplyPageResult {
   const $ = cheerio.load(html);
   const mappings: MappingEntry[] = [];
@@ -190,6 +198,8 @@ export function applyTemplateToHtml(
 
   const status = deriveApplyStatus(mappings, missingFields);
   const targetPagePath = resolveTargetPagePath(targetPagePathPattern, pageUrl);
+  const pageLanguages =
+    languages ?? extractVisualMapperSourceLanguages(html, pageUrl);
 
   return {
     url: pageUrl,
@@ -199,6 +209,7 @@ export function applyTemplateToHtml(
     pageName: pageNameFromTargetPath(targetPagePath),
     missingFields: [...new Set(missingFields)],
     pageTitle: extractPageTitle($),
+    languages: pageLanguages,
   };
 }
 
@@ -210,8 +221,15 @@ export async function applyTemplateToPage(
   try {
     const html = await fetchPageHtml(pageUrl);
     const languages = extractVisualMapperSourceLanguages(html, pageUrl);
+    // Client-side only; no-op on the server API route.
     saveVisualMapperSourceLanguages(pageUrl, languages);
-    return applyTemplateToHtml(html, pageUrl, template, targetPagePathPattern);
+    return applyTemplateToHtml(
+      html,
+      pageUrl,
+      template,
+      targetPagePathPattern,
+      languages,
+    );
   } catch (error) {
     return {
       url: pageUrl,

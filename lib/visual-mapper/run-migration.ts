@@ -19,6 +19,7 @@ import { getDiscoveryResult } from "@/lib/storage/workflow-data";
 import { useVisualMapperStore } from "@/lib/visual-mapper/store";
 import type { BlockMatchResult } from "@/types/ai-match";
 import type { RenderingPlaceholderProfile } from "@/types/discovery";
+import type { SourcePageLanguage } from "@/types/language";
 import type { MappingEntry } from "@/types/visual-mapper";
 import type { MigrationQueueItem } from "@/types/migration-queue";
 
@@ -33,13 +34,35 @@ function prepareVisualMapperQueueItems(
   });
 }
 
-function visualMapperLanguageOptions(pageUrl: string) {
+interface MappingLanguageOverrides {
+  /** Prefer these Sitecore language names (from template session). */
+  selectedLanguages?: string[];
+  /** Prefer this page's detection over localStorage lookup. */
+  languages?: SourcePageLanguage | null;
+}
+
+function visualMapperLanguageOptions(
+  pageUrl: string,
+  overrides?: MappingLanguageOverrides,
+) {
   const discovery = getDiscoveryResult();
   const siteLanguages = discovery?.siteLanguages ?? [];
   const instanceLanguages = discovery?.instanceLanguages ?? [];
-  const pageLanguages = getVisualMapperSourceLanguages(pageUrl);
-  const sourceLanguages = getVisualMapperSourceLanguageCodes(pageUrl);
+  const pageLanguages =
+    overrides?.languages ?? getVisualMapperSourceLanguages(pageUrl);
+  const sourceLanguages = pageLanguages
+    ? [
+        ...(pageLanguages.detectedLanguage
+          ? [pageLanguages.detectedLanguage]
+          : []),
+        ...pageLanguages.availableLanguages,
+      ].filter((code, index, all) => all.indexOf(code) === index)
+    : getVisualMapperSourceLanguageCodes(pageUrl);
   const selectedFromStore = useVisualMapperStore.getState().selectedLanguages;
+  const selectedLanguages =
+    overrides?.selectedLanguages && overrides.selectedLanguages.length > 0
+      ? overrides.selectedLanguages
+      : selectedFromStore;
 
   return {
     discovery,
@@ -48,7 +71,7 @@ function visualMapperLanguageOptions(pageUrl: string) {
     sourceLanguages,
     pageLanguage: pageLanguages?.detectedLanguage,
     sourceAlternateUrls: pageLanguages?.alternateUrls,
-    selectedLanguages: selectedFromStore,
+    selectedLanguages,
   };
 }
 
@@ -58,6 +81,7 @@ export function mappingEntriesToQueueItems(
   pageTitle: string,
   targetPagePath: string,
   renderingProfiles?: RenderingPlaceholderProfile[],
+  languageOverrides?: MappingLanguageOverrides,
 ): MigrationQueueItem[] {
   const {
     discovery,
@@ -67,7 +91,7 @@ export function mappingEntriesToQueueItems(
     pageLanguage,
     sourceAlternateUrls,
     selectedLanguages,
-  } = visualMapperLanguageOptions(pageUrl);
+  } = visualMapperLanguageOptions(pageUrl, languageOverrides);
   const profiles = renderingProfiles ?? discovery?.renderingProfiles;
   const placeholders = discovery?.placeholders;
   const { matches } = prepareVisualMapperMigration(entries, pageUrl, pageTitle);
@@ -166,6 +190,10 @@ export interface BulkQueuePageInput {
   pageUrl: string;
   pageTitle: string;
   targetPagePath: string;
+  /** Sitecore languages from the template mapping session. */
+  selectedLanguages?: string[];
+  /** Languages detected on this bulk-applied page. */
+  languages?: SourcePageLanguage | null;
 }
 
 /** Build queue items for bulk-applied pages without modifying the stored queue. */
@@ -185,6 +213,11 @@ export function buildBulkApplyQueueItems(
         page.pageUrl,
         page.pageTitle,
         page.targetPagePath,
+        undefined,
+        {
+          selectedLanguages: page.selectedLanguages,
+          languages: page.languages,
+        },
       ),
     );
   }
@@ -210,6 +243,11 @@ export function appendBulkApplyToMigrationQueue(
       page.pageUrl,
       page.pageTitle,
       page.targetPagePath,
+      undefined,
+      {
+        selectedLanguages: page.selectedLanguages,
+        languages: page.languages,
+      },
     );
     const existingKeys = new Set(
       items.map((item) => queueItemKey(item.blockId, item.sourcePageUrl)),

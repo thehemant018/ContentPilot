@@ -3,6 +3,7 @@ import {
   applyTemplateToUrls,
   buildPageMappingTemplate,
 } from "@/lib/visual-mapper/apply-template";
+import type { SourcePageLanguage } from "@/types/language";
 import type { MappingEntry, PageMappingTemplate } from "@/types/visual-mapper";
 
 function jsonError(message: string, status = 400): NextResponse {
@@ -15,6 +16,8 @@ interface ApplyTemplateRequestBody {
   template?: PageMappingTemplate;
   urls?: string[];
   targetPagePathPattern?: string;
+  selectedLanguages?: string[];
+  languages?: SourcePageLanguage;
 }
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
@@ -53,7 +56,22 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         "Provide template or both mappings and templatePageUrl.",
       );
     }
-    template = buildPageMappingTemplate(mappings, templatePageUrl);
+    template = buildPageMappingTemplate(mappings, templatePageUrl, {
+      selectedLanguages: body.selectedLanguages,
+      languages: body.languages,
+    });
+  } else if (
+    (body.selectedLanguages?.length || body.languages) &&
+    (!template.selectedLanguages?.length || !template.languages)
+  ) {
+    template = {
+      ...template,
+      selectedLanguages:
+        template.selectedLanguages?.length
+          ? template.selectedLanguages
+          : body.selectedLanguages,
+      languages: template.languages ?? body.languages,
+    };
   }
 
   if (template.components.length === 0) {
