@@ -29,6 +29,41 @@ export function unwrapProxiedUrl(url: string): string {
   return trimmed;
 }
 
+/** Next.js image optimizer paths are media URLs, not page navigation links. */
+export function isNextImageOptimizerUrl(url: string): boolean {
+  const trimmed = url.trim();
+  if (!trimmed) {
+    return false;
+  }
+
+  try {
+    const parsed = new URL(trimmed, "https://example.local");
+    return /\/_next\/image\/?$/i.test(parsed.pathname);
+  } catch {
+    return /\/_next\/image/i.test(trimmed);
+  }
+}
+
+/** Prefer the real asset URL inside /_next/image?url=... when present. */
+export function unwrapNextImageUrl(url: string): string {
+  const trimmed = url.trim();
+  if (!trimmed || !isNextImageOptimizerUrl(trimmed)) {
+    return trimmed;
+  }
+
+  try {
+    const parsed = new URL(trimmed, "https://example.local");
+    const inner = parsed.searchParams.get("url");
+    if (inner?.trim()) {
+      return decodeURIComponent(inner.trim());
+    }
+  } catch {
+    // keep original
+  }
+
+  return trimmed;
+}
+
 export function resolveNavigationHref(
   raw: string,
   pageSourceUrl: string,
@@ -52,5 +87,5 @@ export function resolveNavigationHref(
 
 export function resolveMediaSrc(raw: string, pageSourceUrl: string): string {
   const resolved = resolveNavigationHref(raw, pageSourceUrl);
-  return unwrapProxiedUrl(resolved);
+  return unwrapNextImageUrl(unwrapProxiedUrl(resolved));
 }

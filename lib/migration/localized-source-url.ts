@@ -24,9 +24,47 @@ function localePathCandidates(language: string): string[] {
   return [...new Set(candidates.filter(Boolean))];
 }
 
+function isUnreliableAlternateHost(hostname: string): boolean {
+  const host = hostname.trim().toLowerCase();
+  return (
+    host === "example.com" ||
+    host.endsWith(".example") ||
+    host.endsWith(".example.com") ||
+    host === "localhost" ||
+    host === "127.0.0.1"
+  );
+}
+
+/**
+ * Keep alternate path/query but force the crawled page's origin when hreflang
+ * points at a different (often placeholder) host.
+ */
+export function rebaseAlternateUrlOntoSourceOrigin(
+  alternateUrl: string,
+  sourcePageUrl: string,
+): string {
+  try {
+    const alternate = new URL(alternateUrl);
+    const source = new URL(sourcePageUrl);
+
+    if (alternate.origin === source.origin) {
+      return alternate.toString();
+    }
+
+    const rebased = new URL(source.origin);
+    rebased.pathname = alternate.pathname;
+    rebased.search = alternate.search;
+    rebased.hash = alternate.hash;
+    return rebased.toString();
+  } catch {
+    return alternateUrl;
+  }
+}
+
 function resolveAlternateUrl(
   alternateUrls: Record<string, string> | undefined,
   targetLanguage: string,
+  sourcePageUrl: string,
 ): string | undefined {
   if (!alternateUrls) {
     return undefined;
@@ -35,8 +73,34 @@ function resolveAlternateUrl(
   const normalizedTarget = normalizeLanguageCode(targetLanguage);
   for (const [code, url] of Object.entries(alternateUrls)) {
     const normalizedCode = normalizeLanguageCode(code);
-    if (matchesLanguageCode(normalizedCode, normalizedTarget)) {
-      return url.trim() || undefined;
+    if (!matchesLanguageCode(normalizedCode, normalizedTarget)) {
+      continue;
+    }
+
+    const trimmed = url.trim();
+    if (!trimmed) {
+      continue;
+    }
+
+    try {
+      const alternate = new URL(trimmed, sourcePageUrl);
+      const source = new URL(sourcePageUrl);
+
+      if (alternate.origin === source.origin) {
+        return alternate.toString();
+      }
+
+      if (
+        isUnreliableAlternateHost(alternate.hostname) ||
+        alternate.origin !== source.origin
+      ) {
+        return rebaseAlternateUrlOntoSourceOrigin(
+          alternate.toString(),
+          sourcePageUrl,
+        );
+      }
+    } catch {
+      continue;
     }
   }
 
@@ -108,7 +172,8 @@ export interface ResolveLocalizedSourceUrlOptions {
 
 /**
  * Resolves the source website URL for a target Sitecore language.
- * Prefers hreflang alternates, then swaps the URL locale segment.
+ * Prefers hreflang alternates (rebased onto the crawled origin when needed),
+ * then swaps the URL locale segment.
  */
 export function resolveLocalizedSourceUrl(
   sourcePageUrl: string,
@@ -129,6 +194,7 @@ export function resolveLocalizedSourceUrl(
   const fromAlternate = resolveAlternateUrl(
     options?.alternateUrls,
     targetLanguage,
+    sourcePageUrl,
   );
   if (fromAlternate) {
     return fromAlternate;

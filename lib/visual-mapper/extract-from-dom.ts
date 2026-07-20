@@ -6,16 +6,59 @@ import { resolveNavigationHref } from "@/lib/visual-mapper/resolve-extracted-url
 
 type CheerioElement = Cheerio<AnyNode>;
 
+function isUsableNavigationHref(href: string): boolean {
+  const trimmed = href.trim();
+  if (!trimmed || /^(#|javascript:|mailto:|tel:)/i.test(trimmed)) {
+    return false;
+  }
+  try {
+    const path = new URL(trimmed, "https://example.local").pathname;
+    if (/\/_next\/image\/?$/i.test(path) || /\/_next\/static\//i.test(path)) {
+      return false;
+    }
+  } catch {
+    if (/\/_next\/image/i.test(trimmed)) {
+      return false;
+    }
+  }
+  return true;
+}
+
 function findLinkElement($: CheerioAPI, el: CheerioElement): CheerioElement | null {
-  if (el.is("a")) {
+  if (el.is("a") && isUsableNavigationHref(el.attr("href") || "")) {
     return el;
   }
-  const anchor = el.closest("a");
-  if (anchor.length > 0) {
-    return anchor;
+
+  // Walk ancestors for a real page link (skip image-optimizer / empty hrefs).
+  let current: CheerioElement | null = el;
+  while (current && current.length > 0 && !current.is("html")) {
+    if (current.is("a") && isUsableNavigationHref(current.attr("href") || "")) {
+      return current;
+    }
+    const roleLink = current.is("[role='link']") ? current : null;
+    if (roleLink) {
+      const href =
+        roleLink.attr("href") ||
+        roleLink.attr("data-href") ||
+        roleLink.attr("data-url") ||
+        roleLink.attr("data-link") ||
+        "";
+      if (isUsableNavigationHref(href)) {
+        return roleLink;
+      }
+    }
+    current = current.parent();
   }
-  const roleLink = el.closest("[role='link']");
-  return roleLink.length > 0 ? roleLink : null;
+
+  const nested = el.find("a[href]").toArray();
+  for (const node of nested) {
+    const candidate = $(node);
+    if (isUsableNavigationHref(candidate.attr("href") || "")) {
+      return candidate;
+    }
+  }
+
+  return null;
 }
 
 function extractLinkText($: CheerioAPI, el: CheerioElement): string {

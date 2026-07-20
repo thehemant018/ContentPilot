@@ -9,6 +9,7 @@ import {
   type LinkKind,
 } from "@/lib/migration/link-field";
 import {
+  isNextImageOptimizerUrl,
   resolveMediaSrc,
   resolveNavigationHref,
 } from "@/lib/visual-mapper/resolve-extracted-url";
@@ -42,6 +43,25 @@ function fieldValueFromContent(
   const typeLower = fieldType.toLowerCase();
   const nameLower = fieldName.toLowerCase();
 
+  // Link/CTA fields must win over content.isImage — card CTAs often wrap <img>
+  // (Next.js /_next/image src must not be stored as the General Link URL).
+  if (isLinkField(fieldName, fieldType)) {
+    if (!content.href?.trim()) {
+      return { value: "", preview: "" };
+    }
+    const href = resolveNavigationHref(content.href, pageUrl);
+    if (isNextImageOptimizerUrl(href)) {
+      return { value: "", preview: "" };
+    }
+    const built = buildLinkFieldAssignment(
+      href,
+      pageUrl,
+      content.text,
+      content.linkTarget,
+    );
+    return { value: built.value, preview: built.valuePreview };
+  }
+
   if (
     typeLower.includes("image") ||
     IMAGE_FIELD_PATTERN.test(nameLower) ||
@@ -51,20 +71,6 @@ function fieldValueFromContent(
       content.src || content.html.match(/src=["']([^"']+)["']/i)?.[1] || "";
     const src = resolveMediaSrc(raw, pageUrl);
     return { value: src, preview: src ? truncatePreview(src, 60) : "" };
-  }
-
-  if (isLinkField(fieldName, fieldType)) {
-    if (!content.href?.trim()) {
-      return { value: "", preview: "" };
-    }
-    const href = resolveNavigationHref(content.href, pageUrl);
-    const built = buildLinkFieldAssignment(
-      href,
-      pageUrl,
-      content.text,
-      content.linkTarget,
-    );
-    return { value: built.value, preview: built.valuePreview };
   }
 
   if (content.isRichText || typeLower.includes("rich")) {

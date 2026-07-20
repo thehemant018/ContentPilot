@@ -70,6 +70,26 @@ export async function resolveLinkFieldsForComponent(
     }
 
     if (parsed.linkType === "internal") {
+      const urlPath = parsed.path ?? (() => {
+        try {
+          return new URL(parsed.url).pathname;
+        } catch {
+          return parsed.url;
+        }
+      })();
+
+      if (/\/_next\/image\/?$/i.test(urlPath) || /\/_next\//i.test(urlPath)) {
+        warnings.push(
+          `Link field "${meta.name}" pointed at a Next.js asset path "${urlPath}" (not a page). Remap the CTA to an <a href> in Visual Mapper / Review.`,
+        );
+        fields[meta.name] = formatSitecoreGeneralLink({
+          ...parsed,
+          linkType: "external",
+        });
+        fallbackExternalCount += 1;
+        continue;
+      }
+
       const itemId = await resolveInternalLinkItemId(
         instanceUrl,
         accessToken,

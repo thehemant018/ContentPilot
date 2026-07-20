@@ -53,4 +53,26 @@ describe("resolveLocalizedSourceUrl", () => {
       }),
     ).toBe(SEISMIC_FR);
   });
+
+  it("rebases placeholder hreflang hosts onto the crawled origin", () => {
+    expect(
+      resolveLocalizedSourceUrl("https://byte-canvas-eta.vercel.app/en", "fr-FR", {
+        primarySourceLanguage: "en",
+        alternateUrls: {
+          en: "https://bytecanvas.example/en",
+          fr: "https://bytecanvas.example/fr",
+        },
+      }),
+    ).toBe("https://byte-canvas-eta.vercel.app/fr");
+  });
+
+  it("maps Seismic product-tour EN to FR locale path", () => {
+    expect(
+      resolveLocalizedSourceUrl(
+        "https://www.seismic.com/resources/product-tour",
+        "fr-FR",
+        { primarySourceLanguage: "en" },
+      ),
+    ).toBe("https://www.seismic.com/fr/resources/product-tour");
+  });
 });

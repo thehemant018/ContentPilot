@@ -13,7 +13,11 @@ import { DiscoveryResults } from "@/components/discovery/DiscoveryResults";
 import { SiteSelector } from "@/components/discovery/SiteSelector";
 import { NextPhaseButton } from "@/components/workflow/NextPhaseButton";
 import { markDiscoveryPhaseComplete } from "@/lib/workflow/progress";
-import { saveDiscoveryResult, getDiscoveryResult } from "@/lib/storage/workflow-data";
+import {
+  saveDiscoveryResult,
+  getDiscoveryResult,
+  WORKFLOW_DATA_CHANGED_EVENT,
+} from "@/lib/storage/workflow-data";
 import { DEFAULT_SXA_PAGE_DATA_TEMPLATE_PATH } from "@/lib/migration/sxa-page-structure";
 import { saveVisualMapperSiteId } from "@/lib/visual-mapper/session-storage";
 
@@ -22,12 +26,32 @@ const DEFAULT_PLACEHOLDERS_PATH = "/sitecore/layout/Placeholder Settings";
 const DEFAULT_MEDIA_PATH = "/sitecore/media";
 const DEFAULT_TEMPLATES_PATH = "/sitecore/templates";
 
+function resolveSiteFromDiscovery(
+  sites: SitecoreSite[],
+  saved: DiscoveryResult | null,
+): SitecoreSite | null {
+  if (!saved || sites.length === 0) {
+    return null;
+  }
+
+  return (
+    sites.find(
+      (site) =>
+        (saved.selectedSiteName && site.name === saved.selectedSiteName) ||
+        (saved.selectedSiteRootPath &&
+          site.rootPath === saved.selectedSiteRootPath),
+    ) ?? null
+  );
+}
+
 export function DiscoveryPanel({ embedded = false }: { embedded?: boolean }) {
   const [isConnected, setIsConnected] = useState(false);
   const [sites, setSites] = useState<SitecoreSite[]>([]);
   const [selectedSite, setSelectedSite] = useState<SitecoreSite | null>(null);
   const [renderingsPath, setRenderingsPath] = useState(DEFAULT_RENDERINGS_PATH);
-  const [placeholdersPath, setPlaceholdersPath] = useState(DEFAULT_PLACEHOLDERS_PATH);
+  const [placeholdersPath, setPlaceholdersPath] = useState(
+    DEFAULT_PLACEHOLDERS_PATH,
+  );
   const [mediaPath, setMediaPath] = useState(DEFAULT_MEDIA_PATH);
   const [templatesPath, setTemplatesPath] = useState(DEFAULT_TEMPLATES_PATH);
   const [pageTemplatePath, setPageTemplatePath] = useState("");
@@ -47,9 +71,40 @@ export function DiscoveryPanel({ embedded = false }: { embedded?: boolean }) {
     setIsConnected(Boolean(session && !isSessionExpired(session)));
   }
 
+  function hydrateFromSavedDiscovery(
+    saved: DiscoveryResult | null = getDiscoveryResult(),
+  ): boolean {
+    if (!saved?.success) {
+      return false;
+    }
+
+    setResult(saved);
+    setFeedback({
+      type: "success",
+      message:
+        saved.message ||
+        "Previous discovery results restored. Re-validate if your Sitecore paths changed.",
+    });
+
+    if (saved.mediaPath?.trim()) {
+      setMediaPath(saved.mediaPath.trim());
+    }
+    if (saved.placeholdersPath?.trim()) {
+      setPlaceholdersPath(saved.placeholdersPath.trim());
+    }
+    if (saved.pageTemplatePath) {
+      setPageTemplatePath(saved.pageTemplatePath);
+    }
+    if (saved.sxaPageDataTemplatePath) {
+      setSxaPageDataTemplatePath(saved.sxaPageDataTemplatePath);
+    }
+
+    return true;
+  }
+
   async function loadSites() {
     setIsLoadingSites(true);
-    setFeedback(null);
+    setFeedback((current) => (current?.type === "error" ? null : current));
 
     try {
       const response = await sitecoreApiFetch("/api/sitecore/sites");
@@ -69,8 +124,12 @@ export function DiscoveryPanel({ embedded = false }: { embedded?: boolean }) {
       }
 
       setSites(payload.sites);
-      if (payload.sites.length === 1) {
-        setSelectedSite(payload.sites[0]);
+      const saved = getDiscoveryResult();
+      const matchedSite = resolveSiteFromDiscovery(payload.sites, saved);
+      if (matchedSite) {
+        setSelectedSite(matchedSite);
+      } else if (payload.sites.length === 1) {
+        setSelectedSite(payload.sites[0]!);
       }
     } catch (error) {
       setFeedback({
@@ -87,26 +146,42 @@ export function DiscoveryPanel({ embedded = false }: { embedded?: boolean }) {
   useEffect(() => {
     queueMicrotask(() => {
       refreshConnectionState();
-      const saved = getDiscoveryResult();
-      if (saved?.pageTemplatePath) {
-        setPageTemplatePath(saved.pageTemplatePath);
-      }
-      if (saved?.sxaPageDataTemplatePath) {
-        setSxaPageDataTemplatePath(saved.sxaPageDataTemplatePath);
-      }
+      hydrateFromSavedDiscovery();
     });
 
     function handleSessionChange() {
       refreshConnectionState();
       setSites([]);
       setSelectedSite(null);
+
+      const session = getStoredSession();
+      if (session && !isSessionExpired(session) && hydrateFromSavedDiscovery()) {
+        return;
+      }
+
       setResult(null);
       setFeedback(null);
     }
 
+    function handleWorkflowDataChanged() {
+      if (!getDiscoveryResult()?.success) {
+        return;
+      }
+      hydrateFromSavedDiscovery();
+    }
+
     window.addEventListener(SESSION_CHANGED_EVENT, handleSessionChange);
-    return () =>
+    window.addEventListener(
+      WORKFLOW_DATA_CHANGED_EVENT,
+      handleWorkflowDataChanged,
+    );
+    return () => {
       window.removeEventListener(SESSION_CHANGED_EVENT, handleSessionChange);
+      window.removeEventListener(
+        WORKFLOW_DATA_CHANGED_EVENT,
+        handleWorkflowDataChanged,
+      );
+    };
   }, []);
 
   useEffect(() => {
@@ -116,6 +191,16 @@ export function DiscoveryPanel({ embedded = false }: { embedded?: boolean }) {
       });
     }
   }, [isConnected]);
+
+  useEffect(() => {
+    if (selectedSite || sites.length === 0) {
+      return;
+    }
+    const matchedSite = resolveSiteFromDiscovery(sites, getDiscoveryResult());
+    if (matchedSite) {
+      setSelectedSite(matchedSite);
+    }
+  }, [sites, selectedSite]);
 
   async function handleDiscover(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -175,6 +260,7 @@ export function DiscoveryPanel({ embedded = false }: { embedded?: boolean }) {
     }
   }
 
+  const hasSavedDiscovery = Boolean(result?.success);
   const wrapperClass = embedded
     ? "w-full"
     : "w-full scroll-mt-24 rounded-2xl border p-6 shadow-sm ring-1";
@@ -184,9 +270,7 @@ export function DiscoveryPanel({ embedded = false }: { embedded?: boolean }) {
       <div
         id={embedded ? undefined : "discovery"}
         className={
-          embedded
-            ? "w-full"
-            : `${wrapperClass} border-zinc-200 bg-zinc-50`
+          embedded ? "w-full" : `${wrapperClass} border-zinc-200 bg-zinc-50`
         }
       >
         <p className="text-xs font-semibold uppercase tracking-wider text-teal-600">
@@ -202,11 +286,11 @@ export function DiscoveryPanel({ embedded = false }: { embedded?: boolean }) {
             onClick={() => {
               window.location.hash = "auth";
             }}
-            className="font-medium text-teal-600 underline-offset-2 hover:underline"
+            className="font-semibold text-teal-700 underline-offset-2 hover:underline"
           >
-            Auth tab
+            Auth
           </button>{" "}
-          to list sites and discover renderings, media, and templates.
+          phase first. Discovery needs an active session.
         </p>
       </div>
     );
@@ -216,12 +300,10 @@ export function DiscoveryPanel({ embedded = false }: { embedded?: boolean }) {
     <div
       id={embedded ? undefined : "discovery"}
       className={
-        embedded
-          ? "w-full"
-          : `${wrapperClass} border-teal-200 bg-white ring-teal-100`
+        embedded ? "w-full" : `${wrapperClass} border-teal-100 bg-white`
       }
     >
-      <div className="flex flex-wrap items-start justify-between gap-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wider text-teal-600">
             Phase 2 - Discovery
@@ -229,10 +311,12 @@ export function DiscoveryPanel({ embedded = false }: { embedded?: boolean }) {
           <h2 className="mt-1 text-xl font-semibold text-zinc-900">
             Site &amp; template discovery
           </h2>
-          <p className="mt-2 max-w-3xl text-sm leading-relaxed text-zinc-600">
-            Select a site, then provide the renderings, placeholders, media, and templates
-            paths for ContentPilot to verify. When all paths exist, we load the
-            target schema - read-only, nothing is modified in Sitecore.
+          <p className="mt-2 max-w-2xl text-sm text-zinc-600">
+            Validate Sitecore paths and load renderings, placeholders,
+            templates, and languages for the selected site.
+            {hasSavedDiscovery
+              ? " Previous validated results are shown below — re-run discovery if your portal paths changed."
+              : null}
           </p>
         </div>
         <button
@@ -259,8 +343,8 @@ export function DiscoveryPanel({ embedded = false }: { embedded?: boolean }) {
           </h3>
           <p className="text-sm text-zinc-600">
             Enter the Sitecore item paths where your project keeps renderings,
-            placeholder settings, media, and templates. We check each path exists
-            before loading related items.
+            placeholder settings, media, and templates. We check each path
+            exists before loading related items.
           </p>
 
           <div className="grid gap-4 md:grid-cols-1">
@@ -341,20 +425,17 @@ export function DiscoveryPanel({ embedded = false }: { embedded?: boolean }) {
                 htmlFor="pageTemplatePath"
                 className="block text-sm font-medium text-zinc-700"
               >
-                Page template path (optional)
+                Page template path{" "}
+                <span className="font-normal text-zinc-500">(optional)</span>
               </label>
               <input
                 id="pageTemplatePath"
                 value={pageTemplatePath}
                 onChange={(event) => setPageTemplatePath(event.target.value)}
                 disabled={isDiscovering}
-                placeholder="/sitecore/templates/Project/Page"
+                placeholder="/sitecore/templates/Project/YourSite/Page"
                 className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 font-mono text-sm text-zinc-900 outline-none ring-teal-500 focus:border-teal-500 focus:ring-2 disabled:cursor-not-allowed disabled:bg-zinc-50 disabled:opacity-70"
               />
-              <p className="mt-1 text-xs text-zinc-500">
-                Used when creating missing target pages during migrate push. If
-                empty, ContentPilot infers the template from a sibling page.
-              </p>
             </div>
 
             <div>
@@ -362,7 +443,8 @@ export function DiscoveryPanel({ embedded = false }: { embedded?: boolean }) {
                 htmlFor="sxaPageDataTemplatePath"
                 className="block text-sm font-medium text-zinc-700"
               >
-                SXA Page Data template path (optional)
+                SXA Page Data template path{" "}
+                <span className="font-normal text-zinc-500">(optional)</span>
               </label>
               <input
                 id="sxaPageDataTemplatePath"
@@ -374,20 +456,15 @@ export function DiscoveryPanel({ embedded = false }: { embedded?: boolean }) {
                 placeholder={DEFAULT_SXA_PAGE_DATA_TEMPLATE_PATH}
                 className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 font-mono text-sm text-zinc-900 outline-none ring-teal-500 focus:border-teal-500 focus:ring-2 disabled:cursor-not-allowed disabled:bg-zinc-50 disabled:opacity-70"
               />
-              <p className="mt-1 text-xs text-zinc-500">
-                Template for the page-level <span className="font-mono">Data</span>{" "}
-                item created under new SXA pages during migrate push.
-              </p>
             </div>
           </div>
 
           {feedback && !isDiscovering && (
             <div
-              role="status"
-              className={`rounded-lg px-4 py-3 text-sm ${
+              className={`rounded-lg border px-4 py-3 text-sm ${
                 feedback.type === "success"
-                  ? "border border-emerald-200 bg-emerald-50 text-emerald-900"
-                  : "border border-rose-200 bg-rose-50 text-rose-900"
+                  ? "border-emerald-200 bg-emerald-50 text-emerald-900"
+                  : "border-rose-200 bg-rose-50 text-rose-900"
               }`}
             >
               {feedback.message}
@@ -407,7 +484,11 @@ export function DiscoveryPanel({ embedded = false }: { embedded?: boolean }) {
                 aria-hidden="true"
               />
             )}
-            {isDiscovering ? "Discovering..." : "Validate paths & discover"}
+            {isDiscovering
+              ? "Discovering..."
+              : hasSavedDiscovery
+                ? "Re-validate paths & discover"
+                : "Validate paths & discover"}
           </button>
         </form>
 
