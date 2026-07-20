@@ -226,63 +226,28 @@ export class LocalizedSourcePageCache {
   async getHtml(url: string): Promise<string> {
     const cached = this.htmlByUrl.get(url);
     if (cached) {
-      console.info("[localize][cache] hit in-memory html", {
-        url,
-        htmlLength: cached.length,
-      });
       return cached;
     }
 
-    console.info("[localize][cache] fetching HTML for localized page", { url });
-    try {
-      const { html } = await fetchPageHtml(url, "static");
-      this.htmlByUrl.set(url, html);
-      console.info("[localize][cache] fetched html", {
-        url,
-        htmlLength: html.length,
-      });
-      return html;
-    } catch (error) {
-      console.error("[localize][cache] fetchPageHtml failed", {
-        url,
-        error:
-          error instanceof Error
-            ? {
-                name: error.name,
-                message: error.message,
-                cause: (error as Error & { cause?: unknown }).cause,
-                stack: error.stack,
-              }
-            : error,
-      });
-      throw error;
-    }
+    const { html } = await fetchPageHtml(url, "static");
+    this.htmlByUrl.set(url, html);
+    return html;
   }
 
   async getBlocks(url: string): Promise<ContentBlock[]> {
     const cached = this.pages.get(url);
     if (cached) {
-      console.info("[localize][cache] hit in-memory blocks", { url, count: cached.length });
       return cached;
     }
 
     const crawled = this.findCrawledPage(url);
     if (crawled?.blocks?.length) {
-      console.info("[localize][cache] hit crawl page blocks", {
-        url,
-        count: crawled.blocks.length,
-      });
       this.pages.set(url, crawled.blocks);
       return crawled.blocks;
     }
 
     const html = await this.getHtml(url);
     const blocks = extractBlocksFromHtml(html);
-    console.info("[localize][cache] extracted blocks from html", {
-      url,
-      htmlLength: html.length,
-      blockCount: blocks.length,
-    });
     this.pages.set(url, blocks);
     return blocks;
   }
@@ -335,11 +300,6 @@ export async function localizeQueueItemForLanguage(
         localized: true,
       };
     }
-
-    console.info(
-      "[localize] ignoring cached fields that still match primary language",
-      { id: item.id, language },
-    );
   }
 
   if (
@@ -379,14 +339,6 @@ export async function localizeQueueItemForLanguage(
         localizedUrl,
         item.sourcePageUrl,
       );
-
-      console.info("[localize] visual-mapper selector extraction", {
-        id: item.id,
-        language,
-        localizedUrl,
-        updatedCount: result.updatedCount,
-        missingSelectors: result.missingSelectors,
-      });
 
       if (result.updatedCount === 0) {
         return {
