@@ -377,6 +377,7 @@ export async function localizeQueueItemForLanguage(
         item.fields,
         html,
         localizedUrl,
+        item.sourcePageUrl,
       );
 
       console.info("[localize] visual-mapper selector extraction", {

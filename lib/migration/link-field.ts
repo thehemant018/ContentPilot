@@ -142,6 +142,18 @@ export function classifyLinkKind(
     return "tel";
   }
 
+  // Next.js image optimizer URLs are media assets, never Sitecore page links.
+  try {
+    const path = new URL(trimmed, sourcePageUrl).pathname;
+    if (/\/_next\/image\/?$/i.test(path)) {
+      return "external";
+    }
+  } catch {
+    if (/\/_next\/image/i.test(trimmed)) {
+      return "external";
+    }
+  }
+
   try {
     const linkUrl = new URL(trimmed, sourcePageUrl);
     const pageUrl = new URL(sourcePageUrl);
