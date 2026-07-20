@@ -13,7 +13,7 @@ export function PhasePlaceholder({ phase }: PhasePlaceholderProps) {
         {phase.number}
       </span>
       <h3 className="mt-4 text-lg font-semibold text-zinc-900">
-        Phase {phase.number} — {phase.name}
+        Phase {phase.number} - {phase.name}
       </h3>
       <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-zinc-600">
         {phase.description}

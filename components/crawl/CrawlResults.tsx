@@ -20,7 +20,7 @@ const BLOCK_TYPE_LABELS: Record<ContentBlock["type"], string> = {
 
 const BLOCK_TYPE_COLORS: Record<ContentBlock["type"], string> = {
   navigation: "bg-sky-100 text-sky-800",
-  hero: "bg-violet-100 text-violet-800",
+  hero: "bg-teal-100 text-teal-800",
   quote: "bg-indigo-100 text-indigo-800",
   video: "bg-red-100 text-red-800",
   "rich-text": "bg-zinc-100 text-zinc-800",
@@ -123,7 +123,7 @@ function PagePanel({ page, defaultOpen }: { page: CrawledPage; defaultOpen: bool
           </div>
           <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800">
             {page.blocks.length} block(s)
-            {subBlockCount > 0 ? ` · ${subBlockCount} sub-block(s)` : ""}
+            {subBlockCount > 0 ? ` Â· ${subBlockCount} sub-block(s)` : ""}
           </span>
         </div>
       </summary>

@@ -1,6 +1,6 @@
 /** Explicit light-surface field styles — avoids unreadable inherited text in dark mode. */
 export const visualMapperInputClass =
-  "w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-900 shadow-sm placeholder:font-normal placeholder:text-zinc-500 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-200";
+  "w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 placeholder:font-normal placeholder:text-slate-500 outline-none transition-shadow focus:border-sky-500 focus:ring-2 focus:ring-sky-500/25";
 
 export const visualMapperInputMonoClass =
-  "rounded-lg border border-zinc-300 bg-white px-3 py-2 font-mono text-xs text-zinc-900 shadow-sm placeholder:font-sans placeholder:text-zinc-500 outline-none transition-colors focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200";
+  "rounded-xl border border-slate-300 bg-white px-3 py-2 font-mono text-xs text-slate-900 placeholder:font-sans placeholder:text-slate-500 outline-none transition-shadow focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/25";

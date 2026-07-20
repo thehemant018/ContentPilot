@@ -367,13 +367,13 @@ export function MigratePanel({ embedded = false }: { embedded?: boolean }) {
     <div className={embedded ? "space-y-6" : "mx-auto max-w-4xl space-y-6"}>
       <div>
         <p className="text-xs font-semibold uppercase tracking-wider text-emerald-600">
-          Phase 7 — Migrate
+          Phase 7 - Migrate
         </p>
         <h3 className="mt-1 text-lg font-semibold text-zinc-900">
           Push to Sitecore
         </h3>
         <p className="mt-1 text-sm text-zinc-600">
-          Sends your Review queue directly to Sitecore — creates datasource items
+          Sends your Review queue directly to Sitecore - creates datasource items
           under each target page&apos;s Data folder, fills field values, uploads
           crawled images, and assigns renderings. No local files are stored.
         </p>
@@ -539,7 +539,7 @@ export function MigratePanel({ embedded = false }: { embedded?: boolean }) {
                     ? "created"
                     : entry.datasourceUpdated
                       ? "updated"
-                      : "—"}
+                      : "-"}
                   {" · "}
                   Presentation:{" "}
                   {entry.presentationAssigned ? "assigned" : "not assigned"}

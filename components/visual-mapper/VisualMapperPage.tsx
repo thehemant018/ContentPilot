@@ -437,11 +437,11 @@ export function VisualMapperPage() {
   const canOpenReview = session.mappings.length > 0;
 
   return (
-    <div className="flex h-screen flex-col bg-zinc-50 text-zinc-900 scheme-light">
-      <header className="flex flex-wrap items-center gap-3 border-b border-zinc-200 bg-white px-4 py-3">
+    <div className="flex h-screen flex-col bg-slate-50 text-slate-900 scheme-light">
+      <header className="flex flex-wrap items-center gap-3 border-b border-slate-200/90 bg-white/95 px-4 py-3 backdrop-blur-sm">
         <div className="flex min-w-0 flex-1 items-center gap-2">
-          <span className="shrink-0 rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-800">
-            Visual Mapper Mode
+          <span className="font-display shrink-0 rounded-lg bg-sky-100 px-3 py-1 text-xs font-semibold text-sky-800">
+            Visual Mapper
           </span>
           <input
             type="url"
@@ -458,15 +458,15 @@ export function VisualMapperPage() {
           <button
             type="button"
             onClick={handleLoadPage}
-            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+            className="rounded-xl bg-sky-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-sky-700"
           >
             Load Page
           </button>
           <label
-            className={`flex shrink-0 cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm ${
+            className={`flex shrink-0 cursor-pointer items-center gap-2 rounded-xl border px-3 py-2 text-sm ${
               pageInteractivityEnabled
                 ? "border-amber-300 bg-amber-50 text-amber-900"
-                : "border-zinc-200 bg-white text-zinc-700"
+                : "border-slate-200 bg-white text-slate-700"
             }`}
             title={
               pageInteractivityEnabled
@@ -480,7 +480,7 @@ export function VisualMapperPage() {
               onChange={(event) =>
                 setPageInteractivityEnabled(event.target.checked)
               }
-              className="h-4 w-4 rounded border-zinc-300 text-amber-600 focus:ring-amber-500"
+              className="h-4 w-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500"
             />
             <span className="font-medium whitespace-nowrap">Page interactivity</span>
           </label>
@@ -490,11 +490,11 @@ export function VisualMapperPage() {
           type="button"
           onClick={handleGoToReviewQueue}
           disabled={!canOpenReview}
-          className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-800 hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-50"
+          className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-800 transition-colors hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-50"
         >
           Review Queue
           {session.mappings.length > 0 && (
-            <span className="ml-1.5 rounded-full bg-rose-200 px-1.5 py-0.5 text-xs">
+            <span className="ml-1.5 rounded-md bg-rose-200 px-1.5 py-0.5 text-xs">
               {session.mappings.length}
             </span>
           )}
@@ -509,7 +509,7 @@ export function VisualMapperPage() {
               ? "Push the queued components on this template page to Sitecore"
               : "Add components to the queue and map at least one field"
           }
-          className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+          className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {isMigrating ? "Migrating…" : "Migrate template page"}
         </button>
@@ -517,7 +517,7 @@ export function VisualMapperPage() {
         <button
           type="button"
           onClick={() => returnToMapModePhase()}
-          className="inline-flex items-center justify-center rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm font-semibold text-indigo-800 transition-colors hover:bg-indigo-100"
+          className="inline-flex items-center justify-center rounded-xl border border-sky-200 bg-sky-50 px-4 py-2 text-sm font-semibold text-sky-800 transition-colors hover:bg-sky-100"
         >
           Back to Map →
         </button>

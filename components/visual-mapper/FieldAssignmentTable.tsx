@@ -47,7 +47,7 @@ function LinkValuePreview({
             className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
               parsed.linkType === kind
                 ? kind === "internal"
-                  ? "bg-violet-100 text-violet-800"
+                  ? "bg-teal-100 text-teal-800"
                   : "bg-sky-100 text-sky-800"
                 : "bg-zinc-100 text-zinc-500 hover:bg-zinc-200"
             }`}

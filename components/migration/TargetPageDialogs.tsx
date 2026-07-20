@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { createPortal } from "react-dom";
 import type { TargetPageProgressItem } from "@/types/migration-page-progress";
 import { countPageProgress } from "@/types/migration-page-progress";
 
@@ -31,7 +32,7 @@ export function ConfirmDialog({
   hideActions = false,
   maxWidthClass = "max-w-md",
 }: ConfirmDialogProps) {
-  if (!open) {
+  if (!open || typeof document === "undefined") {
     return null;
   }
 
@@ -40,23 +41,23 @@ export function ConfirmDialog({
       ? "bg-rose-600 hover:bg-rose-700"
       : "bg-emerald-600 hover:bg-emerald-700";
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4"
       role="dialog"
       aria-modal="true"
       aria-labelledby="confirm-dialog-title"
     >
       <div
-        className={`w-full ${maxWidthClass} rounded-xl border border-zinc-200 bg-white p-5 shadow-xl`}
+        className={`w-full ${maxWidthClass} rounded-2xl border border-slate-200 bg-white p-5 shadow-lg`}
       >
         <h2
           id="confirm-dialog-title"
-          className="text-base font-semibold text-zinc-900"
+          className="font-display text-base font-semibold text-slate-900"
         >
           {title}
         </h2>
-        <div className="mt-3 text-sm leading-relaxed text-zinc-600">
+        <div className="mt-3 text-sm leading-relaxed text-slate-600">
           {children}
         </div>
         {!hideActions && (
@@ -65,7 +66,7 @@ export function ConfirmDialog({
               type="button"
               onClick={onCancel}
               disabled={isLoading}
-              className="rounded-lg border border-zinc-200 px-4 py-2 text-sm font-semibold text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
+              className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
             >
               {cancelLabel}
             </button>
@@ -73,14 +74,15 @@ export function ConfirmDialog({
               type="button"
               onClick={onConfirm}
               disabled={isLoading}
-              className={`rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 ${confirmClass}`}
+              className={`rounded-xl px-4 py-2 text-sm font-semibold text-white transition-colors disabled:opacity-50 ${confirmClass}`}
             >
-              {isLoading ? "Please wait…" : confirmLabel}
+              {isLoading ? "Please wait..." : confirmLabel}
             </button>
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

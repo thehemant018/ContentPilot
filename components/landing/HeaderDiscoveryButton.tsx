@@ -54,7 +54,7 @@ export function HeaderDiscoveryButton({
     <button
       type="button"
       onClick={handleClick}
-      className={`inline-flex items-center justify-center rounded-lg border border-teal-200 bg-teal-50 text-sm font-semibold text-teal-800 transition-colors hover:bg-teal-100 ${
+      className={`inline-flex items-center justify-center rounded-xl border border-teal-200 bg-teal-50 text-sm font-semibold text-teal-800 transition-colors hover:bg-teal-100 ${
         mobile ? "w-full px-4 py-2.5" : "px-4 py-2"
       }`}
     >

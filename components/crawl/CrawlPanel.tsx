@@ -111,7 +111,7 @@ export function CrawlPanel({ embedded = false }: { embedded?: boolean }) {
     <div className={embedded ? "space-y-6" : "mx-auto max-w-4xl space-y-6"}>
       <div>
         <h3 className="text-lg font-semibold text-zinc-900">
-          Phase 4 — Source URL crawl
+          Phase 4 - Source URL crawl
         </h3>
         <p className="mt-1 text-sm text-zinc-600">
           Paste a page URL or domain root. We detect semantic content blocks such

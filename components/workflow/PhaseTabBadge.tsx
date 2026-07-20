@@ -24,7 +24,7 @@ export function PhaseTabBadge({
 }) {
   return (
     <span
-      className={`flex h-6 w-6 items-center justify-center rounded-md text-xs font-bold text-white ${
+      className={`flex h-6 w-6 items-center justify-center rounded-lg text-xs font-bold text-white ${
         completed ? "bg-emerald-600" : colorClass
       }`}
     >

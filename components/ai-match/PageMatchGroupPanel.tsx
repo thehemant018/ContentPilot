@@ -76,7 +76,7 @@ export function PageMatchGroupPanel({
               </span>
             )}
             {stats.inQueue > 0 && (
-              <span className="rounded-full bg-violet-100 px-2.5 py-0.5 text-xs font-medium text-violet-800">
+              <span className="rounded-full bg-teal-100 px-2.5 py-0.5 text-xs font-medium text-teal-800">
                 {stats.inQueue} in queue
               </span>
             )}

@@ -124,26 +124,26 @@ export function ConnectSitecoreForm({ embedded = false }: { embedded?: boolean }
       className={
         embedded
           ? "w-full"
-          : "w-full scroll-mt-24 rounded-2xl border border-violet-200 bg-white p-6 shadow-sm ring-1 ring-violet-100"
+          : "w-full scroll-mt-24 rounded-2xl border border-teal-200 bg-white p-6 shadow-sm ring-1 ring-teal-100"
       }
     >
       <div className="flex items-start justify-between gap-4">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wider text-violet-600">
-            Phase 1 — Authentication
+          <p className="text-xs font-semibold uppercase tracking-wider text-teal-600">
+            Phase 1 - Authentication
           </p>
-          <h2 className="mt-1 text-xl font-semibold text-zinc-900">
+          <h2 className="font-display mt-1 text-xl font-semibold text-slate-900">
             Connect to Sitecore XM Cloud
           </h2>
-          <p className="mt-2 text-sm leading-relaxed text-zinc-600">
+          <p className="mt-2 text-sm leading-relaxed text-slate-600">
             Enter your XM instance URL and automation client credentials. We
             validate against the Identity Server token endpoint and confirm the
-            Authoring Content API is reachable. Read-only — nothing is written
+            Authoring Content API is reachable. Read-only - nothing is written
             to Sitecore.
           </p>
         </div>
         {hasValidSession && (
-          <span className="shrink-0 rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-800">
+          <span className="shrink-0 rounded-lg bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-800">
             Connected
           </span>
         )}
@@ -171,7 +171,7 @@ export function ConnectSitecoreForm({ embedded = false }: { embedded?: boolean }
         <div>
           <label
             htmlFor="instanceUrl"
-            className="block text-sm font-medium text-zinc-700"
+            className="block text-sm font-medium text-slate-700"
           >
             Sitecore XM instance URL
           </label>
@@ -184,14 +184,14 @@ export function ConnectSitecoreForm({ embedded = false }: { embedded?: boolean }
             value={instanceUrl}
             onChange={(event) => setInstanceUrl(event.target.value)}
             disabled={isSubmitting}
-            className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none ring-violet-500 focus:border-violet-500 focus:ring-2 disabled:cursor-not-allowed disabled:bg-zinc-50 disabled:opacity-70"
+            className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition-shadow focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:opacity-70"
           />
         </div>
 
         <div>
           <label
             htmlFor="clientId"
-            className="block text-sm font-medium text-zinc-700"
+            className="block text-sm font-medium text-slate-700"
           >
             Client ID
           </label>
@@ -205,14 +205,14 @@ export function ConnectSitecoreForm({ embedded = false }: { embedded?: boolean }
             value={clientId}
             onChange={(event) => setClientId(event.target.value)}
             disabled={isSubmitting}
-            className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none ring-violet-500 focus:border-violet-500 focus:ring-2 disabled:cursor-not-allowed disabled:bg-zinc-50 disabled:opacity-70"
+            className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition-shadow focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:opacity-70"
           />
         </div>
 
         <div>
           <label
             htmlFor="clientSecret"
-            className="block text-sm font-medium text-zinc-700"
+            className="block text-sm font-medium text-slate-700"
           >
             Client secret
           </label>
@@ -226,7 +226,7 @@ export function ConnectSitecoreForm({ embedded = false }: { embedded?: boolean }
             value={clientSecret}
             onChange={(event) => setClientSecret(event.target.value)}
             disabled={isSubmitting}
-            className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none ring-violet-500 focus:border-violet-500 focus:ring-2 disabled:cursor-not-allowed disabled:bg-zinc-50 disabled:opacity-70"
+            className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition-shadow focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:opacity-70"
           />
         </div>
 
@@ -247,7 +247,7 @@ export function ConnectSitecoreForm({ embedded = false }: { embedded?: boolean }
           <button
             type="submit"
             disabled={isSubmitting}
-            className="inline-flex items-center justify-center gap-2 rounded-lg bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-teal-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {isSubmitting && (
               <span
@@ -265,7 +265,7 @@ export function ConnectSitecoreForm({ embedded = false }: { embedded?: boolean }
             <button
               type="button"
               onClick={handleDisconnect}
-              className="inline-flex items-center justify-center rounded-lg border border-zinc-300 bg-white px-5 py-2.5 text-sm font-semibold text-zinc-700 transition-colors hover:bg-zinc-50"
+              className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50"
             >
               Disconnect
             </button>
