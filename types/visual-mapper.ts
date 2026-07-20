@@ -1,3 +1,5 @@
+import type { SourcePageLanguage } from "@/types/language";
+
 export interface SelectedElement {
   selector: string;
   tagName: string;
@@ -46,6 +48,10 @@ export interface MappingEntry {
 export interface PageMappingTemplate {
   templatePageUrl: string;
   components: ComponentMappingTemplate[];
+  /** Sitecore language names selected when mapping the template page. */
+  selectedLanguages?: string[];
+  /** Languages detected on the template page (reference for bulk apply). */
+  languages?: SourcePageLanguage;
 }
 
 export interface ComponentMappingTemplate {
@@ -73,6 +79,8 @@ export interface BulkApplyPageResult {
   pageName: string;
   missingFields: string[];
   pageTitle: string;
+  /** Languages detected on this applied page. */
+  languages?: SourcePageLanguage;
   error?: string;
 }
 

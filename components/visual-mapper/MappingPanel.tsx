@@ -73,6 +73,8 @@ export function MappingPanel({
   const clearField = useVisualMapperStore((s) => s.clearField);
   const setLinkFieldType = useVisualMapperStore((s) => s.setLinkFieldType);
   const sourcePageUrl = useVisualMapperStore((s) => s.session.sourceUrl);
+  const selectedLanguages = useVisualMapperStore((s) => s.selectedLanguages);
+  const pageLanguages = useVisualMapperStore((s) => s.pageLanguages);
   const autoSuggestFields = useVisualMapperStore((s) => s.autoSuggestFields);
   const confirmComponent = useVisualMapperStore((s) => s.confirmComponent);
   const cancelComponentMapping = useVisualMapperStore(
@@ -319,6 +321,8 @@ export function MappingPanel({
             mappings={mappings}
             templatePageUrl={sourcePageUrl}
             defaultTargetPagePath={targetPagePath}
+            selectedLanguages={selectedLanguages}
+            templateLanguages={pageLanguages}
           />
         )}
       </div>
