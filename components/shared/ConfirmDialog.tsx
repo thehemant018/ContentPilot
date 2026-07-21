@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
 interface ConfirmDialogProps {
@@ -26,6 +26,36 @@ export function ConfirmDialog({
   isLoading = false,
   variant = "default",
 }: ConfirmDialogProps) {
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    const { body } = document;
+    const previousOverflow = body.style.overflow;
+    const previousPaddingRight = body.style.paddingRight;
+    const scrollbarWidth =
+      window.innerWidth - document.documentElement.clientWidth;
+
+    body.style.overflow = "hidden";
+    if (scrollbarWidth > 0) {
+      body.style.paddingRight = `${scrollbarWidth}px`;
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape" && !isLoading) {
+        onCancel();
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      body.style.overflow = previousOverflow;
+      body.style.paddingRight = previousPaddingRight;
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [open, onCancel, isLoading]);
+
   if (!open || typeof document === "undefined") {
     return null;
   }
@@ -37,12 +67,20 @@ export function ConfirmDialog({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4"
+      className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto overscroll-contain bg-slate-900/40 p-4 backdrop-blur-[2px]"
       role="dialog"
       aria-modal="true"
       aria-labelledby="confirm-dialog-title"
+      onClick={() => {
+        if (!isLoading) {
+          onCancel();
+        }
+      }}
     >
-      <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-lg">
+      <div
+        className="my-auto w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-xl"
+        onClick={(event) => event.stopPropagation()}
+      >
         <h2
           id="confirm-dialog-title"
           className="font-display text-base font-semibold text-slate-900"

@@ -1,10 +1,12 @@
 "use client";
 
+import { useState } from "react";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { getMappingSourceBackTarget } from "@/lib/workflow/migration-mode";
 import { startNewContentMigration } from "@/lib/workflow/progress";
 
 const DEFAULT_RESTART_CONFIRM =
-  "Start over with a different page? Crawl, AI Match, Review queue, and Migrate progress for the current page will be cleared. Auth and Discovery stay connected.";
+  "Crawl, AI Match, Review queue, and Migrate progress for the current page will be cleared. Auth and Discovery stay connected.";
 
 interface ReturnToMappingSourceButtonProps {
   variant?: "link" | "button" | "primary";
@@ -24,6 +26,7 @@ export function ReturnToMappingSourceButton({
   showArrow = "left",
   intent = "restart",
 }: ReturnToMappingSourceButtonProps) {
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const backTarget = getMappingSourceBackTarget();
   const resolvedLabel =
     label ?? (intent === "back" ? backTarget.label : "Crawl a different page");
@@ -33,10 +36,11 @@ export function ReturnToMappingSourceButton({
       getMappingSourceBackTarget().navigate();
       return;
     }
+    setConfirmOpen(true);
+  }
 
-    if (!window.confirm(confirmMessage)) {
-      return;
-    }
+  function handleConfirm(): void {
+    setConfirmOpen(false);
     startNewContentMigration();
   }
 
@@ -44,8 +48,8 @@ export function ReturnToMappingSourceButton({
   const arrowSuffix = showArrow === "right" ? " →" : "";
   const text = `${arrowPrefix}${resolvedLabel}${arrowSuffix}`;
 
-  if (variant === "primary") {
-    return (
+  const button =
+    variant === "primary" ? (
       <button
         type="button"
         onClick={handleClick}
@@ -53,11 +57,7 @@ export function ReturnToMappingSourceButton({
       >
         {text}
       </button>
-    );
-  }
-
-  if (variant === "button") {
-    return (
+    ) : variant === "button" ? (
       <button
         type="button"
         onClick={handleClick}
@@ -65,17 +65,33 @@ export function ReturnToMappingSourceButton({
       >
         {text}
       </button>
+    ) : (
+      <button
+        type="button"
+        onClick={handleClick}
+        className={`shrink-0 text-sm font-medium text-blue-600 underline-offset-2 hover:underline ${className}`}
+      >
+        {text}
+      </button>
     );
-  }
 
   return (
-    <button
-      type="button"
-      onClick={handleClick}
-      className={`shrink-0 text-sm font-medium text-blue-600 underline-offset-2 hover:underline ${className}`}
-    >
-      {text}
-    </button>
+    <>
+      {button}
+      {intent === "restart" && (
+        <ConfirmDialog
+          open={confirmOpen}
+          title="Start over with a different page?"
+          confirmLabel="Start over"
+          cancelLabel="Cancel"
+          variant="danger"
+          onConfirm={handleConfirm}
+          onCancel={() => setConfirmOpen(false)}
+        >
+          {confirmMessage}
+        </ConfirmDialog>
+      )}
+    </>
   );
 }
 
