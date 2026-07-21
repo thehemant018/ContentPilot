@@ -28,12 +28,15 @@ export function saveSession(
   accessToken: string,
   expiresIn: number,
   instanceUrl: string,
+  itemOwner?: string,
 ): StoredSitecoreSession {
+  const normalizedOwner = itemOwner?.trim() || undefined;
   const session: StoredSitecoreSession = {
     accessToken,
     expiresAt: Date.now() + expiresIn * 1000,
     instanceUrl,
     connectedAt: new Date().toISOString(),
+    ...(normalizedOwner ? { itemOwner: normalizedOwner } : {}),
   };
 
   localStorage.setItem(STORAGE_KEYS.session, JSON.stringify(session));

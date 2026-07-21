@@ -3,6 +3,8 @@ import { NextResponse } from "next/server";
 export interface SitecoreRequestAuth {
   accessToken: string;
   instanceUrl: string;
+  /** Sitecore username for Security Owner on created items. */
+  itemOwner?: string;
 }
 
 export function getAuthFromRequest(
@@ -15,9 +17,12 @@ export function getAuthFromRequest(
     return null;
   }
 
+  const itemOwner = request.headers.get("X-Sitecore-Item-Owner")?.trim();
+
   return {
     accessToken: authHeader.slice("Bearer ".length),
     instanceUrl: instanceUrl.trim(),
+    ...(itemOwner ? { itemOwner } : {}),
   };
 }
 

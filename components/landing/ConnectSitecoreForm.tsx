@@ -18,6 +18,7 @@ export function ConnectSitecoreForm({ embedded = false }: { embedded?: boolean }
   const [instanceUrl, setInstanceUrl] = useState("");
   const [clientId, setClientId] = useState("");
   const [clientSecret, setClientSecret] = useState("");
+  const [itemOwner, setItemOwner] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [feedback, setFeedback] = useState<{
     type: "success" | "error";
@@ -32,6 +33,7 @@ export function ConnectSitecoreForm({ embedded = false }: { embedded?: boolean }
       if (stored) {
         setSession(stored);
         setInstanceUrl(stored.instanceUrl);
+        setItemOwner(stored.itemOwner ?? "");
       }
     });
 
@@ -51,7 +53,7 @@ export function ConnectSitecoreForm({ embedded = false }: { embedded?: boolean }
       const response = await fetch("/api/sitecore/connect", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ instanceUrl, clientId, clientSecret }),
+        body: JSON.stringify({ instanceUrl, clientId, clientSecret, itemOwner }),
       });
 
       const result = (await response.json()) as SitecoreConnectionResult;
@@ -67,14 +69,20 @@ export function ConnectSitecoreForm({ embedded = false }: { embedded?: boolean }
         return;
       }
 
+      const ownerToStore =
+        (result.itemOwner ?? itemOwner.trim()) || undefined;
       const stored = saveSession(
         result.token,
         result.expiresIn ?? 86400,
         result.instanceUrl,
+        ownerToStore,
       );
 
       setSession(stored);
       setClientSecret("");
+      if (result.itemOwner) {
+        setItemOwner(result.itemOwner);
+      }
       setFeedback({
         type: "success",
         message: `${result.message} Moving to Discovery in 3 seconds…`,
@@ -108,6 +116,7 @@ export function ConnectSitecoreForm({ embedded = false }: { embedded?: boolean }
     setSession(null);
     setClientId("");
     setClientSecret("");
+    setItemOwner("");
     setFeedback({
       type: "success",
       message: "Disconnected. Stored token removed from local storage.",
@@ -138,8 +147,8 @@ export function ConnectSitecoreForm({ embedded = false }: { embedded?: boolean }
           <p className="mt-2 text-sm leading-relaxed text-slate-600">
             Enter your XM instance URL and automation client credentials. We
             validate against the Identity Server token endpoint and confirm the
-            Authoring Content API is reachable. Read-only - nothing is written
-            to Sitecore.
+            Authoring Content API is reachable. Optionally set a Sitecore username
+            as item owner; leave it blank to keep the default client ID owner.
           </p>
         </div>
         {hasValidSession && (
@@ -158,6 +167,12 @@ export function ConnectSitecoreForm({ embedded = false }: { embedded?: boolean }
           <p className="mt-1 text-emerald-800">
             Token expires: {formatExpiry(session)}
           </p>
+          {session.itemOwner && (
+            <p className="mt-1 text-emerald-800">
+              Item owner:{" "}
+              <span className="font-mono text-xs">{session.itemOwner}</span>
+            </p>
+          )}
         </div>
       )}
 
@@ -228,6 +243,31 @@ export function ConnectSitecoreForm({ embedded = false }: { embedded?: boolean }
             disabled={isSubmitting}
             className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition-shadow focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:opacity-70"
           />
+        </div>
+
+        <div>
+          <label
+            htmlFor="itemOwner"
+            className="block text-sm font-medium text-slate-700"
+          >
+            Item owner (Sitecore username){" "}
+            <span className="font-normal text-slate-400">(optional)</span>
+          </label>
+          <input
+            id="itemOwner"
+            name="itemOwner"
+            type="text"
+            autoComplete="off"
+            placeholder="sitecore\abc.company.com"
+            value={itemOwner}
+            onChange={(event) => setItemOwner(event.target.value)}
+            disabled={isSubmitting}
+            className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition-shadow focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:opacity-70"
+          />
+          <p className="mt-1 text-xs text-slate-500">
+            Optional. If set, we verify the user exists in Sitecore after client
+            credentials succeed. Leave blank to keep the default Owner (client ID).
+          </p>
         </div>
 
         {feedback && (

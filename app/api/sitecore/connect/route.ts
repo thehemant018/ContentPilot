@@ -4,7 +4,9 @@ import {
   connectErrorMessage,
   connectErrorStatusCode,
 } from "@/lib/sitecore/connect-errors";
+import { normalizeSitecoreItemOwner } from "@/lib/sitecore/item-owner";
 import { verifyContentApiAccess } from "@/lib/sitecore/validate";
+import { verifySitecoreUserExists } from "@/lib/sitecore/verify-user";
 import type {
   SitecoreConnectionInput,
   SitecoreConnectionResult,
@@ -25,7 +27,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const { instanceUrl, clientId, clientSecret } = body;
+    const { instanceUrl, clientId, clientSecret, itemOwner } = body;
 
     if (!instanceUrl?.trim() || !clientId?.trim() || !clientSecret?.trim()) {
       return NextResponse.json<SitecoreConnectionResult>(
@@ -57,13 +59,32 @@ export async function POST(request: Request) {
     const token = await requestAccessToken(clientId, clientSecret);
     await verifyContentApiAccess(normalizedUrl, token.access_token);
 
+    const normalizedOwner = normalizeSitecoreItemOwner(itemOwner ?? "");
+    let verifiedOwner: string | undefined;
+    if (normalizedOwner) {
+      const user = await verifySitecoreUserExists(
+        normalizedUrl,
+        token.access_token,
+        normalizedOwner,
+      );
+      verifiedOwner = user.name;
+    }
+
+    const ownerSuffix = verifiedOwner
+      ? ` Item owner verified: ${verifiedOwner}.`
+      : "";
+
     return NextResponse.json<SitecoreConnectionResult>({
       success: true,
-      message: "Connected to Sitecore XM Cloud. Token issued and Content API verified.",
+      message:
+        "Connected to Sitecore XM Cloud. Token issued and Content API verified." +
+        ownerSuffix,
       token: token.access_token,
       expiresIn: token.expires_in,
       instanceUrl: normalizedUrl,
       contentApiVerified: true,
+      itemOwnerVerified: Boolean(verifiedOwner),
+      itemOwner: verifiedOwner,
     });
   } catch (error) {
     const message = connectErrorMessage(error);

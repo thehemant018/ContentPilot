@@ -5,6 +5,7 @@ import {
   UPDATE_ITEM_MUTATION,
 } from "@/lib/sitecore/item-authoring-queries";
 import { getSitecoreItemByPath } from "@/lib/sitecore/item-lookup";
+import { withSitecoreItemOwnerFields } from "@/lib/sitecore/item-owner";
 
 const ITEM_SERVICE_PATH = "/sitecore/api/ssc/item";
 export const DEFAULT_ITEM_DATABASE = "master";
@@ -13,6 +14,8 @@ export interface ItemServiceOptions {
   database?: string;
   language?: string;
   version?: string;
+  /** Sitecore username for Security Owner (e.g. sitecore\\user@company.com). */
+  itemOwner?: string;
 }
 
 export interface ItemServiceItem {
@@ -279,7 +282,11 @@ export async function createItem(
     throw new Error(`Parent item not found at ${parentPath}.`);
   }
 
-  const graphqlFields = toGraphQLFieldInputs(fields);
+  const fieldsWithOwner = withSitecoreItemOwnerFields(
+    fields,
+    options?.itemOwner,
+  );
+  const graphqlFields = toGraphQLFieldInputs(fieldsWithOwner);
   const data = await executeGraphQL<{
     createItem?: {
       item?: {
