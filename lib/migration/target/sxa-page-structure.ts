@@ -1,6 +1,6 @@
 import { ensureItemLanguageVersion, getSitecoreItemByPathInLanguage } from "@/lib/sitecore/item-version";
 import { DEFAULT_MIGRATION_LANGUAGE } from "@/lib/migration/constants";
-import { normalizeSitecoreItemPath } from "@/lib/migration/sitecore-path";
+import { normalizeSitecoreItemPath } from "@/lib/migration/target/sitecore-path";
 import { SEARCH_UNDER_PATH_QUERY } from "@/lib/sitecore/discovery/queries";
 import { executeGraphQL } from "@/lib/sitecore/graphql-client";
 import {

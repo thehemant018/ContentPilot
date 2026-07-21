@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { validateTargetPagePaths } from "@/lib/migration/target-page";
+import { validateTargetPagePaths } from "@/lib/migration/target/target-page";
 import {
   getAuthFromRequest,
   unauthorizedResponse,

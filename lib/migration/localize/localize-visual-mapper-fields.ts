@@ -7,14 +7,14 @@ import {
   normalizeInternalLinkPath,
   parseLinkFieldValue,
   type ParsedLinkField,
-} from "@/lib/migration/link-field";
+} from "@/lib/migration/fields/link-field";
 import { fieldValueFromPick } from "@/lib/visual-mapper/auto-suggest-fields";
 import {
   extractContentFromElement,
   querySelectorElement,
 } from "@/lib/visual-mapper/extract-from-dom";
 import { resolveNavigationHref } from "@/lib/visual-mapper/resolve-extracted-url";
-import { swapUrlLocale } from "@/lib/migration/localized-source-url";
+import { swapUrlLocale } from "@/lib/migration/localize/localized-source-url";
 import type { EditableFieldValue } from "@/types/migration-queue";
 
 /** Visual Mapper stores CSS selectors in sourceRegion (e.g. h1.title, a.cta). */

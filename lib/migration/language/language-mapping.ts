@@ -1,5 +1,5 @@
 import { DEFAULT_MIGRATION_LANGUAGE } from "@/lib/migration/constants";
-import { extractLocaleFromUrl } from "@/lib/migration/locale-from-url";
+import { extractLocaleFromUrl } from "@/lib/migration/language/locale-from-url";
 import type { SitecoreLanguage } from "@/types/language";
 import type { MigrationQueueItem } from "@/types/migration-queue";
 

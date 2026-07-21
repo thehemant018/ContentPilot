@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { pushQueueToSitecore } from "@/lib/migration/push-to-sitecore";
+import { pushQueueToSitecore } from "@/lib/migration/push/push-to-sitecore";
 import {
   getAuthFromRequest,
   unauthorizedResponse,

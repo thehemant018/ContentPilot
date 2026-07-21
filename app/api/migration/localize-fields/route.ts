@@ -4,8 +4,8 @@ import {
   LocalizedSourcePageCache,
   localizeQueueItemForLanguage,
   resolvePrimarySourceLanguage,
-} from "@/lib/migration/localized-queue-fields";
-import { resolveLocalizedSourceUrl } from "@/lib/migration/localized-source-url";
+} from "@/lib/migration/localize/localized-queue-fields";
+import { resolveLocalizedSourceUrl } from "@/lib/migration/localize/localized-source-url";
 import type { CrawledPage } from "@/types/crawl";
 import type { MigrationQueueItem } from "@/types/migration-queue";
 

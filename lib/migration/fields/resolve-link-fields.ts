@@ -4,7 +4,7 @@ import {
   isLinkField,
   parseLinkFieldValue,
   type ParsedLinkField,
-} from "@/lib/migration/link-field";
+} from "@/lib/migration/fields/link-field";
 import { getSitecoreItemByPath } from "@/lib/sitecore/item-lookup";
 import type { MigrationComponentExport } from "@/types/migration-export";
 

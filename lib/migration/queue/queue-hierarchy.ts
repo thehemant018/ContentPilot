@@ -10,7 +10,7 @@ import {
   resolveChildPlaceholderKeyForNesting,
   findRenderingProfile,
   childAllowsNestedPresentation,
-} from "@/lib/migration/placeholder-registry";
+} from "@/lib/migration/target/placeholder-registry";
 
 function isAncestor(
   ancestorId: string,

@@ -1,5 +1,5 @@
 import * as cheerio from "cheerio";
-import { extractLocaleFromUrl } from "@/lib/migration/locale-from-url";
+import { extractLocaleFromUrl } from "@/lib/migration/language/locale-from-url";
 import type { SourcePageLanguage } from "@/types/language";
 
 function normalizeDetectedLanguage(code: string | undefined): string | undefined {

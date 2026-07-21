@@ -1,5 +1,5 @@
 import { sitecoreApiFetch } from "@/lib/sitecore/api-client";
-import type { TargetPageValidation } from "@/lib/migration/target-page";
+import type { TargetPageValidation } from "@/lib/migration/target/target-page";
 
 export interface ValidateTargetPagesResponse {
   results: TargetPageValidation[];

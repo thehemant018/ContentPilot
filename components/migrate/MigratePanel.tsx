@@ -10,7 +10,7 @@ import {
 import {
   uniqueTargetPaths,
   validateTargetPages,
-} from "@/lib/migration/validate-target-pages-client";
+} from "@/lib/migration/target/validate-target-pages-client";
 import {
   getStoredSession,
   isSessionExpired,
@@ -28,12 +28,12 @@ import { ReturnToReviewBanner } from "@/components/workflow/ReturnToReviewBanner
 import { normalizeMediaUploadPath } from "@/lib/sitecore/media-upload";
 import { getDiscoveryResult, getCrawlResult } from "@/lib/storage/workflow-data";
 import { getMigrationQueue, MIGRATION_QUEUE_CHANGED_EVENT } from "@/lib/storage/migration-queue";
-import { prepareQueueForMigration } from "@/lib/migration/queue-sync";
+import { prepareQueueForMigration } from "@/lib/migration/queue/queue-sync";
 import {
   applyPushResultToPageProgress,
   ensureTargetPagesWithProgress,
   markPagesAsPushing,
-} from "@/lib/migration/ensure-target-page-client";
+} from "@/lib/migration/target/ensure-target-page-client";
 import {
   initialPageProgressItems,
   type TargetPageProgressItem,

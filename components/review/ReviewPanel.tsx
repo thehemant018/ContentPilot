@@ -5,8 +5,8 @@ import { PageMigrationGroup } from "@/components/review/PageMigrationGroup";
 import { NextPhaseButton } from "@/components/workflow/NextPhaseButton";
 import { ReturnToCrawlBanner } from "@/components/workflow/ReturnToCrawlBanner";
 import { buildPageTitleMap } from "@/lib/ai-match/group-by-page";
-import { validateMigrationQueue } from "@/lib/migration/validate-queue";
-import { normalizeSourcePageUrl } from "@/lib/migration/sitecore-path";
+import { validateMigrationQueue } from "@/lib/migration/queue/validate-queue";
+import { normalizeSourcePageUrl } from "@/lib/migration/target/sitecore-path";
 import {
   getMigrationQueue,
   removeQueueItem,

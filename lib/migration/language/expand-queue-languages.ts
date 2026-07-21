@@ -1,4 +1,4 @@
-import { resolveQueueLanguages } from "@/lib/migration/language-mapping";
+import { resolveQueueLanguages } from "@/lib/migration/language/language-mapping";
 import type { MigrationQueueItem } from "@/types/migration-queue";
 
 /** Expands each queue item once per selected Sitecore language. */

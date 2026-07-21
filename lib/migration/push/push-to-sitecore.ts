@@ -1,18 +1,18 @@
-import { expandQueueItemsForLanguages } from "@/lib/migration/expand-queue-languages";
-import { localizeExpandedQueueItems } from "@/lib/migration/localized-queue-fields";
+import { expandQueueItemsForLanguages } from "@/lib/migration/language/expand-queue-languages";
+import { localizeExpandedQueueItems } from "@/lib/migration/localize/localized-queue-fields";
 import { DEFAULT_MIGRATION_LANGUAGE } from "@/lib/migration/constants";
-import { pagePresentationKey } from "@/lib/migration/page-presentation-key";
-import { resolveQueueLanguages, compareMigrationLanguageOrder } from "@/lib/migration/language-mapping";
+import { pagePresentationKey } from "@/lib/migration/target/page-presentation-key";
+import { resolveQueueLanguages, compareMigrationLanguageOrder } from "@/lib/migration/language/language-mapping";
 import { sortComponentsForPresentationTree } from "@/lib/sitecore/presentation-tree";
 import {
   buildComponentsFromQueue,
   prepareQueueForMigration,
-} from "@/lib/migration/queue-sync";
-import { resolveLinkFieldsForComponent } from "@/lib/migration/resolve-link-fields";
-import { resolveMediaFieldsForComponent } from "@/lib/migration/resolve-media-fields";
-import { normalizeSitecoreItemPath } from "@/lib/migration/sitecore-path";
-import { ensureTargetPagesExist, resolveQueueTargetPagePaths } from "@/lib/migration/target-page";
-import { ensurePageLanguageContext } from "@/lib/migration/page-language-context";
+} from "@/lib/migration/queue/queue-sync";
+import { resolveLinkFieldsForComponent } from "@/lib/migration/fields/resolve-link-fields";
+import { resolveMediaFieldsForComponent } from "@/lib/migration/fields/resolve-media-fields";
+import { normalizeSitecoreItemPath } from "@/lib/migration/target/sitecore-path";
+import { ensureTargetPagesExist, resolveQueueTargetPagePaths } from "@/lib/migration/target/target-page";
+import { ensurePageLanguageContext } from "@/lib/migration/language/page-language-context";
 import {
   ensureSitecoreItemExists,
   getSitecoreItemByPath,
@@ -22,7 +22,7 @@ import {
   requireItemLanguageVersionBeforeWrite,
   resolveExistingItemAtPath,
 } from "@/lib/sitecore/item-version";
-import { resolveVersionSourceLanguages } from "@/lib/migration/version-source-languages";
+import { resolveVersionSourceLanguages } from "@/lib/migration/language/version-source-languages";
 import {
   createItem,
   editItemById,

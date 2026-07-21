@@ -18,7 +18,7 @@ import {
   getDiscoveryResult,
   WORKFLOW_DATA_CHANGED_EVENT,
 } from "@/lib/storage/workflow-data";
-import { DEFAULT_SXA_PAGE_DATA_TEMPLATE_PATH } from "@/lib/migration/sxa-page-structure";
+import { DEFAULT_SXA_PAGE_DATA_TEMPLATE_PATH } from "@/lib/migration/target/sxa-page-structure";
 import { saveVisualMapperSiteId } from "@/lib/visual-mapper/session-storage";
 
 const DEFAULT_RENDERINGS_PATH = "/sitecore/layout/Renderings";

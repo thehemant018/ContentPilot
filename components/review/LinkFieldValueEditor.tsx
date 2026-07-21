@@ -7,7 +7,7 @@ import {
   parseLinkFieldValue,
   rebuildLinkField,
   type LinkKind,
-} from "@/lib/migration/link-field";
+} from "@/lib/migration/fields/link-field";
 import {
   reviewFieldInputClass,
   reviewFieldLabelClass,

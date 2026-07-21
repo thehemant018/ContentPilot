@@ -1,7 +1,7 @@
 import {
   buildComponentsFromQueue,
   prepareQueueForMigration,
-} from "@/lib/migration/queue-sync";
+} from "@/lib/migration/queue/queue-sync";
 import type { MigrationQueueItem } from "@/types/migration-queue";
 
 export interface MigrationQueueValidation {

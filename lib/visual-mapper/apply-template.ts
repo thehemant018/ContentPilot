@@ -1,6 +1,6 @@
 import * as cheerio from "cheerio";
 import { nanoid } from "nanoid";
-import { ensureLinkFieldStoredValue, formatLinkPreview, isLinkField, parseLinkFieldValue } from "@/lib/migration/link-field";
+import { ensureLinkFieldStoredValue, formatLinkPreview, isLinkField, parseLinkFieldValue } from "@/lib/migration/fields/link-field";
 import { fieldValueFromPick } from "@/lib/visual-mapper/auto-suggest-fields";
 import {
   extractContentFromElement,

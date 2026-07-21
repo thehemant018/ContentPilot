@@ -5,7 +5,7 @@ import {
   isLinkField,
   parseLinkFieldValue,
   type LinkKind,
-} from "@/lib/migration/link-field";
+} from "@/lib/migration/fields/link-field";
 import type { FieldAssignment } from "@/types/visual-mapper";
 
 interface FieldAssignmentTableProps {

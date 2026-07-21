@@ -5,8 +5,8 @@ import {
   resolveDefaultPageLanguages,
   resolveQueueLanguages,
   sanitizeSelectedLanguages,
-} from "@/lib/migration/language-mapping";
-import type { LanguagePickerOption } from "@/lib/migration/language-mapping";
+} from "@/lib/migration/language/language-mapping";
+import type { LanguagePickerOption } from "@/lib/migration/language/language-mapping";
 import { getVisualMapperSourceLanguages } from "@/lib/visual-mapper/source-page-languages";
 import type { DiscoveryResult } from "@/types/discovery";
 

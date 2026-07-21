@@ -23,7 +23,7 @@ import {
 import { resolveNestedPlaceholderFormatForPair } from "@/lib/sitecore/nested-placeholder-format";
 import type { RenderingPlaceholderProfile } from "@/types/discovery";
 import type { MigrationComponentExport } from "@/types/migration-export";
-import { pickNestedPlaceholderKeyPattern } from "@/lib/migration/placeholder-registry";
+import { pickNestedPlaceholderKeyPattern } from "@/lib/migration/target/placeholder-registry";
 
 export interface PresentationTreeNode {
   component: MigrationComponentExport;

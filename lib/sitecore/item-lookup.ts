@@ -1,5 +1,5 @@
 import { VALIDATE_PATH_QUERY } from "@/lib/sitecore/discovery/queries";
-import { normalizeSitecoreItemPath } from "@/lib/migration/sitecore-path";
+import { normalizeSitecoreItemPath } from "@/lib/migration/target/sitecore-path";
 import { executeGraphQL } from "@/lib/sitecore/graphql-client";
 
 export interface SitecoreItemRef {

@@ -1,16 +1,16 @@
-import { buildDatasourcePath, buildComponentExport } from "@/lib/migration/build-export";
-import { expandQueueItemsForLanguages } from "@/lib/migration/expand-queue-languages";
-import { resolveQueueLanguages } from "@/lib/migration/language-mapping";
+import { buildDatasourcePath, buildComponentExport } from "@/lib/migration/queue/build-export";
+import { expandQueueItemsForLanguages } from "@/lib/migration/language/expand-queue-languages";
+import { resolveQueueLanguages } from "@/lib/migration/language/language-mapping";
 import {
   applyDiscoveryPlaceholderDefaults,
   linkQueueHierarchy,
-} from "@/lib/migration/queue-hierarchy";
+} from "@/lib/migration/queue/queue-hierarchy";
 import type { MigrationComponentExport } from "@/types/migration-export";
 import { buildSxaDatasourceParentPath } from "@/lib/sitecore/item-lookup";
 import {
   normalizeSitecoreItemPath,
   normalizeSourcePageUrl,
-} from "@/lib/migration/sitecore-path";
+} from "@/lib/migration/target/sitecore-path";
 import type { MigrationQueueItem } from "@/types/migration-queue";
 import type {
   PlaceholderDefinition,
