@@ -1,7 +1,7 @@
 "use client";
 
-import { formatSitecoreLanguageLabel } from "@/lib/migration/language-mapping";
-import type { LanguagePickerOption } from "@/lib/migration/language-mapping";
+import { formatSitecoreLanguageLabel } from "@/lib/migration/language/language-mapping";
+import type { LanguagePickerOption } from "@/lib/migration/language/language-mapping";
 
 interface LanguageMultiSelectProps {
   id: string;

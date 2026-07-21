@@ -7,8 +7,8 @@ import {
   mergeAssignmentsWithTemplate,
   updateLinkFieldType,
 } from "@/lib/visual-mapper/auto-suggest-fields";
-import type { LinkKind } from "@/lib/migration/link-field";
-import { ensureLinkFieldStoredValue, formatLinkPreview, isLinkField, parseLinkFieldValue } from "@/lib/migration/link-field";
+import type { LinkKind } from "@/lib/migration/fields/link-field";
+import { ensureLinkFieldStoredValue, formatLinkPreview, isLinkField, parseLinkFieldValue } from "@/lib/migration/fields/link-field";
 import { componentTemplateKey } from "@/lib/visual-mapper/template-key";
 import {
   buildDraftRenderingInfo,

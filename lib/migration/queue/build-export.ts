@@ -5,8 +5,8 @@ import {
 import {
   findRenderingProfile,
   pickNestedPlaceholderKeyPattern,
-} from "@/lib/migration/placeholder-registry";
-import { normalizeSitecoreItemPath } from "@/lib/migration/sitecore-path";
+} from "@/lib/migration/target/placeholder-registry";
+import { normalizeSitecoreItemPath } from "@/lib/migration/target/sitecore-path";
 import { buildSxaDatasourceParentPath } from "@/lib/sitecore/item-lookup";
 import { resolveNestedDynamicPresentationPlaceholder } from "@/lib/sitecore/rendering-parameters";
 import type { RenderingPlaceholderProfile } from "@/types/discovery";

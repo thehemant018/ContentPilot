@@ -3,7 +3,7 @@ import {
   childAllowsNestedPresentation,
   childAllowedInParentExposedPlaceholder,
   findRenderingProfile,
-} from "@/lib/migration/placeholder-registry";
+} from "@/lib/migration/target/placeholder-registry";
 import { renderingNamesSuggestParentChild } from "@/lib/ai-match/catalog-shape";
 import type {
   PlaceholderDefinition,

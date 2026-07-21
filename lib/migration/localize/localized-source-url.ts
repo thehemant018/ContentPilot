@@ -1,8 +1,8 @@
 import {
   matchesLanguageCode,
   normalizeLanguageCode,
-} from "@/lib/migration/language-mapping";
-import { extractLocaleFromUrl } from "@/lib/migration/locale-from-url";
+} from "@/lib/migration/language/language-mapping";
+import { extractLocaleFromUrl } from "@/lib/migration/language/locale-from-url";
 
 function localePathCandidates(language: string): string[] {
   const trimmed = language.trim();

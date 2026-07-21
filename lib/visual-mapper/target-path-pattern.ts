@@ -1,6 +1,6 @@
-import { sanitizePathSegment } from "@/lib/migration/build-export";
-import { extractLocaleFromUrl } from "@/lib/migration/locale-from-url";
-import { normalizeSitecoreItemPath } from "@/lib/migration/sitecore-path";
+import { sanitizePathSegment } from "@/lib/migration/queue/build-export";
+import { extractLocaleFromUrl } from "@/lib/migration/language/locale-from-url";
+import { normalizeSitecoreItemPath } from "@/lib/migration/target/sitecore-path";
 
 const PLACEHOLDER_PATTERN = /\{(slug|locale|path)\}/i;
 

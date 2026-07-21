@@ -1,4 +1,4 @@
-import { normalizeSourcePageUrl } from "@/lib/migration/sitecore-path";
+import { normalizeSourcePageUrl } from "@/lib/migration/target/sitecore-path";
 import type { BlockMatchResult } from "@/types/ai-match";
 import type { CrawledPage } from "@/types/crawl";
 

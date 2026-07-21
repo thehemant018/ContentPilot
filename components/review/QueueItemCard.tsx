@@ -3,12 +3,12 @@
 import {
   buildComponentExport,
   buildDatasourcePath,
-} from "@/lib/migration/build-export";
+} from "@/lib/migration/queue/build-export";
 import { getDiscoveryResult } from "@/lib/storage/workflow-data";
 import { isHttpImageFieldValue } from "@/lib/sitecore/media-upload";
 import { isSitecoreMediaPathValue } from "@/lib/sitecore/media-lookup";
 import { LinkFieldValueEditor } from "@/components/review/LinkFieldValueEditor";
-import { isLinkField } from "@/lib/migration/link-field";
+import { isLinkField } from "@/lib/migration/fields/link-field";
 import {
   reviewFieldInputClass,
   reviewFieldLabelClass,

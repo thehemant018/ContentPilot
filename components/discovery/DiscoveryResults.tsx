@@ -1,5 +1,5 @@
 import type { DiscoveryResult } from "@/types/discovery";
-import { formatSitecoreLanguageLabel } from "@/lib/migration/language-mapping";
+import { formatSitecoreLanguageLabel } from "@/lib/migration/language/language-mapping";
 
 interface DiscoveryResultsProps {
   result: DiscoveryResult;

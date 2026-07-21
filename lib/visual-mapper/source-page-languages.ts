@@ -1,5 +1,5 @@
 import { extractPageLanguages } from "@/lib/crawl/extract-languages";
-import { normalizeSourcePageUrl } from "@/lib/migration/sitecore-path";
+import { normalizeSourcePageUrl } from "@/lib/migration/target/sitecore-path";
 import { STORAGE_KEYS } from "@/lib/sitecore/constants";
 import type { SourcePageLanguage } from "@/types/language";
 

@@ -10,15 +10,15 @@ import {
   reviewSettingsPanelClass,
 } from "@/components/review/form-styles";
 import { DEFAULT_PRESENTATION_PLACEHOLDER } from "@/lib/migration/constants";
-import { isLinkField } from "@/lib/migration/link-field";
+import { isLinkField } from "@/lib/migration/fields/link-field";
 import {
   getFieldsForLanguage,
   isSameMigrationLanguage,
   resolvePrimarySourceLanguage,
-} from "@/lib/migration/queue-language-fields";
-import { resolveLocalizedSourceUrl } from "@/lib/migration/localized-source-url";
-import { buildPageLanguagePicker } from "@/lib/migration/page-language-picker";
-import { listPageRootPlaceholderKeys } from "@/lib/migration/placeholder-registry";
+} from "@/lib/migration/localize/queue-language-fields";
+import { resolveLocalizedSourceUrl } from "@/lib/migration/localize/localized-source-url";
+import { buildPageLanguagePicker } from "@/lib/migration/language/page-language-picker";
+import { listPageRootPlaceholderKeys } from "@/lib/migration/target/placeholder-registry";
 import { getCrawlResult, getDiscoveryResult } from "@/lib/storage/workflow-data";
 import { getVisualMapperSourceLanguageCodes } from "@/lib/visual-mapper/source-page-languages";
 import type { EditableFieldValue, MigrationQueueItem } from "@/types/migration-queue";

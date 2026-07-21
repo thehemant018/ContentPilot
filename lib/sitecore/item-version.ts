@@ -1,6 +1,6 @@
 import { DEFAULT_MIGRATION_LANGUAGE } from "@/lib/migration/constants";
-import { normalizeLanguageCode } from "@/lib/migration/language-mapping";
-import { normalizeSitecoreItemPath } from "@/lib/migration/sitecore-path";
+import { normalizeLanguageCode } from "@/lib/migration/language/language-mapping";
+import { normalizeSitecoreItemPath } from "@/lib/migration/target/sitecore-path";
 import {
   SitecoreGraphQLError,
   executeGraphQL,

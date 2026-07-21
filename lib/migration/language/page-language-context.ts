@@ -1,5 +1,5 @@
-import { normalizeSitecoreItemPath } from "@/lib/migration/sitecore-path";
-import { ensureSxaPageDataItem } from "@/lib/migration/sxa-page-structure";
+import { normalizeSitecoreItemPath } from "@/lib/migration/target/sitecore-path";
+import { ensureSxaPageDataItem } from "@/lib/migration/target/sxa-page-structure";
 import { buildSxaDatasourceParentPath } from "@/lib/sitecore/item-lookup";
 import {
   type EnsureItemLanguageVersionOptions,

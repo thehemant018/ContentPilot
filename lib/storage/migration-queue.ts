@@ -5,18 +5,18 @@ import {
 import {
   resolveDefaultPageLanguages,
   resolveMappedPageLanguage,
-} from "@/lib/migration/language-mapping";
+} from "@/lib/migration/language/language-mapping";
 import {
   linkQueueHierarchy,
   applyDiscoveryPlaceholderDefaults,
-} from "@/lib/migration/queue-hierarchy";
-import { resolveChildPlaceholderKey } from "@/lib/migration/placeholder-registry";
+} from "@/lib/migration/queue/queue-hierarchy";
+import { resolveChildPlaceholderKey } from "@/lib/migration/target/placeholder-registry";
 import {
   applyTargetPageChangeToQueueItem,
   normalizeQueueItemPaths,
-} from "@/lib/migration/queue-sync";
+} from "@/lib/migration/queue/queue-sync";
 import { DEFAULT_PRESENTATION_PLACEHOLDER } from "@/lib/migration/constants";
-import { normalizeSourcePageUrl } from "@/lib/migration/sitecore-path";
+import { normalizeSourcePageUrl } from "@/lib/migration/target/sitecore-path";
 import { STORAGE_KEYS } from "@/lib/sitecore/constants";
 import { getCrawlResult, getDiscoveryResult } from "@/lib/storage/workflow-data";
 import type { BlockMatchResult } from "@/types/ai-match";

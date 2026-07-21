@@ -1,5 +1,5 @@
-import { ensureLinkFieldStoredValue, isLinkField } from "@/lib/migration/link-field";
-import { enrichImageFieldAlts } from "@/lib/migration/image-metadata";
+import { ensureLinkFieldStoredValue, isLinkField } from "@/lib/migration/fields/link-field";
+import { enrichImageFieldAlts } from "@/lib/migration/fields/image-metadata";
 import {
   DEFAULT_MIGRATION_LANGUAGE,
   DEFAULT_PRESENTATION_PLACEHOLDER,

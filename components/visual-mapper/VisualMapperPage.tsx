@@ -8,8 +8,8 @@ import {
   visualMapperInputClass,
 } from "@/components/visual-mapper/form-styles";
 import { sitecoreApiFetch } from "@/lib/sitecore/api-client";
-import { validateTargetPages } from "@/lib/migration/validate-target-pages-client";
-import { buildPageLanguagePicker } from "@/lib/migration/page-language-picker";
+import { validateTargetPages } from "@/lib/migration/target/validate-target-pages-client";
+import { buildPageLanguagePicker } from "@/lib/migration/language/page-language-picker";
 import { getDiscoveryResult } from "@/lib/storage/workflow-data";
 import {
   getStoredSession,
@@ -33,12 +33,12 @@ import {
   returnToMapModePhase,
 } from "@/lib/workflow/progress";
 import { saveMigrationMode } from "@/lib/workflow/migration-mode";
-import { summarizePushResult } from "@/lib/migration/push-feedback";
+import { summarizePushResult } from "@/lib/migration/push/push-feedback";
 import {
   applyPushResultToPageProgress,
   ensureTargetPagesWithProgress,
   markPagesAsPushing,
-} from "@/lib/migration/ensure-target-page-client";
+} from "@/lib/migration/target/ensure-target-page-client";
 import {
   initialPageProgressItems,
   type TargetPageProgressItem,

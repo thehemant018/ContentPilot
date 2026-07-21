@@ -1,24 +1,24 @@
 import { extractBlocksFromHtml } from "@/lib/crawl/extract-blocks";
 import { fetchPageHtml } from "@/lib/crawl/fetch-html";
 import { DEFAULT_MIGRATION_LANGUAGE } from "@/lib/migration/constants";
-import { enrichImageFieldAlts } from "@/lib/migration/image-metadata";
+import { enrichImageFieldAlts } from "@/lib/migration/fields/image-metadata";
 import {
   ensureLinkFieldStoredValue,
   isLinkField,
-} from "@/lib/migration/link-field";
+} from "@/lib/migration/fields/link-field";
 import {
   matchesLanguageCode,
   normalizeLanguageCode,
-} from "@/lib/migration/language-mapping";
+} from "@/lib/migration/language/language-mapping";
 import {
   localizeFieldsFromSelectors,
   queueItemUsesVisualMapperSelectors,
-} from "@/lib/migration/localize-visual-mapper-fields";
-import { resolveLocalizedSourceUrl } from "@/lib/migration/localized-source-url";
+} from "@/lib/migration/localize/localize-visual-mapper-fields";
+import { resolveLocalizedSourceUrl } from "@/lib/migration/localize/localized-source-url";
 import {
   getFieldsForLanguage,
   resolvePrimarySourceLanguage,
-} from "@/lib/migration/queue-language-fields";
+} from "@/lib/migration/localize/queue-language-fields";
 import type { ContentBlock, CrawledPage, CrawlLink } from "@/types/crawl";
 import type {
   EditableFieldValue,
@@ -28,7 +28,7 @@ import type {
 export {
   getFieldsForLanguage,
   resolvePrimarySourceLanguage,
-} from "@/lib/migration/queue-language-fields";
+} from "@/lib/migration/localize/queue-language-fields";
 
 
 function extractVideoEmbedUrl(htmlSnippet: string): string | undefined {

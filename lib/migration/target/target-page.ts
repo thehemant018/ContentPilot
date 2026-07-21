@@ -3,12 +3,12 @@ import {
   TARGET_PAGE_ENSURE_CONCURRENCY,
 } from "@/lib/migration/concurrency";
 import { DEFAULT_MIGRATION_LANGUAGE } from "@/lib/migration/constants";
-import { normalizeSitecoreItemPath } from "@/lib/migration/sitecore-path";
+import { normalizeSitecoreItemPath } from "@/lib/migration/target/sitecore-path";
 import {
   ensureSxaPageDataItem,
   resolveSxaPageDataTemplateId,
   DEFAULT_SXA_PAGE_DATA_TEMPLATE_PATH,
-} from "@/lib/migration/sxa-page-structure";
+} from "@/lib/migration/target/sxa-page-structure";
 import {
   getSitecoreItemByPathInLanguage,
   requireItemLanguageVersionBeforeWrite,

@@ -2,7 +2,7 @@ import {
   buildMediaCandidateStems,
   resolveMediaDisplayName,
   resolveMediaItemStem,
-} from "@/lib/migration/image-metadata";
+} from "@/lib/migration/fields/image-metadata";
 import {
   findExistingMediaItem,
   isSitecoreImageFieldValue,

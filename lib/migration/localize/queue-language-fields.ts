@@ -1,7 +1,7 @@
 import {
   matchesLanguageCode,
   normalizeLanguageCode,
-} from "@/lib/migration/language-mapping";
+} from "@/lib/migration/language/language-mapping";
 import { DEFAULT_MIGRATION_LANGUAGE } from "@/lib/migration/constants";
 import type {
   EditableFieldValue,

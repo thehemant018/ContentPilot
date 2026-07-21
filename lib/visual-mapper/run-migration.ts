@@ -1,9 +1,9 @@
 import {
   resolveDefaultPageLanguages,
   resolveMappedPageLanguage,
-} from "@/lib/migration/language-mapping";
+} from "@/lib/migration/language/language-mapping";
 import { queueItemFromMatch, queueItemKey } from "@/lib/migration-queue/from-match";
-import { prepareQueueForMigration } from "@/lib/migration/queue-sync";
+import { prepareQueueForMigration } from "@/lib/migration/queue/queue-sync";
 import { prepareVisualMapperMigration } from "@/lib/visual-mapper/migrate";
 import { inferVisualMapperParentBlockIds } from "@/lib/visual-mapper/queue-hierarchy";
 import {
