@@ -18,6 +18,9 @@ export async function sitecoreApiFetch(
   const headers = new Headers(options.headers);
   headers.set("Authorization", `Bearer ${session.accessToken}`);
   headers.set("X-Sitecore-Instance-Url", session.instanceUrl);
+  if (session.itemOwner?.trim()) {
+    headers.set("X-Sitecore-Item-Owner", session.itemOwner.trim());
+  }
 
   if (options.body && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");

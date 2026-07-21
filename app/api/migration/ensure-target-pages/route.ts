@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { ensureTargetPagesExist } from "@/lib/migration/target/target-page";
+import { runWithSitecoreItemOwner } from "@/lib/sitecore/item-owner";
 import {
   getAuthFromRequest,
   unauthorizedResponse,
@@ -27,15 +28,12 @@ export async function POST(request: Request) {
       );
     }
 
-    const result = await ensureTargetPagesExist(
-      auth.instanceUrl,
-      auth.accessToken,
-      paths,
-      {
+    const result = await runWithSitecoreItemOwner(auth.itemOwner, () =>
+      ensureTargetPagesExist(auth.instanceUrl, auth.accessToken, paths, {
         language: body.language?.trim() || "en",
         pageTemplatePath: body.pageTemplatePath,
         sxaPageDataTemplatePath: body.sxaPageDataTemplatePath,
-      },
+      }),
     );
 
     const failed = result.results.filter((entry) => entry.error);

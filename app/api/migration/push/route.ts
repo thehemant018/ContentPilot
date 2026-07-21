@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { pushQueueToSitecore } from "@/lib/migration/push/push-to-sitecore";
+import { runWithSitecoreItemOwner } from "@/lib/sitecore/item-owner";
 import {
   getAuthFromRequest,
   unauthorizedResponse,
@@ -42,19 +43,17 @@ export async function POST(request: Request) {
       );
     }
 
-    const result = await pushQueueToSitecore(
-      auth.instanceUrl,
-      auth.accessToken,
-      {
+    const result = await runWithSitecoreItemOwner(auth.itemOwner, () =>
+      pushQueueToSitecore(auth.instanceUrl, auth.accessToken, {
         mediaLibraryPath: body.mediaLibraryPath ?? "",
-        queue: body.queue,
+        queue: body.queue!,
         createMissingPages: body.createMissingPages ?? false,
         pageTemplatePath: body.pageTemplatePath,
         sxaPageDataTemplatePath: body.sxaPageDataTemplatePath,
         placeholders: body.placeholders,
         renderingProfiles: body.renderingProfiles,
         sourcePages: body.sourcePages,
-      },
+      }),
     );
 
     return NextResponse.json<MigrationPushResult>(result, {

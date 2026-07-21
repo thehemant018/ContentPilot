@@ -2,6 +2,8 @@ export interface SitecoreConnectionInput {
   instanceUrl: string;
   clientId: string;
   clientSecret: string;
+  /** Optional Sitecore username to use as item Owner after connect. */
+  itemOwner?: string;
 }
 
 export interface SitecoreTokenResponse {
@@ -18,6 +20,8 @@ export interface SitecoreConnectionResult {
   expiresIn?: number;
   instanceUrl?: string;
   contentApiVerified?: boolean;
+  itemOwnerVerified?: boolean;
+  itemOwner?: string;
 }
 
 export interface StoredSitecoreSession {
@@ -25,4 +29,6 @@ export interface StoredSitecoreSession {
   expiresAt: number;
   instanceUrl: string;
   connectedAt: string;
+  /** Sitecore username for item Security Owner (e.g. sitecore\user@company.com). */
+  itemOwner?: string;
 }
