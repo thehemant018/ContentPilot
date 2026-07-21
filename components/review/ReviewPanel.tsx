@@ -25,8 +25,11 @@ import { getVisualMapperSourceLanguageCodes } from "@/lib/visual-mapper/source-p
 import { isVisualMapperMode } from "@/lib/workflow/migration-mode";
 import {
   advanceToWorkflowPhase,
+  getFurthestPhaseIndex,
   isAiMatchPhaseComplete,
+  isMapModePhaseComplete,
   markReviewPhaseComplete,
+  resetWorkflowToMapPhase,
   setFurthestPhaseIndex,
   subscribeWorkflowProgress,
 } from "@/lib/workflow/progress";
@@ -36,19 +39,26 @@ import type { MigrationQueueItem } from "@/types/migration-queue";
 export function ReviewPanel({ embedded = false }: { embedded?: boolean }) {
   const [queue, setQueue] = useState<MigrationQueueItem[]>([]);
   const [prerequisitesMet, setPrerequisitesMet] = useState(false);
+  const [queueCleared, setQueueCleared] = useState(false);
   const [feedback, setFeedback] = useState<{
     type: "success" | "error";
     message: string;
   } | null>(null);
 
   const refreshQueue = useCallback(() => {
-    setQueue(getMigrationQueue());
+    const next = getMigrationQueue();
+    setQueue(next);
+    if (next.length > 0) {
+      setQueueCleared(false);
+    }
   }, []);
 
   const refreshPrerequisites = useCallback(() => {
-    setPrerequisitesMet(
-      isAiMatchPhaseComplete() && Boolean(getAiMatchResult()),
-    );
+    const aiReady =
+      isAiMatchPhaseComplete() && Boolean(getAiMatchResult());
+    const visualMapperReady =
+      isVisualMapperMode() && isMapModePhaseComplete();
+    setPrerequisitesMet(aiReady || visualMapperReady);
   }, []);
 
   useEffect(() => {
@@ -119,8 +129,16 @@ export function ReviewPanel({ embedded = false }: { embedded?: boolean }) {
 
   function handleClearQueue(): void {
     saveMigrationQueue([]);
+    setQueueCleared(true);
     refreshQueue();
-    setFeedback({ type: "success", message: "Queue cleared." });
+    setFeedback({
+      type: "success",
+      message: "Queue cleared. You can return to Map to start again.",
+    });
+  }
+
+  function handleReturnToMap(): void {
+    resetWorkflowToMapPhase();
   }
 
   function handleContinueToMigrate(): void {
@@ -171,8 +189,14 @@ export function ReviewPanel({ embedded = false }: { embedded?: boolean }) {
     return Array.from(groups.entries()).sort(([a], [b]) => a.localeCompare(b));
   }, [queue]);
   const multiPage = queueBySourcePage.length > 1;
+  const reviewPhaseIndex = WORKFLOW_PHASES.findIndex(
+    (phase) => phase.id === "review",
+  );
+  const hasReachedReview = getFurthestPhaseIndex() >= reviewPhaseIndex;
+  const showClearedQueueState =
+    queue.length === 0 && (queueCleared || hasReachedReview || prerequisitesMet);
 
-  if (!prerequisitesMet && queue.length === 0) {
+  if (!showClearedQueueState && !prerequisitesMet && queue.length === 0) {
     return (
       <div
         className={
@@ -182,12 +206,19 @@ export function ReviewPanel({ embedded = false }: { embedded?: boolean }) {
         }
       >
         <h3 className="text-lg font-semibold text-amber-900">
-          Complete AI Match first
+          Complete mapping first
         </h3>
         <p className="mt-2 text-sm text-amber-800">
-          Run AI matching and add components to the queue. Queued items appear
-          here for review and editing before push.
+          Finish Map (Crawl + AI Match or Visual Mapper) and add components to
+          the queue. Queued items appear here for review before push.
         </p>
+        <button
+          type="button"
+          onClick={handleReturnToMap}
+          className="mt-4 inline-flex items-center justify-center rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-sky-700"
+        >
+          Go to Map
+        </button>
       </div>
     );
   }
@@ -290,12 +321,22 @@ export function ReviewPanel({ embedded = false }: { embedded?: boolean }) {
       )}
 
       {queue.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-zinc-300 bg-zinc-50 p-8 text-center">
-          <p className="text-sm font-medium text-zinc-800">Queue is empty</p>
-          <p className="mt-2 text-sm text-zinc-600">
-            Go to AI Match and click &quot;Add to queue&quot; on components you
-            want to migrate.
+        <div className="rounded-xl border border-dashed border-sky-200 bg-sky-50 p-8 text-center">
+          <p className="text-sm font-medium text-sky-950">
+            {queueCleared ? "Queue cleared" : "Queue is empty"}
           </p>
+          <p className="mt-2 text-sm text-sky-800">
+            {queueCleared
+              ? "Your Review queue was cleared. Return to Map to choose Crawl + AI Match or Visual Mapper and add components again."
+              : "Return to Map to choose a mapping approach, then add components to the queue."}
+          </p>
+          <button
+            type="button"
+            onClick={handleReturnToMap}
+            className="mt-4 inline-flex items-center justify-center rounded-lg bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-sky-700"
+          >
+            Return to Map
+          </button>
         </div>
       ) : (
         <div className="space-y-6">

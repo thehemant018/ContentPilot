@@ -312,6 +312,36 @@ export function clearDownstreamOfDiscovery(): void {
   window.dispatchEvent(new Event(WORKFLOW_PROGRESS_EVENT));
 }
 
+/**
+ * Return to Map and clear Crawl → Migrate progress/data.
+ * Auth + Discovery stay; later tabs become locked until Map is completed again.
+ */
+export function resetWorkflowToMapPhase(): void {
+  clearDownstreamOfDiscovery();
+
+  const mapIndex = getPhaseIndex("map-mode");
+  if (mapIndex >= 0) {
+    setWorkflowPhaseIndex(mapIndex);
+  }
+
+  window.dispatchEvent(new Event(CONTENT_MIGRATION_RESET_EVENT));
+
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  if (window.location.pathname !== "/") {
+    window.location.href = "/#map-mode";
+    return;
+  }
+
+  window.location.hash = "map-mode";
+  document.getElementById("workflow")?.scrollIntoView({
+    behavior: "smooth",
+    block: "start",
+  });
+}
+
 export function requestReopenDiscoveryPhase(): void {
   if (!canReturnToDiscoveryPhase()) {
     return;
@@ -397,18 +427,7 @@ export function returnToMapModePhase(): void {
     return;
   }
 
-  clearQueueOnMapNavigation();
-
-  if (window.location.pathname !== "/") {
-    window.location.href = "/#map-mode";
-    return;
-  }
-
-  window.location.hash = "map-mode";
-  document.getElementById("workflow")?.scrollIntoView({
-    behavior: "smooth",
-    block: "start",
-  });
+  resetWorkflowToMapPhase();
 }
 
 /** Clears Review queue whenever the user navigates to Map from any later phase. */
