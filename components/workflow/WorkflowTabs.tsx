@@ -27,6 +27,7 @@ import {
   getMigrationCycleId,
   isAuthPhaseComplete,
   isPhaseComplete,
+  resetWorkflowToMapPhase,
   setFurthestPhaseIndex,
   subscribeWorkflowProgress,
 } from "@/lib/workflow/progress";
@@ -70,6 +71,15 @@ export function WorkflowTabs() {
       }
 
       if (tabId === "map-mode") {
+        const mapIndex = getPhaseIndex("map-mode");
+        // Coming back from a later phase — clear Crawl → Migrate progress.
+        if (furthest > mapIndex) {
+          resetWorkflowToMapPhase();
+          setFurthestIndex(getFurthestPhaseIndex());
+          setMigrationCycleId(getMigrationCycleId());
+          setActiveTab("map-mode");
+          return;
+        }
         clearQueueOnMapNavigation();
       }
 
